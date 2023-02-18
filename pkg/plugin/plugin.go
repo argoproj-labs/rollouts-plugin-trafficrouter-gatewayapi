@@ -18,7 +18,6 @@ import (
 // Type holds this controller type
 const Type = "GatewayAPI"
 
-const httpRoutes = "httproutes"
 const GatewayAPIUpdateError = "GatewayAPIUpdateError"
 
 type RpcPlugin struct {
@@ -32,7 +31,7 @@ type GatewayAPITrafficRouting struct {
 	HTTPRoute string `json:"httpRoute" protobuf:"bytes,1,name=httpRoute"`
 }
 
-func (r *RpcPlugin) NewTrafficRouterPlugin() pluginTypes.RpcError {
+func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 	kubeConfig, err := utils.GetKubeConfig()
 	if err != nil {
 		return pluginTypes.RpcError{
