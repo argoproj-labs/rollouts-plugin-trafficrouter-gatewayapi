@@ -1,9 +1,10 @@
 package main
 
 import (
+	plugin "github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg"
 	"strings"
 
-	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/plugin"
+	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	goPlugin "github.com/hashicorp/go-plugin"
 	log "github.com/sirupsen/logrus"
 )
