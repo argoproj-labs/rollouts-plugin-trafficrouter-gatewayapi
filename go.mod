@@ -1,4 +1,4 @@
-module github.com/argoproj-labs/rollouts-trafficrouter-gatewayapi-plugin
+module github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin
 
 go 1.19
 

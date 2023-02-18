@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/argoproj-labs/rollouts-trafficrouter-gatewayapi-plugin/pkg/plugin"
+	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/plugin"
 	goPlugin "github.com/hashicorp/go-plugin"
 	log "github.com/sirupsen/logrus"
 )
