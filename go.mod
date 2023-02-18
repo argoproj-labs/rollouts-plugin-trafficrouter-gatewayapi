@@ -2,8 +2,10 @@ module github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin
 
 go 1.19
 
+replace github.com/argoproj/argo-rollouts => github.com/zachaller/argo-rollouts v1.2.1-0.20230218144053-831c7b16cfc8
+
 require (
-	github.com/argoproj/argo-rollouts v1.4.0-rc1.0.20230217191422-e79d1cae3611
+	github.com/argoproj/argo-rollouts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/go-plugin v1.4.8
 	github.com/sirupsen/logrus v1.9.0
 	k8s.io/client-go v0.26.0
@@ -54,7 +56,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.26.0
+	k8s.io/api v0.26.0 // indirect
 	k8s.io/apimachinery v0.26.0
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
