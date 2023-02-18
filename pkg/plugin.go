@@ -11,8 +11,8 @@ import (
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes"
+	gatewayV1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
 // Type holds this controller type
@@ -23,18 +23,13 @@ const GatewayAPIUpdateError = "GatewayAPIUpdateError"
 
 type RpcPlugin struct {
 	LogCtx *logrus.Entry
-	Client ClientInterface
+	Client *gatewayApiClientset.Clientset
 }
 
 type GatewayAPITrafficRouting struct {
 	// HTTPRoute refers to the name of the HTTPRoute used to route traffic to the
 	// service
 	HTTPRoute string `json:"httpRoute" protobuf:"bytes,1,name=httpRoute"`
-}
-
-type ClientInterface interface {
-	Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error)
-	Update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error)
 }
 
 func (r *RpcPlugin) NewTrafficRouterPlugin() pluginTypes.RpcError {
@@ -44,7 +39,12 @@ func (r *RpcPlugin) NewTrafficRouterPlugin() pluginTypes.RpcError {
 			ErrorString: err.Error(),
 		}
 	}
-	clientset, err := kubernetes.NewForConfig(kubeConfig)
+	r.Client, err = gatewayApiClientset.NewForConfig(kubeConfig)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
 	return pluginTypes.RpcError{}
 }
 
@@ -55,14 +55,18 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
 	ctx := context.TODO()
 	gatewayAPIConfig := GatewayAPITrafficRouting{}
-	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugin["gatewayAPI"], &gatewayAPIConfig)
+	// TODO: Remove this line when Zach will push the changes in argo-rollouts
+	trafficRouting := (interface{}(rollout.Spec.Strategy.Canary.TrafficRouting)).(struct{ Plugin map[string]json.RawMessage })
+	err := json.Unmarshal(trafficRouting.Plugin["gatewayAPI"], &gatewayAPIConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
+	gatewayV1beta1 := r.Client.GatewayV1beta1()
 	httpRouteName := gatewayAPIConfig.HTTPRoute
-	httpRoute, err := r.Client.Get(ctx, httpRouteName, metav1.GetOptions{})
+	httpRouteClientset := gatewayV1beta1.HTTPRoutes(metav1.NamespaceAll)
+	httpRoute, err := httpRouteClientset.Get(ctx, httpRouteName, metav1.GetOptions{})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -70,17 +74,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	rules, isFound, err := unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	if !isFound {
-		return pluginTypes.RpcError{
-			ErrorString: errors.New("spec.rules field was not found in httpRoute").Error(),
-		}
-	}
+	rules := httpRoute.Spec.Rules
 	backendRefs, err := getBackendRefList(rules)
 	if err != nil {
 		return pluginTypes.RpcError{
@@ -93,62 +87,38 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 			ErrorString: err.Error(),
 		}
 	}
-	err = unstructured.SetNestedField(canaryBackendRef, int64(desiredWeight), "weight")
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+	canaryBackendRef.Weight = &desiredWeight
 	stableBackendRef, err := getBackendRef(stableServiceName, backendRefs)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	err = unstructured.SetNestedField(stableBackendRef, int64(100-desiredWeight), "weight")
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+	restWeight := 100 - desiredWeight
+	stableBackendRef.Weight = &restWeight
 	rules, err = mergeBackendRefs(rules, backendRefs)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	err = unstructured.SetNestedSlice(httpRoute.Object, rules, "spec", "rules")
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	_, err = r.Client.Update(ctx, httpRoute, metav1.UpdateOptions{})
+	httpRoute.Spec.Rules = rules
+	_, err = httpRouteClientset.Update(ctx, httpRoute, metav1.UpdateOptions{})
 	if err != nil {
 		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
-		r.sendWarningEvent(GatewayAPIUpdateError, msg)
+		r.LogCtx.Error(msg)
 	}
 	return pluginTypes.RpcError{
 		ErrorString: err.Error(),
 	}
 }
 
-func getBackendRef(serviceName string, backendRefs []interface{}) (map[string]interface{}, error) {
-	var selectedService map[string]interface{}
+func getBackendRef(serviceName string, backendRefs []gatewayV1beta1.HTTPBackendRef) (*gatewayV1beta1.HTTPBackendRef, error) {
+	var selectedService *gatewayV1beta1.HTTPBackendRef
 	for _, service := range backendRefs {
-		typedService, ok := service.(map[string]interface{})
-		if !ok {
-			return nil, errors.New("Failed type assertion for gateway api service")
-		}
-		nameOfCurrentService, isFound, err := unstructured.NestedString(typedService, "name")
-		if err != nil {
-			return nil, err
-		}
-		if !isFound {
-			continue
-		}
+		nameOfCurrentService := string(service.Name)
 		if nameOfCurrentService == serviceName {
-			selectedService = typedService
+			selectedService = &service
 			break
 		}
 	}
@@ -158,49 +128,23 @@ func getBackendRef(serviceName string, backendRefs []interface{}) (map[string]in
 	return selectedService, nil
 }
 
-func getBackendRefList(rules []interface{}) ([]interface{}, error) {
+func getBackendRefList(rules []gatewayV1beta1.HTTPRouteRule) ([]gatewayV1beta1.HTTPBackendRef, error) {
 	for _, rule := range rules {
-		typedRule, ok := rule.(map[string]interface{})
-		if !ok {
-			return nil, errors.New("Failed type assertion setting rule for http route")
-		}
-		backendRefs, isFound, err := unstructured.NestedSlice(typedRule, "backendRefs")
-		if err != nil {
-			return nil, err
-		}
-		if !isFound {
-			continue
-		}
+		backendRefs := rule.BackendRefs
 		return backendRefs, nil
 	}
 	return nil, errors.New("backendRefs was not found in httpRoute")
 }
 
-func mergeBackendRefs(rules, backendRefs []interface{}) ([]interface{}, error) {
+func mergeBackendRefs(rules []gatewayV1beta1.HTTPRouteRule, backendRefs []gatewayV1beta1.HTTPBackendRef) ([]gatewayV1beta1.HTTPRouteRule, error) {
 	for _, rule := range rules {
-		typedRule, ok := rule.(map[string]interface{})
-		if !ok {
-			return nil, errors.New("Failed type assertion setting rule for http route")
-		}
-		isFound, err := hasBackendRefs(typedRule)
-		if err != nil {
-			return nil, err
-		}
-		if !isFound {
+		if rule.BackendRefs == nil {
 			continue
 		}
-		err = unstructured.SetNestedSlice(typedRule, backendRefs, "backendRefs")
-		if err != nil {
-			return nil, err
-		}
+		rule.BackendRefs = backendRefs
 		return rules, nil
 	}
 	return rules, errors.New("backendRefs was not found and merged in rules")
-}
-
-func hasBackendRefs(typedRule map[string]interface{}) (bool, error) {
-	_, isFound, err := unstructured.NestedSlice(typedRule, "backendRefs")
-	return isFound, err
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
