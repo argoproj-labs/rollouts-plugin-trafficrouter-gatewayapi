@@ -8,6 +8,7 @@ import (
 
 	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+	"github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -153,7 +154,8 @@ func (r *RpcPlugin) SetMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute *v1
 }
 
 func (r *RpcPlugin) VerifyWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) (*bool, pluginTypes.RpcError) {
-	return nil, pluginTypes.RpcError{}
+	verified := true
+	return &verified, pluginTypes.RpcError{ErrorString: plugin.ErrNotImplemented}
 }
 
 func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.RpcError {
