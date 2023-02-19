@@ -30,6 +30,7 @@ type GatewayAPITrafficRouting struct {
 	// HTTPRoute refers to the name of the HTTPRoute used to route traffic to the
 	// service
 	HTTPRoute string `json:"httpRoute" protobuf:"bytes,1,name=httpRoute"`
+	Namespace string `json:"namespace" protobuf:"bytes,2,name=namespace"`
 }
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
@@ -55,16 +56,15 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
 	ctx := context.TODO()
 	gatewayAPIConfig := GatewayAPITrafficRouting{}
-	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugin["gatewayAPI"], &gatewayAPIConfig)
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugin["argoproj-labs/gatewayAPI"], &gatewayAPIConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	gatewayV1beta1 := r.Client.GatewayV1beta1()
-	httpRouteName := gatewayAPIConfig.HTTPRoute
-	httpRouteClientset := gatewayV1beta1.HTTPRoutes(metav1.NamespaceAll)
-	httpRoute, err := httpRouteClientset.Get(ctx, httpRouteName, metav1.GetOptions{})
+	httpRouteClientset := gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
+	httpRoute, err := httpRouteClientset.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
