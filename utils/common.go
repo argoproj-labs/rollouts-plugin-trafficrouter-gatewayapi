@@ -1,24 +1,20 @@
 package utils
 
 import (
-	"errors"
-	"fmt"
-	"path/filepath"
-
+	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func GetKubeConfig() (*rest.Config, error) {
-	config, err := rest.InClusterConfig()
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	// if you want to change the loading rules (which files in which order), you can do so here
+	configOverrides := &clientcmd.ConfigOverrides{}
+	// if you want to change override values or bind them to flags, there are methods to help you
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	config, err := kubeConfig.ClientConfig()
 	if err != nil {
-		kubeConfig := filepath.Join("~", ".kube", "config")
-		config, err = clientcmd.BuildConfigFromFlags("", kubeConfig)
-		if err != nil {
-			errorString := fmt.Sprintf("The kubeconfig cannot be loaded: %v\n", err)
-			fmt.Println(errorString)
-			return nil, errors.New(errorString)
-		}
+		return nil, pluginTypes.RpcError{ErrorString: err.Error()}
 	}
 	return config, nil
 }
