@@ -54,9 +54,7 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
 	ctx := context.TODO()
 	gatewayAPIConfig := GatewayAPITrafficRouting{}
-	// TODO: Remove this line when Zach will push the changes in argo-rollouts
-	trafficRouting := (interface{}(rollout.Spec.Strategy.Canary.TrafficRouting)).(struct{ Plugin map[string]json.RawMessage })
-	err := json.Unmarshal(trafficRouting.Plugin["gatewayAPI"], &gatewayAPIConfig)
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugin["gatewayAPI"], &gatewayAPIConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
