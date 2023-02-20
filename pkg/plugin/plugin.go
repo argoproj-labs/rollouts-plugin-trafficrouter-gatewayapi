@@ -94,29 +94,21 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 	restWeight := 100 - desiredWeight
 	stableBackendRef.Weight = &restWeight
-	rules, err = mergeBackendRefs(rules, backendRefs)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	httpRoute.Spec.Rules = rules
 	_, err = httpRouteClientset.Update(ctx, httpRoute, metav1.UpdateOptions{})
 	if err != nil {
 		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
 	}
-	return pluginTypes.RpcError{
-		ErrorString: err.Error(),
-	}
+	return pluginTypes.RpcError{}
 }
 
 func getBackendRef(serviceName string, backendRefs []gatewayV1beta1.HTTPBackendRef) (*gatewayV1beta1.HTTPBackendRef, error) {
 	var selectedService *gatewayV1beta1.HTTPBackendRef
-	for _, service := range backendRefs {
+	for i := 0; i < len(backendRefs); i++ {
+		service := &backendRefs[i]
 		nameOfCurrentService := string(service.Name)
 		if nameOfCurrentService == serviceName {
-			selectedService = &service
+			selectedService = service
 			break
 		}
 	}
@@ -128,21 +120,13 @@ func getBackendRef(serviceName string, backendRefs []gatewayV1beta1.HTTPBackendR
 
 func getBackendRefList(rules []gatewayV1beta1.HTTPRouteRule) ([]gatewayV1beta1.HTTPBackendRef, error) {
 	for _, rule := range rules {
+		if rule.BackendRefs == nil {
+			continue
+		}
 		backendRefs := rule.BackendRefs
 		return backendRefs, nil
 	}
 	return nil, errors.New("backendRefs was not found in httpRoute")
-}
-
-func mergeBackendRefs(rules []gatewayV1beta1.HTTPRouteRule, backendRefs []gatewayV1beta1.HTTPBackendRef) ([]gatewayV1beta1.HTTPRouteRule, error) {
-	for _, rule := range rules {
-		if rule.BackendRefs == nil {
-			continue
-		}
-		rule.BackendRefs = backendRefs
-		return rules, nil
-	}
-	return rules, errors.New("backendRefs was not found and merged in rules")
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
