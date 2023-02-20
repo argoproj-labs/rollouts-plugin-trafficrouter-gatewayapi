@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"strings"
+
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -17,4 +20,31 @@ func GetKubeConfig() (*rest.Config, error) {
 		return nil, pluginTypes.RpcError{ErrorString: err.Error()}
 	}
 	return config, nil
+}
+
+func SetLogLevel(logLevel string) {
+	level, err := log.ParseLevel(logLevel)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetLevel(level)
+}
+
+func CreateFormatter(logFormat string) log.Formatter {
+	var formatType log.Formatter
+	switch strings.ToLower(logFormat) {
+	case "json":
+		formatType = &log.JSONFormatter{}
+	case "text":
+		formatType = &log.TextFormatter{
+			FullTimestamp: true,
+		}
+	default:
+		log.Infof("Unknown format: %s. Using text logformat", logFormat)
+		formatType = &log.TextFormatter{
+			FullTimestamp: true,
+		}
+	}
+
+	return formatType
 }

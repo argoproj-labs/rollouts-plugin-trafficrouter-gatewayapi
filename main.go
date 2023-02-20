@@ -1,9 +1,8 @@
 package main
 
 import (
-	"strings"
-
-	plugin "github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/plugin"
+	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/plugin"
+	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/utils"
 
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	goPlugin "github.com/hashicorp/go-plugin"
@@ -23,8 +22,8 @@ var handshakeConfig = goPlugin.HandshakeConfig{
 func main() {
 	logCtx := log.WithFields(log.Fields{"plugin": "trafficrouter"})
 
-	setLogLevel("debug")
-	log.SetFormatter(createFormatter("text"))
+	utils.SetLogLevel("debug")
+	log.SetFormatter(utils.CreateFormatter("text"))
 
 	rpcPluginImp := &plugin.RpcPlugin{
 		LogCtx: logCtx,
@@ -40,31 +39,4 @@ func main() {
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
 	})
-}
-
-func createFormatter(logFormat string) log.Formatter {
-	var formatType log.Formatter
-	switch strings.ToLower(logFormat) {
-	case "json":
-		formatType = &log.JSONFormatter{}
-	case "text":
-		formatType = &log.TextFormatter{
-			FullTimestamp: true,
-		}
-	default:
-		log.Infof("Unknown format: %s. Using text logformat", logFormat)
-		formatType = &log.TextFormatter{
-			FullTimestamp: true,
-		}
-	}
-
-	return formatType
-}
-
-func setLogLevel(logLevel string) {
-	level, err := log.ParseLevel(logLevel)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.SetLevel(level)
 }

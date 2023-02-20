@@ -12,7 +12,7 @@ import (
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gatewayV1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
@@ -23,7 +23,12 @@ const GatewayAPIUpdateError = "GatewayAPIUpdateError"
 
 type RpcPlugin struct {
 	LogCtx *logrus.Entry
-	Client *gatewayApiClientset.Clientset
+	Client RpcPluginClient
+}
+
+type RpcPluginClient interface {
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1beta1.HTTPRoute, error)
+	Update(ctx context.Context, hTTPRoute *v1beta1.HTTPRoute, opts metav1.UpdateOptions) (*v1beta1.HTTPRoute, error)
 }
 
 type GatewayAPITrafficRouting struct {
@@ -33,19 +38,28 @@ type GatewayAPITrafficRouting struct {
 	Namespace string `json:"namespace" protobuf:"bytes,2,name=namespace"`
 }
 
-func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
+func (r *RpcPlugin) InitPlugin(rollout *v1alpha1.Rollout) pluginTypes.RpcError {
 	kubeConfig, err := utils.GetKubeConfig()
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	r.Client, err = gatewayApiClientset.NewForConfig(kubeConfig)
+	clientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
+	gatewayAPIConfig := GatewayAPITrafficRouting{}
+	err = json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugin["argoproj-labs/gatewayAPI"], &gatewayAPIConfig)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	gatewayV1beta1 := clientset.GatewayV1beta1()
+	r.Client = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	return pluginTypes.RpcError{}
 }
 
@@ -62,9 +76,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 			ErrorString: err.Error(),
 		}
 	}
-	gatewayV1beta1 := r.Client.GatewayV1beta1()
-	httpRouteClientset := gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
-	httpRoute, err := httpRouteClientset.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+	httpRoute, err := r.Client.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -94,7 +106,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 	restWeight := 100 - desiredWeight
 	stableBackendRef.Weight = &restWeight
-	_, err = httpRouteClientset.Update(ctx, httpRoute, metav1.UpdateOptions{})
+	_, err = r.Client.Update(ctx, httpRoute, metav1.UpdateOptions{})
 	if err != nil {
 		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
@@ -102,8 +114,8 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	return pluginTypes.RpcError{}
 }
 
-func getBackendRef(serviceName string, backendRefs []gatewayV1beta1.HTTPBackendRef) (*gatewayV1beta1.HTTPBackendRef, error) {
-	var selectedService *gatewayV1beta1.HTTPBackendRef
+func getBackendRef(serviceName string, backendRefs []v1beta1.HTTPBackendRef) (*v1beta1.HTTPBackendRef, error) {
+	var selectedService *v1beta1.HTTPBackendRef
 	for i := 0; i < len(backendRefs); i++ {
 		service := &backendRefs[i]
 		nameOfCurrentService := string(service.Name)
@@ -118,7 +130,7 @@ func getBackendRef(serviceName string, backendRefs []gatewayV1beta1.HTTPBackendR
 	return selectedService, nil
 }
 
-func getBackendRefList(rules []gatewayV1beta1.HTTPRouteRule) ([]gatewayV1beta1.HTTPBackendRef, error) {
+func getBackendRefList(rules []v1beta1.HTTPRouteRule) ([]v1beta1.HTTPBackendRef, error) {
 	for _, rule := range rules {
 		if rule.BackendRefs == nil {
 			continue
