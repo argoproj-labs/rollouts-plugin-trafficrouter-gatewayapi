@@ -8,6 +8,8 @@ require (
 	github.com/argoproj/argo-rollouts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/go-plugin v1.4.8
 	github.com/sirupsen/logrus v1.9.0
+	github.com/stretchr/testify v1.8.1
+	github.com/tj/assert v0.0.3
 	k8s.io/client-go v0.26.0
 	sigs.k8s.io/gateway-api v0.6.1
 )
@@ -52,6 +54,7 @@ require (
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/opsgenie/opsgenie-go-sdk-v2 v1.2.13 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect

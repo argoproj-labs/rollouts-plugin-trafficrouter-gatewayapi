@@ -23,10 +23,11 @@ const Type = "GatewayAPI"
 const GatewayAPIUpdateError = "GatewayAPIUpdateError"
 
 type RpcPlugin struct {
-	IsTest          bool
-	LogCtx          *logrus.Entry
-	Client          *gatewayApiClientset.Clientset
-	HttpRouteClient gatewayApiv1beta1.HTTPRouteInterface
+	IsTest               bool
+	LogCtx               *logrus.Entry
+	Client               *gatewayApiClientset.Clientset
+	UpdatedMockHttpRoute *v1beta1.HTTPRoute
+	HttpRouteClient      gatewayApiv1beta1.HTTPRouteInterface
 }
 
 type GatewayAPITrafficRouting struct {
@@ -70,7 +71,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		}
 	}
 	httpRouteClient := r.HttpRouteClient
-	if r.IsTest {
+	if !r.IsTest {
 		gatewayV1beta1 := r.Client.GatewayV1beta1()
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	}
@@ -104,7 +105,10 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 	restWeight := 100 - desiredWeight
 	stableBackendRef.Weight = &restWeight
-	_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+	updatedHttpRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+	if r.IsTest {
+		r.UpdatedMockHttpRoute = updatedHttpRoute
+	}
 	if err != nil {
 		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
 		r.LogCtx.Error(msg)

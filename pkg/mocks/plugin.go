@@ -5,10 +5,11 @@ import (
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-type FakeClient struct {
-	IsGetError    bool
-	IsUpdateError bool
-}
+const (
+	StableServiceName = "argo-rollouts-stable-service"
+	CanaryServiceName = "argo-rollouts-canary-service"
+	HttpRouteName     = "argo-rollouts-http-route"
+)
 
 var (
 	port         = v1beta1.PortNumber(80)
@@ -17,7 +18,8 @@ var (
 
 var HttpRouteObj = v1beta1.HTTPRoute{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: "argo-rollouts-http-route",
+		Name: HttpRouteName,
+		Namespace: "default",
 	},
 	Spec: v1beta1.HTTPRouteSpec{
 		CommonRouteSpec: v1beta1.CommonRouteSpec{
@@ -33,7 +35,7 @@ var HttpRouteObj = v1beta1.HTTPRoute{
 					{
 						BackendRef: v1beta1.BackendRef{
 							BackendObjectReference: v1beta1.BackendObjectReference{
-								Name: "argo-rollouts-stable-service",
+								Name: StableServiceName,
 								Port: &port,
 							},
 							Weight: &weight,
@@ -42,7 +44,7 @@ var HttpRouteObj = v1beta1.HTTPRoute{
 					{
 						BackendRef: v1beta1.BackendRef{
 							BackendObjectReference: v1beta1.BackendObjectReference{
-								Name: "argo-rollouts-canary-service",
+								Name: CanaryServiceName,
 								Port: &port,
 							},
 							Weight: &weight,
