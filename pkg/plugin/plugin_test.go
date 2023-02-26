@@ -7,8 +7,10 @@ import (
 
 	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/utils"
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
+	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/mocks"
 
 	log "github.com/sirupsen/logrus"
+	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
 
 	goPlugin "github.com/hashicorp/go-plugin"
 )
@@ -29,6 +31,8 @@ func TestRunSuccessfully(t *testing.T) {
 	defer cancel()
 	rpcPluginImp := &RpcPlugin{
 		LogCtx: logCtx,
+		IsTest: true,
+		HttpRouteClient: gwFake.NewSimpleClientset(&mocks.HttpRouteObj).GatewayV1beta1().HTTPRoutes("default"),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -88,10 +92,9 @@ func TestRunSuccessfully(t *testing.T) {
 		t.Fail()
 	}
 
-	pluginInstance := raw.(rolloutsPlugin.RpcTrafficRouterPlugin)
-
-	err = pluginInstance.Impl.InitPlugin()
-	if err != nil {
+	pluginInstance := raw.(*rolloutsPlugin.TrafficRouterPluginRPC)
+	err = pluginInstance.InitPlugin()
+	if err.Error() != "" {
 		t.Fail()
 	}
 

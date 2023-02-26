@@ -1,9 +1,6 @@
 package mocks
 
 import (
-	"context"
-	"errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -18,7 +15,7 @@ var (
 	weight int32 = 0
 )
 
-var httpRouteObj = v1beta1.HTTPRoute{
+var HttpRouteObj = v1beta1.HTTPRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "argo-rollouts-http-route",
 	},
@@ -55,18 +52,4 @@ var httpRouteObj = v1beta1.HTTPRoute{
 			},
 		},
 	},
-}
-
-func (f *FakeClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1beta1.HTTPRoute, error) {
-	if f.IsGetError {
-		return &httpRouteObj, errors.New("gateway API get error")
-	}
-	return &httpRouteObj, nil
-}
-
-func (f *FakeClient) Update(ctx context.Context, httpRoute *v1beta1.HTTPRoute, opts metav1.UpdateOptions) (*v1beta1.HTTPRoute, error) {
-	if f.IsUpdateError {
-		return httpRoute, errors.New("gateway API update error")
-	}
-	return httpRoute, nil
 }
