@@ -13,6 +13,7 @@ Gateway API is an open source project managed by the [SIG-NETWORK](https://githu
 5. Create canary and stable services
 6. Create argo-rollouts resources
 7. Create config map from where argo rollouts takes information where to search our binary plugin file for Gateway API
+8. Install binary of this plugin and put it in the location that you specified in config map
 
 We will go through all these steps together with an example Traefik
 
@@ -253,3 +254,22 @@ spec:
               memory: 32Mi
               cpu: 5m
 ```
+
+### Create config map
+
+You can specify any name inside *trafficRouterPlugins* you would like but it should be the same as in argo rollouts you specify under the key *plugins*.
+The value of location key also can be any path or url where your binary plugin file is located
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-rollouts-config # must be so name
+  namespace: argo-rollouts # must be in this namespace
+data:
+  trafficRouterPlugins: |-
+    - name: "argoproj-labs/gatewayAPI"
+      location: "file:///Users/test/go/src/github.com/argoproj-labs/rollouts-trafficrouter-gatewayapi-plugin/gatewayapi-plugin"
+```
+
+### Install binary of this plugin and put it in the location that you specified in config map
