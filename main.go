@@ -21,10 +21,8 @@ var handshakeConfig = goPlugin.HandshakeConfig{
 
 func main() {
 	logCtx := log.WithFields(log.Fields{"plugin": "trafficrouter"})
-
 	utils.SetLogLevel("debug")
 	log.SetFormatter(utils.CreateFormatter("text"))
-
 	rpcPluginImp := &plugin.RpcPlugin{
 		LogCtx: logCtx,
 	}
@@ -32,9 +30,7 @@ func main() {
 	var pluginMap = map[string]goPlugin.Plugin{
 		"RpcTrafficRouterPlugin": &rolloutsPlugin.RpcTrafficRouterPlugin{Impl: rpcPluginImp},
 	}
-
 	logCtx.Debug("message from plugin", "foo", "bar")
-
 	goPlugin.Serve(&goPlugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,

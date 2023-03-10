@@ -9,7 +9,7 @@ const (
 	StableServiceName = "argo-rollouts-stable-service"
 	CanaryServiceName = "argo-rollouts-canary-service"
 	HttpRouteName     = "argo-rollouts-http-route"
-	Namespace = "default"
+	Namespace         = "default"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 
 var HttpRouteObj = v1beta1.HTTPRoute{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: HttpRouteName,
+		Name:      HttpRouteName,
 		Namespace: Namespace,
 	},
 	Spec: v1beta1.HTTPRouteSpec{

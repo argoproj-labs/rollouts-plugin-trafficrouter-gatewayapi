@@ -135,7 +135,7 @@ func newRollout(stableSvc, canarySvc, httpRouteName string) *v1alpha1.Rollout {
 					StableService: stableSvc,
 					CanaryService: canarySvc,
 					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
-						Plugin: map[string]json.RawMessage{
+						Plugins: map[string]json.RawMessage{
 							"argoproj-labs/gatewayAPI": encodedGatewayAPIConfig,
 						},
 					},
