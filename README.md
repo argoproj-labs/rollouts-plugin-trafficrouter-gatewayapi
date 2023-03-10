@@ -19,6 +19,7 @@ We will go through all these steps together with an example Traefik
 
 ### Enable Gateway Provider and create Gateway entrypoint
 
+Before enabling Gateway Provider oyu also need to install traefik. How to install it you can find [here](https://doc.traefik.io/traefik/getting-started/install-traefik/)
 Every contoller has its own instruction how we need to enable Gateway API provider. I will follow to the instructions of [Traefik controller](https://doc.traefik.io/traefik/providers/kubernetes-gateway/)
 
 1. Register [Gateway API CRD](https://gateway-api.sigs.k8s.io/guides/#install-standard-channel)
