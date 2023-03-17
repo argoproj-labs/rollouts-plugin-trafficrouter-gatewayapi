@@ -32,6 +32,12 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
+      - name: Setup Git author information
+        run: |
+          set -ue
+          git config --global user.email "${GIT_EMAIL}"
+          git config --global user.name "${GIT_USERNAME}"
+
       - name: Preparing env variables
         run: |
           set -xue
@@ -87,6 +93,12 @@ jobs:
           cat ${RELEASE_NOTES}
           echo "=============END RELEASE NOTES=================="
           echo "RELEASE_NOTES=${RELEASE_NOTES}" >> $GITHUB_ENV
+
+      - name: Create the release tag
+        run: |
+          set -ue
+          echo "Creating release ${RELEASE_TAG}"
+          git tag ${RELEASE_TAG}
 
       - name: Create release
         run: |
