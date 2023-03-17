@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Whether to create release
-      DRY_RUN: false
+      IS_DRY_RUN: true
       # Whether a draft release should be created, instead of public one
-      DRAFT_RELEASE: false
+      IS_DRAFT_RELEASE: true
       # Name of the GitHub user for Git config
       GIT_USERNAME: PhilippPlotnikov
       # E-Mail of the GitHub user for Git config
@@ -33,7 +33,7 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      - name: Preparing for release creation
+      - name: Preparing env variables
         run: |
           set -xue
           # Target version must match major.minor.patch and optional -rcX suffix
@@ -41,7 +41,7 @@ jobs:
           # The release tag is the source tag, minus the release- prefix
           RELEASE_TAG="${SOURCE_TAG#*release-}"
           # Whether this is a pre-release (indicated by -rc suffix)
-          PRE_RELEASE=false
+          IS_PRE_RELEASE=false
           if echo "${RELEASE_TAG}" | egrep -- '-rc[0-9]+$'; then
             PRE_RELEASE=true
           fi
@@ -61,10 +61,20 @@ jobs:
           echo "TARGET_BRANCH=${TARGET_BRANCH}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
           echo "PRE_RELEASE=${PRE_RELEASE}" >> $GITHUB_ENV
+        
+      - name: Preparing release notes
+        run: |
+
 
       - name: Create release
         run: |
           make release
+
+      - name: Read release notes file
+        id: release-notes
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ${{ env.RELEASE_NOTES_PATH }}
 
       - name: Create GitHub release place
         uses: actions/create-release@v1
@@ -74,8 +84,8 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           release_name: ${{ env.RELEASE_TAG }}
-          draft: ${{ env.DRAFT_RELEASE }}
-          prerelease: ${{ env.PRE_RELEASE }}
+          draft: ${{ env.IS_DRAFT_RELEASE }}
+          prerelease: ${{ env.IS_PRE_RELEASE }}
           body: ${{ steps.release-notes.outputs.content }}
 
       - name: Upload gateway-api-plugin-linux-amd64 binary to release assets
@@ -87,7 +97,7 @@ jobs:
           asset_path: ./dist/gateway-api-plugin-linux-amd64
           asset_name: gateway-api-plugin-linux-amd64
           asset_content_type: application/octet-stream
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ env.IS_DRY_RUN != 'true' }}
 
       - name: Upload gateway-api-plugin-linux-arm64 binary to release assets
         uses: actions/upload-release-asset@v1
@@ -98,7 +108,7 @@ jobs:
           asset_path: ./dist/gateway-api-plugin-linux-arm64
           asset_name: gateway-api-plugin-linux-arm64
           asset_content_type: application/octet-stream
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ env.IS_DRY_RUN != 'true' }}
 
       - name: Upload gateway-api-plugin-darwin-amd64 binary to release assets
         uses: actions/upload-release-asset@v1
@@ -109,7 +119,7 @@ jobs:
           asset_path: ./dist/gateway-api-plugin-darwin-amd64
           asset_name: gateway-api-plugin-darwin-amd64
           asset_content_type: application/octet-stream
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ env.IS_DRY_RUN != 'true' }}
 
       - name: Upload gateway-api-plugin-darwin-arm64 binary to release assets
         uses: actions/upload-release-asset@v1
@@ -120,7 +130,7 @@ jobs:
           asset_path: ./dist/gateway-api-plugin-darwin-arm64
           asset_name: gateway-api-plugin-darwin-arm64
           asset_content_type: application/octet-stream
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ env.IS_DRY_RUN != 'true' }}
 
       - name: Upload gateway-api-plugin-windows-amd64 binary to release assets
         uses: actions/upload-release-asset@v1
@@ -131,5 +141,5 @@ jobs:
           asset_path: ./dist/gateway-api-plugin-windows-amd64.exe
           asset_name: gateway-api-plugin-windows-amd64.exe
           asset_content_type: application/octet-stream
-        if: ${{ env.DRY_RUN != 'true' }}
+        if: ${{ env.IS_DRY_RUN != 'true' }}
 
