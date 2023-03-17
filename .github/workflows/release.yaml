@@ -2,15 +2,16 @@ name: Create Gateway API plugin release
 on:
   push:
     tags:
-      - "release-v[0-9]+.[0-9]+.[0-9]+-?[a-zA-Z0-9]*"
+      - "release-v[0-9]+.[0-9]+.[0-9]+(-rc[a-zA-Z0-9]*)?"
+
+env:
+  GOLANG_VERSION: "1.18"
 
 jobs:
   release-creation:
     name: Automatic release creation triggered on ${{ github.ref }}
     runs-on: ubuntu-latest
     env:
-      # The name of the tag as supplied by the GitHub event
-      SOURCE_TAG: ${{ github.ref }}
       # Whether to create release
       DRY_RUN: false
       # Whether a draft release should be created, instead of public one
@@ -19,8 +20,53 @@ jobs:
       GIT_USERNAME: PhilippPlotnikov
       # E-Mail of the GitHub user for Git config
       GIT_EMAIL: philipp.plotnikov@codefresh.io
-    steps: 
-      - name: Create GitHub release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+      
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Preparing for release creation
+        run: |
+          set -xue
+          # Target version must match major.minor.patch and optional -rcX suffix
+          # where X must be a number.
+          # The release tag is the source tag, minus the release- prefix
+          RELEASE_TAG="${SOURCE_TAG#*release-}"
+          # Whether this is a pre-release (indicated by -rc suffix)
+          PRE_RELEASE=false
+          if echo "${RELEASE_TAG}" | egrep -- '-rc[0-9]+$'; then
+            PRE_RELEASE=true
+          fi
+          # We must not have a release trigger within the same release branch,
+          # because that means a release for this branch is already running.
+          if git tag -l | grep "release-v${TARGET_VERSION%\.[0-9]*}" | grep -v "release-v${TARGET_VERSION}"; then
+            echo "::error::Another release for branch ${TARGET_BRANCH} is currently in progress."
+            exit 1
+          fi
+          # Ensure that release do not yet exist
+          if git rev-parse ${RELEASE_TAG}; then
+            echo "::error::Release tag ${RELEASE_TAG} already exists in repository. Refusing to continue."
+            exit 1
+          fi
+          # Make the variables available in follow-up steps
+          echo "TARGET_VERSION=${TARGET_VERSION}" >> $GITHUB_ENV
+          echo "TARGET_BRANCH=${TARGET_BRANCH}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
+          echo "PRE_RELEASE=${PRE_RELEASE}" >> $GITHUB_ENV
+
+      - name: Create release
+        run: |
+          make release
+
+      - name: Create GitHub release place
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
