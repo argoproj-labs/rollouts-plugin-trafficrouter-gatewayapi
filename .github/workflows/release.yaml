@@ -1,0 +1,167 @@
+name: Create Gateway API plugin release
+on:
+  push:
+    tags:
+      - "release-v[0-9]+.[0-9]+.[0-9]+(-rc[a-zA-Z0-9]*)?"
+
+env:
+  GOLANG_VERSION: "1.18"
+
+jobs:
+  release-creation:
+    name: Automatic release creation triggered on ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    env:
+      # Whether to create release
+      IS_DRY_RUN: true
+      # Whether a draft release should be created, instead of public one
+      IS_DRAFT_RELEASE: true
+      # Name of the GitHub user for Git config
+      GIT_USERNAME: PhilippPlotnikov
+      # E-Mail of the GitHub user for Git config
+      GIT_EMAIL: philipp.plotnikov@codefresh.io
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Preparing env variables
+        run: |
+          set -xue
+          # Target version must match major.minor.patch and optional -rcX suffix
+          # where X must be a number.
+          # The release tag is the source tag, minus the release- prefix
+          RELEASE_TAG="${github.ref_name#*release-}"
+          # Whether this is a pre-release (indicated by -rc suffix)
+          IS_PRE_RELEASE=false
+          if echo "${RELEASE_TAG}" | egrep -- '-rc[0-9]+$'; then
+            PRE_RELEASE=true
+          fi
+          # Ensure that release do not yet exist
+          if git rev-parse ${RELEASE_TAG}; then
+            echo "::error::Release tag ${RELEASE_TAG} already exists in repository. Refusing to continue."
+            exit 1
+          fi
+          # Make the variables available in follow-up steps
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
+          echo "IS_PRE_RELEASE=${IS_PRE_RELEASE}" >> $GITHUB_ENV
+        
+      - name: Preparing release notes
+        run: |
+          set -ue
+          # Fetch all tag information as well
+          git fetch --prune --tags --force
+          echo "=========== BEGIN COMMIT MESSAGE ============="
+          git show ${RELEASE_TAG}
+          echo "============ END COMMIT MESSAGE =============="
+          # Quite dirty hack to get the release notes from the annotated tag
+          # into a temporary file.
+          RELEASE_NOTES=$(mktemp -p /tmp release-notes.XXXXXX)
+          prefix=true
+          begin=false
+          git show ${SOURCE_TAG} | while read line; do
+            # Whatever is in commit history for the tag, we only want that
+            # annotation from our tag. We discard everything else.
+            if test "$begin" = "false"; then
+              if echo "$line" | grep -q "tag ${SOURCE_TAG#refs/tags/}"; then begin="true"; fi
+              continue
+            fi
+            if test "$prefix" = "true"; then
+                  if test -z "$line"; then prefix=false; fi
+            else
+                  if echo "$line" | egrep -q '^commit [0-9a-f]+'; then
+                          break
+                  fi
+                  echo "$line" >> ${RELEASE_NOTES}
+            fi
+          done
+          # For debug purposes
+          echo "============BEGIN RELEASE NOTES================="
+          cat ${RELEASE_NOTES}
+          echo "=============END RELEASE NOTES=================="
+          echo "RELEASE_NOTES=${RELEASE_NOTES}" >> $GITHUB_ENV
+
+      - name: Create release
+        run: |
+          make release
+
+      - name: Read release notes file
+        id: release-notes
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ${{ env.RELEASE_NOTES_PATH }}
+
+      - name: Create GitHub release place
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: create_release
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          release_name: ${{ env.RELEASE_TAG }}
+          draft: ${{ env.IS_DRAFT_RELEASE }}
+          prerelease: ${{ env.IS_PRE_RELEASE }}
+          body: ${{ steps.release-notes.outputs.content }}
+
+      - name: Upload gateway-api-plugin-linux-amd64 binary to release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/gateway-api-plugin-linux-amd64
+          asset_name: gateway-api-plugin-linux-amd64
+          asset_content_type: application/octet-stream
+        if: ${{ env.IS_DRY_RUN != 'true' }}
+
+      - name: Upload gateway-api-plugin-linux-arm64 binary to release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/gateway-api-plugin-linux-arm64
+          asset_name: gateway-api-plugin-linux-arm64
+          asset_content_type: application/octet-stream
+        if: ${{ env.IS_DRY_RUN != 'true' }}
+
+      - name: Upload gateway-api-plugin-darwin-amd64 binary to release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/gateway-api-plugin-darwin-amd64
+          asset_name: gateway-api-plugin-darwin-amd64
+          asset_content_type: application/octet-stream
+        if: ${{ env.IS_DRY_RUN != 'true' }}
+
+      - name: Upload gateway-api-plugin-darwin-arm64 binary to release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/gateway-api-plugin-darwin-arm64
+          asset_name: gateway-api-plugin-darwin-arm64
+          asset_content_type: application/octet-stream
+        if: ${{ env.IS_DRY_RUN != 'true' }}
+
+      - name: Upload gateway-api-plugin-windows-amd64 binary to release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/gateway-api-plugin-windows-amd64.exe
+          asset_name: gateway-api-plugin-windows-amd64.exe
+          asset_content_type: application/octet-stream
+        if: ${{ env.IS_DRY_RUN != 'true' }}
+
