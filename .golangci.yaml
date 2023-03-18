@@ -1,0 +1,12 @@
+run:
+  modules-download-mode: readonly
+linters:
+  enable:
+    - vet
+    - gofmt
+    - goimports
+    - unused
+    - ineffassign
+    - unconvert
+    - misspell
+  disable-all: true
