@@ -161,3 +161,4 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 func (r *RpcPlugin) Type() string {
 	return Type
 }
+
