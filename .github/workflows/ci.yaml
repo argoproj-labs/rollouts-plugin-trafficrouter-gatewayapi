@@ -2,10 +2,10 @@ name: Gateway API plugin CI
 on:
   push:
     branches:
-      - "master"
+      - "main"
   pull_request:
     branches:
-      - "master"
+      - "main"
 env:
   GOLANG_VERSION: '1.19'
 
@@ -41,6 +41,8 @@ jobs:
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
+        with:
+          args: --verbose --timeout 6m
     
   build:
     name: Build creation
