@@ -1,0 +1,59 @@
+name: Gateway API plugin CI
+on:
+  push:
+    branches:
+      - "master"
+  pull_request:
+    branches:
+      - "master"
+env:
+  GOLANG_VERSION: '1.19'
+
+jobs:
+  unit-tests:
+    name: Unit tests running
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Checkout code
+        uses: actions/checkout@v3.1.0
+
+      - name: Unit tests running
+        run: |
+          go test -v ./...
+
+
+  linting:
+    name: Go code linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Checkout code
+        uses: actions/checkout@v3.1.0
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+    
+    build:
+      name: Build creation
+      runs-on: ubuntu-latest
+      steps:
+        - name: Set up Go
+          uses: actions/setup-go@v3
+          with:
+            go-version: ${{ env.GOLANG_VERSION }}
+
+        - name: Checkout code
+          uses: actions/checkout@v3.1.0
+
+        - name: Build creation
+          run: |
+            go build -v
