@@ -2,7 +2,8 @@ name: Create Gateway API plugin release
 on:
   push:
     tags:
-      - "release-v[0-9]+.[0-9]+.[0-9]+(-rc[a-zA-Z0-9]*)?"
+      - "release-v[0-9]+.[0-9]+.[0-9]+"
+      - "release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+"
 
 env:
   GOLANG_VERSION: "1.18"
@@ -12,25 +13,36 @@ jobs:
     name: Automatic release creation triggered on ${{ github.ref_name }}
     runs-on: ubuntu-latest
     env:
+      # The full name of the tag as supplied by the GitHub event
+      # refs/tags/release-v0.0.0-rc1
+      TRIGGER_TAG: ${{ github.ref }}
+      # Only tag name
+      TRIGGER_TAG_NAME: ${{ github.ref_name }}
       # Whether to create release
-      IS_DRY_RUN: true
+      IS_DRY_RUN: false
       # Whether a draft release should be created, instead of public one
-      IS_DRAFT_RELEASE: true
+      IS_DRAFT_RELEASE: false
       # Name of the GitHub user for Git config
       GIT_USERNAME: PhilippPlotnikov
       # E-Mail of the GitHub user for Git config
       GIT_EMAIL: philipp.plotnikov@codefresh.io
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Setup Golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Setup Git author information
+        run: |
+          set -ue
+          git config --global user.email "${GIT_EMAIL}"
+          git config --global user.name "${GIT_USERNAME}"
 
       - name: Preparing env variables
         run: |
@@ -38,68 +50,45 @@ jobs:
           # Target version must match major.minor.patch and optional -rcX suffix
           # where X must be a number.
           # The release tag is the source tag, minus the release- prefix
-          RELEASE_TAG="${github.ref_name#*release-}"
+          RELEASE_TAG="${TRIGGER_TAG#*release-}"
           # Whether this is a pre-release (indicated by -rc suffix)
           IS_PRE_RELEASE=false
-          if echo "${RELEASE_TAG}" | egrep -- '-rc[0-9]+$'; then
-            PRE_RELEASE=true
+          if echo "${RELEASE_TAG}" | grep -E -- '-rc[0-9]+$'; then
+            IS_PRE_RELEASE=true
           fi
           # Ensure that release do not yet exist
-          if git rev-parse ${RELEASE_TAG}; then
+          if [[ -n $(git tag -l | grep -E -- '^'${RELEASE_TAG}) ]]; then
             echo "::error::Release tag ${RELEASE_TAG} already exists in repository. Refusing to continue."
             exit 1
           fi
           # Make the variables available in follow-up steps
           echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
           echo "IS_PRE_RELEASE=${IS_PRE_RELEASE}" >> $GITHUB_ENV
-        
-      - name: Preparing release notes
+
+      - name: Creating the release tag
         run: |
           set -ue
-          # Fetch all tag information as well
-          git fetch --prune --tags --force
-          echo "=========== BEGIN COMMIT MESSAGE ============="
-          git show ${RELEASE_TAG}
-          echo "============ END COMMIT MESSAGE =============="
-          # Quite dirty hack to get the release notes from the annotated tag
-          # into a temporary file.
-          RELEASE_NOTES=$(mktemp -p /tmp release-notes.XXXXXX)
-          prefix=true
-          begin=false
-          git show ${SOURCE_TAG} | while read line; do
-            # Whatever is in commit history for the tag, we only want that
-            # annotation from our tag. We discard everything else.
-            if test "$begin" = "false"; then
-              if echo "$line" | grep -q "tag ${SOURCE_TAG#refs/tags/}"; then begin="true"; fi
-              continue
-            fi
-            if test "$prefix" = "true"; then
-                  if test -z "$line"; then prefix=false; fi
-            else
-                  if echo "$line" | egrep -q '^commit [0-9a-f]+'; then
-                          break
-                  fi
-                  echo "$line" >> ${RELEASE_NOTES}
-            fi
-          done
-          # For debug purposes
-          echo "============BEGIN RELEASE NOTES================="
-          cat ${RELEASE_NOTES}
-          echo "=============END RELEASE NOTES=================="
-          echo "RELEASE_NOTES=${RELEASE_NOTES}" >> $GITHUB_ENV
+          if [[ "$IS_DRY_RUN" == "true" ]]; then
+            echo "IS_DRY_RUN=${IS_DRY_RUN}"
+            exit 0
+          fi
+          echo "Creating release tag ${RELEASE_TAG}"
+          git tag ${RELEASE_TAG}
+          git push origin ${RELEASE_TAG}
 
-      - name: Create release
+      - name: Deleting pushed tag
+        run: |
+          set -ue
+          echo "Deleting pushed tag ${TRIGGER_TAG_NAME}"
+          git tag -d ${TRIGGER_TAG_NAME}
+          git push -d origin ${TRIGGER_TAG_NAME}
+
+      - name: Release building
         run: |
           make release
 
-      - name: Read release notes file
-        id: release-notes
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ${{ env.RELEASE_NOTES_PATH }}
-
-      - name: Create GitHub release place
-        uses: actions/create-release@v1
+      - name: GitHub release place creation
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         id: create_release
@@ -108,9 +97,9 @@ jobs:
           release_name: ${{ env.RELEASE_TAG }}
           draft: ${{ env.IS_DRAFT_RELEASE }}
           prerelease: ${{ env.IS_PRE_RELEASE }}
-          body: ${{ steps.release-notes.outputs.content }}
+          body_path: RELEASE_NOTES.md
 
-      - name: Upload gateway-api-plugin-linux-amd64 binary to release assets
+      - name: Gateway-api-plugin-linux-amd64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,7 +110,7 @@ jobs:
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Upload gateway-api-plugin-linux-arm64 binary to release assets
+      - name: Gateway-api-plugin-linux-arm64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,7 +121,7 @@ jobs:
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Upload gateway-api-plugin-darwin-amd64 binary to release assets
+      - name: Gateway-api-plugin-darwin-amd64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -143,7 +132,7 @@ jobs:
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Upload gateway-api-plugin-darwin-arm64 binary to release assets
+      - name: Gateway-api-plugin-darwin-arm64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -154,7 +143,7 @@ jobs:
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Upload gateway-api-plugin-windows-amd64 binary to release assets
+      - name: Gateway-api-plugin-windows-amd64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -164,4 +153,3 @@ jobs:
           asset_name: gateway-api-plugin-windows-amd64.exe
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
-
