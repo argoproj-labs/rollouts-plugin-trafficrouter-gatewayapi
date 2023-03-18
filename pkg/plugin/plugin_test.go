@@ -103,10 +103,10 @@ func TestRunSuccessfully(t *testing.T) {
 	}
 	t.Run("SetWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
-		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HttpRouteName), int32(desiredWeight), []v1alpha1.WeightDestination{})
+		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HttpRouteName), desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
-		assert.Equal(t, int32(100-desiredWeight), *(rpcPluginImp.UpdatedMockHttpRoute.Spec.Rules[0].BackendRefs[0].BackendRef.Weight))
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedMockHttpRoute.Spec.Rules[0].BackendRefs[0].BackendRef.Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedMockHttpRoute.Spec.Rules[0].BackendRefs[1].BackendRef.Weight))
 	})
 
