@@ -42,18 +42,18 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
     
-    build:
-      name: Build creation
-      runs-on: ubuntu-latest
-      steps:
-        - name: Set up Go
-          uses: actions/setup-go@v3
-          with:
-            go-version: ${{ env.GOLANG_VERSION }}
+  build:
+    name: Build creation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
 
-        - name: Checkout code
-          uses: actions/checkout@v3.1.0
+      - name: Checkout code
+        uses: actions/checkout@v3.1.0
 
-        - name: Build creation
-          run: |
-            go build -v
+      - name: Build creation
+        run: |
+          go build -v
