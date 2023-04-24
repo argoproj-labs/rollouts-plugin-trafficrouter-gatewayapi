@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/plugin"
-	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/utils"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	goPlugin "github.com/hashicorp/go-plugin"
