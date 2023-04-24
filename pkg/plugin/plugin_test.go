@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/pkg/mocks"
-	"github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/utils"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/mocks"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"

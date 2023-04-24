@@ -1,14 +1,12 @@
-**Code:** 
-[![Go Report Card](https://goreportcard.com/badge/github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin)](https://goreportcard.com/report/github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin)
-[![Gateway API plugin CI](https://github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/actions/workflows/ci.yaml/badge.svg)](https://github.com/argoproj-labs/rollouts-gatewayapi-trafficrouter-plugin/actions/workflows/ci.yaml)
+**Code:**
+[![Go Report Card](https://goreportcard.com/badge/github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi)](https://goreportcard.com/report/github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi)
+[![Gateway API plugin CI](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/actions/workflows/ci.yaml/badge.svg)](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/actions/workflows/ci.yaml)
 
 **Social:**
 [![Twitter Follow](https://img.shields.io/twitter/follow/argoproj?style=social)](https://twitter.com/argoproj)
 [![Slack](https://img.shields.io/badge/slack-argoproj-brightgreen.svg?logo=slack)](https://argoproj.github.io/community/join-slack)
 
 # Argo Rollouts Gateway API plugin
-
-
 
 Argo Rollouts is a progressivey delivery controller for Kubernetes. It supports several advanced deployment methods such as blue/green and canaries.
 For canary deployments Argo Rollouts can optionally use a traffic provider to split traffic between pods with full control and in a gradual way.
@@ -28,7 +26,7 @@ See a [list of current projects](https://gateway-api.sigs.k8s.io/implementations
 You need the following
 
 1. A Kubernetes cluster
-2. An [installation](https://argoproj.github.io/argo-rollouts/installation/) of the Argo Rollouts controller 
+2. An [installation](https://argoproj.github.io/argo-rollouts/installation/) of the Argo Rollouts controller
 3. A traffic provider that supports the Gateway API (e.g. [Traefik Proxy](https://traefik.io/))
 4. An installation of the Gateway plugin as described below
 
@@ -91,6 +89,7 @@ spec:
 ```
 
 3. Create the same ServiceAccount
+
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -289,7 +288,7 @@ spec:
 
 ### Create config map
 
-You can specify any name inside *trafficRouterPlugins* you would like but it should be the same as in argo rollouts you specify under the key *plugins*.
+You can specify any name inside _trafficRouterPlugins_ you would like but it should be the same as in argo rollouts you specify under the key _plugins_.
 The value of location key also can be any path or url where your binary plugin file is located
 
 ```yaml
