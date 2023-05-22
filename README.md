@@ -8,7 +8,7 @@
 
 # Argo Rollouts Gateway API plugin
 
-Argo Rollouts is a progressivey delivery controller for Kubernetes. It supports several advanced deployment methods such as blue/green and canaries.
+Argo Rollouts is a progressive delivery controller for Kubernetes. It supports several advanced deployment methods such as blue/green and canaries.
 For canary deployments Argo Rollouts can optionally use a traffic provider to split traffic between pods with full control and in a gradual way.
 
 ![Gateway API with traffic providers](public/images/gateway-api.png)
@@ -252,8 +252,8 @@ spec:
       canaryService: argo-rollouts-canary-service # our created canary service
       stableService: argo-rollouts-stable-service # our created stable service
       trafficRouting:
-        plugin:
-          gatewayAPI:
+        plugins:
+          argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
       steps:
         - setWeight: 30
@@ -300,7 +300,7 @@ metadata:
 data:
   trafficRouterPlugins: |-
     - name: "argoproj-labs/gatewayAPI"
-      location: "file:///Users/test/go/src/github.com/argoproj-labs/rollouts-trafficrouter-gatewayapi-plugin/gatewayapi-plugin"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.0.0-rc1/gateway-api-plugin-linux-amd64"
 ```
 
-### Install binary of this plugin and put it in the location that you specified in config map
+
