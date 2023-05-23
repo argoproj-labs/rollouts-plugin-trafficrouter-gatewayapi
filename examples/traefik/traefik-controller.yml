@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: argo-rollouts-traefik-lb
+  template:
+    metadata:
+      labels:
+        app: argo-rollouts-traefik-lb
+    spec:
+      serviceAccountName: traefik-controller
+      containers:
+        - name: traefik
+          image: traefik:v2.9
+          args:
+            - --entrypoints.web.address=:80
+            - --entrypoints.websecure.address=:443
+            - --experimental.kubernetesgateway
+            - --providers.kubernetesgateway
+          ports:
+            - name: web
+              containerPort: 80
