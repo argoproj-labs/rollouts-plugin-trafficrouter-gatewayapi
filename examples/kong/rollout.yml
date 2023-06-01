@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: rollouts-demo
-          image: kostiscodefresh/summer-of-k8s-app:v2 # change to v2 for next version
+          image: kostiscodefresh/summer-of-k8s-app:v1 # change to v2 for next version
           ports:
             - name: http
               containerPort: 8080

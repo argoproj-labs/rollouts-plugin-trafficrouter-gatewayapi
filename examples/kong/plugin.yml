@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: argo-rollouts-config # must be so name
-  namespace: argo-rollouts # must be in this namespace
-data:
-  trafficRouterPlugins: |-
-    - name: "argoproj-labs/gatewayAPI"
-      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.0.0-rc1/gateway-api-plugin-linux-amd64"
