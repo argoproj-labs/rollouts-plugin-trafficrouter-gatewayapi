@@ -51,6 +51,7 @@ See end-to-end examples for:
 
 * [Traefik](examples/traefik/)
 * [Google Cloud](examples/google-cloud)
+* [Kong](examples/kong)
 
 Note that the examples are just for illustration purposes. You should be able
 to use any solution that implements the Gateway API. 
