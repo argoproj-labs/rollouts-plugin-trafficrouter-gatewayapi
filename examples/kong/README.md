@@ -14,7 +14,7 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/downloa
 
 It is imperative you install the APIs **before** installing Kong, as the Helm chart detects the APIs and also installs the correct roles for Kong itself to manage Gateway resources.
 
-## Step 1 - Create a cluster with Kong Gateway support.
+## Step 1 - Deploy Kong Ingress to the cluster
 
 Follow [the official instructions](https://docs.konghq.com/kubernetes-ingress-controller/2.9.x/deployment/k4k8s/#helm)
 
@@ -54,7 +54,7 @@ spec:
 
 Apply the file with `kubectl`
 
-Create a gateway and apply it to the cluster with
+Create a gateway:
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
@@ -70,7 +70,7 @@ spec:
 
 ```
 
-Get the IP of the gateway with
+Get the IP of the gateway with:
 
 ```shell
 kubectl get gateways.gateway.networking.k8s.io kong -o=jsonpath="{.status.addresses[0].value}"
