@@ -5,6 +5,7 @@ metadata:
 spec:
   parentRefs:
     - name: argo-rollouts-gateway
+      namespace: default
   rules:
     - backendRefs:
         - name: argo-rollouts-stable-service

@@ -4,7 +4,6 @@ metadata:
   name: rollouts-demo
   namespace: default
 spec:
-  revisionHistoryLimit: 1
   replicas: 10
   strategy:
     canary:
