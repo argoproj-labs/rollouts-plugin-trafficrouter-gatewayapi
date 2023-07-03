@@ -63,7 +63,6 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: traefik-controller-role
   namespace: aws-local-runtime
 rules:
@@ -203,8 +202,21 @@ spec:
   selector:
     app: rollouts-demo
 ```
+## Step 6 - Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources
 
-## Step 6 - Create argo-rollouts resources
+The argo-rollouts service account needs the ability to be able to view and mofiy HTTPRoutes as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions:
+
+```yaml
+rules:
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  verbs:
+  - '*'
+```
+
+## Step 7 - Create argo-rollouts resources
 
 We can finally create the definition of the application.
 
@@ -223,6 +235,7 @@ spec:
         plugins:
           argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
+            namespace: default # namespace where this rollout resides.
       steps:
         - setWeight: 30
         - pause: {}
@@ -256,7 +269,7 @@ spec:
 
 Apply all the yaml files to your cluster
 
-## Step 7 - Test the canary
+## Step 8 - Test the canary
 
 Perform a deployment like any other Rollout and the Gateway plugin will split the traffic to your canary by instructing Traefik proxy via the Gateway API
 

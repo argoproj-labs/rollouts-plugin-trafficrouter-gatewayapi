@@ -12,6 +12,7 @@ spec:
         plugins:
           argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
+            namespace: default # namespace where this rollout resides
       steps:
         - setWeight: 30
         - pause: {}
