@@ -1,6 +1,6 @@
 # Using Cilium Gateway API with Argo Rollouts
 
-Cilium has [native support]() for the Gateway API making the integration with Argo Rollouts a straightforward process. Read more on eBPF and Cilium [here]().
+Cilium has [native support]() for the Gateway API making the integration with Argo Rollouts a straightforward process. Read more on eBPF and Cilium [here](https://cilium.io/).
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.7.0/config/crd/experimental/gateway.networking.k8s.io_tlsroutes.yaml
 
 ```
-- [Cilium Gateway API Controller enabled](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/). This will create a `GatewayClass` object on your behalf.
+- [Cilium Gateway API Controller enabled](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/). This will create a `GatewayClass` object on your behalf. Try running `kubectl get gatewayclass` after enabling the Gateway Controller.
 - Similar to Ingress, Gateway API controller creates a service of LoadBalancer type, so your environment will need to support this (for example MetalLB if running locally).
 
 ## Step 1 - Create your Gateway object
