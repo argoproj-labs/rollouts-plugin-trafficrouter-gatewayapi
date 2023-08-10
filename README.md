@@ -8,8 +8,8 @@
 
 # Argo Rollouts Gateway API plugin
 
-Argo Rollouts is a progressive delivery controller for Kubernetes. It supports several advanced deployment methods such as blue/green and canaries.
-For canary deployments Argo Rollouts can optionally use a traffic provider to split traffic between pods with full control and in a gradual way.
+[Argo Rollouts](https://argoproj.github.io/rollouts/) is a progressive delivery controller for Kubernetes. It supports several advanced deployment methods such as blue/green and canaries.
+For canary deployments Argo Rollouts can optionally use [a traffic provider](https://argoproj.github.io/argo-rollouts/features/traffic-management/) to split traffic between pods with full control and in a gradual way.
 
 ![Gateway API with traffic providers](public/images/gateway-api.png)
 
@@ -49,11 +49,13 @@ The first 3 steps are specific to your provider/implementation of the Gateway AP
 
 See end-to-end examples for:
 
-* [Traefik](examples/traefik/)
+* [Cilium](examples/cilium)
 * [Google Cloud](examples/google-cloud)
 * [Kong](examples/kong)
+* [Traefik](examples/traefik/)
 
-Note that the examples are just for illustration purposes. You should be able
+
+Note that these examples are included just for illustration purposes. You should be able
 to use any solution that implements the Gateway API. 
 
 ## Installing the plugin
