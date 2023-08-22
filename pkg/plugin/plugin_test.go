@@ -106,8 +106,8 @@ func TestRunSuccessfully(t *testing.T) {
 		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HttpRouteName), desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
-		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedMockHttpRoute.Spec.Rules[0].BackendRefs[0].BackendRef.Weight))
-		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedMockHttpRoute.Spec.Rules[0].BackendRefs[1].BackendRef.Weight))
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].BackendRef.Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].BackendRef.Weight))
 	})
 
 	// Canceling should cause an exit
