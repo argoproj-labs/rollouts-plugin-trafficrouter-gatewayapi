@@ -29,3 +29,38 @@ type GatewayAPITrafficRouting struct {
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace"`
 }
+
+type HTTPBackendRef v1beta1.HTTPBackendRef
+
+type TCPBackendRef v1beta1.BackendRef
+
+type HTTPRouteRuleList []v1beta1.HTTPRouteRule
+
+type TCPRouteRuleList []v1alpha2.TCPRouteRule
+
+type HTTPBackendRefList []v1beta1.HTTPBackendRef
+
+type TCPBackendRefList []v1beta1.BackendRef
+
+type GatewayAPIBackendRef interface {
+	*HTTPBackendRef | *TCPBackendRef
+	GetName() string
+}
+
+type GatewayAPIBackendRefList interface {
+	HTTPBackendRefList | TCPBackendRefList
+}
+
+type GatewayAPIRouteRuleCollection[T GatewayAPIBackendRefList] interface {
+	Iterator() (GatewayAPIRouteRuleIterator[T], bool)
+	Error() error
+}
+
+type GatewayAPIBackendRefCollection[T GatewayAPIBackendRef] interface {
+	Iterator() (GatewayAPIBackendRefIterator[T], bool)
+	Error() error
+}
+
+type GatewayAPIRouteRuleIterator[T GatewayAPIBackendRefList] func() (T, bool)
+
+type GatewayAPIBackendRefIterator[T GatewayAPIBackendRef] func() (T, bool)

@@ -2,12 +2,10 @@ package plugin
 
 import (
 	"encoding/json"
-	"errors"
 
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
@@ -16,7 +14,8 @@ const (
 	Type       = "GatewayAPI"
 	PluginName = "argoproj-labs/gatewayAPI"
 
-	GatewayAPIUpdateError   = "GatewayAPIUpdateError"
+	GatewayAPIUpdateError = "GatewayAPIUpdateError"
+	// The place that potentially can have a bug in future
 	GatewayAPIManifestError = "httpRoute and tcpRoute fields are empty. tcpRoute or httpRoute should be set"
 )
 
@@ -63,22 +62,6 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 }
 
-func getBackendRef(serviceName string, backendRefs []v1beta1.HTTPBackendRef) (*v1beta1.HTTPBackendRef, error) {
-	var selectedService *v1beta1.HTTPBackendRef
-	for i := 0; i < len(backendRefs); i++ {
-		service := &backendRefs[i]
-		nameOfCurrentService := string(service.Name)
-		if nameOfCurrentService == serviceName {
-			selectedService = service
-			break
-		}
-	}
-	if selectedService == nil {
-		return nil, errors.New("service was not found in httpRoute")
-	}
-	return selectedService, nil
-}
-
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
 	return pluginTypes.RpcError{}
 }
@@ -97,4 +80,32 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 
 func (r *RpcPlugin) Type() string {
 	return Type
+}
+
+func getBackendRefList[T GatewayAPIBackendRefList](ruleList GatewayAPIRouteRuleCollection[T]) (T, error) {
+	var backendRefList T
+	for next, hasNext := ruleList.Iterator(); hasNext; {
+		backendRefList, hasNext = next()
+		if backendRefList == nil {
+			continue
+		}
+		return backendRefList, nil
+	}
+	return nil, ruleList.Error()
+}
+
+func getBackendRef[T GatewayAPIBackendRef](backendRefName string, backendRefList GatewayAPIBackendRefCollection[T]) (T, error) {
+	var selectedService, backendRef T
+	for next, hasNext := backendRefList.Iterator(); hasNext; {
+		backendRef, hasNext = next()
+		nameOfCurrentService := backendRef.GetName()
+		if nameOfCurrentService == backendRefName {
+			selectedService = backendRef
+			break
+		}
+	}
+	if selectedService == nil {
+		return nil, backendRefList.Error()
+	}
+	return selectedService, nil
 }

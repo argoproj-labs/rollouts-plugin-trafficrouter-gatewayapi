@@ -16,3 +16,7 @@ gateway-api-plugin-build:
 .PHONY: local-build
 local-build:
 	go build -gcflags=all="-N -l" -o gatewayapi-plugin
+
+.PHONY: lint
+lint:
+	golangci-lint run --fix

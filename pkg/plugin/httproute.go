@@ -8,10 +8,8 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-// TODO: Refactor
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HttpRouteClient
@@ -27,21 +25,21 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	}
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	rules := httpRoute.Spec.Rules
-	backendRefs, err := getHTTPRouteBackendRefList(rules)
+	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+	backendRefList, err := getBackendRefList[HTTPBackendRefList](routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	canaryBackendRef, err := getHTTPRouteBackendRef(canaryServiceName, backendRefs)
+	canaryBackendRef, err := getBackendRef[*HTTPBackendRef](canaryServiceName, backendRefList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	canaryBackendRef.Weight = &desiredWeight
-	stableBackendRef, err := getHTTPRouteBackendRef(stableServiceName, backendRefs)
+	stableBackendRef, err := getBackendRef[*HTTPBackendRef](stableServiceName, backendRefList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -60,29 +58,42 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	return pluginTypes.RpcError{}
 }
 
-func getHTTPRouteBackendRefList(rules []v1beta1.HTTPRouteRule) ([]v1beta1.HTTPBackendRef, error) {
-	for _, rule := range rules {
-		if rule.BackendRefs == nil {
-			continue
+func (r HTTPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[HTTPBackendRefList], bool) {
+	ruleList := r
+	index := 0
+	next := func() (HTTPBackendRefList, bool) {
+		if len(ruleList) == index {
+			return nil, false
 		}
-		backendRefs := rule.BackendRefs
-		return backendRefs, nil
+		backendRefList := HTTPBackendRefList(ruleList[index].BackendRefs)
+		index = index + 1
+		return backendRefList, len(ruleList) > index
 	}
-	return nil, errors.New("backendRefs was not found in httpRoute")
+	return next, len(ruleList) == index
 }
 
-func getHTTPRouteBackendRef(serviceName string, backendRefs []v1beta1.HTTPBackendRef) (*v1beta1.HTTPBackendRef, error) {
-	var selectedService *v1beta1.HTTPBackendRef
-	for i := 0; i < len(backendRefs); i++ {
-		service := &backendRefs[i]
-		nameOfCurrentService := string(service.Name)
-		if nameOfCurrentService == serviceName {
-			selectedService = service
-			break
+func (r HTTPRouteRuleList) Error() error {
+	return errors.New("backendRefs was not found in httpRoute")
+}
+
+func (r HTTPBackendRefList) Iterator() (GatewayAPIBackendRefIterator[*HTTPBackendRef], bool) {
+	backendRefList := r
+	index := 0
+	next := func() (*HTTPBackendRef, bool) {
+		if len(backendRefList) == index {
+			return nil, false
 		}
+		backendRef := (*HTTPBackendRef)(&backendRefList[index])
+		index = index + 1
+		return backendRef, len(backendRefList) == index
 	}
-	if selectedService == nil {
-		return nil, errors.New("service was not found in httpRoute")
-	}
-	return selectedService, nil
+	return next, len(backendRefList) == index
+}
+
+func (r HTTPBackendRefList) Error() error {
+	return errors.New("backendRef was not found in httpRoute")
+}
+
+func (r *HTTPBackendRef) GetName() string {
+	return string(r.Name)
 }
