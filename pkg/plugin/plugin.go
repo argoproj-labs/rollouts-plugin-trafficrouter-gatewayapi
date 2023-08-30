@@ -15,7 +15,6 @@ const (
 	PluginName = "argoproj-labs/gatewayAPI"
 
 	GatewayAPIUpdateError = "GatewayAPIUpdateError"
-	// The place that potentially can have a bug in future
 	GatewayAPIManifestError = "httpRoute and tcpRoute fields are empty. tcpRoute or httpRoute should be set"
 )
 

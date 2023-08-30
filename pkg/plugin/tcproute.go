@@ -69,7 +69,7 @@ func (r TCPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[TCPBackendRefL
 		index = index + 1
 		return backendRefList, len(ruleList) > index
 	}
-	return next, len(ruleList) == index
+	return next, len(ruleList) > index
 }
 
 func (r TCPRouteRuleList) Error() error {
@@ -85,9 +85,9 @@ func (r TCPBackendRefList) Iterator() (GatewayAPIBackendRefIterator[*TCPBackendR
 		}
 		backendRef := (*TCPBackendRef)(&backendRefList[index])
 		index = index + 1
-		return backendRef, len(backendRefList) == index
+		return backendRef, len(backendRefList) > index
 	}
-	return next, len(backendRefList) == index
+	return next, len(backendRefList) > index
 }
 
 func (r TCPBackendRefList) Error() error {
