@@ -36,7 +36,8 @@ func TestRunSuccessfully(t *testing.T) {
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          logCtx,
 		IsTest:          true,
-		HttpRouteClient: gwFake.NewSimpleClientset(&(mocks.HttpRouteObj)).GatewayV1beta1().HTTPRoutes("default"),
+		HTTPRouteClient: gwFake.NewSimpleClientset(&(mocks.HTTPRouteObj)).GatewayV1beta1().HTTPRoutes(mocks.Namespace),
+		TCPRouteClient:  gwFake.NewSimpleClientset(&(mocks.TCPPRouteObj)).GatewayV1alpha2().TCPRoutes(mocks.Namespace),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -101,13 +102,21 @@ func TestRunSuccessfully(t *testing.T) {
 	if err.Error() != "" {
 		t.Fail()
 	}
-	t.Run("SetWeight", func(t *testing.T) {
+	t.Run("SetHTTPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
-		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HttpRouteName), desiredWeight, []v1alpha1.WeightDestination{})
+		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName), desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
-		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].BackendRef.Weight))
-		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].BackendRef.Weight))
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
+	t.Run("SetTCPRouteWeight", func(t *testing.T) {
+		var desiredWeight int32 = 30
+		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.TCPRoute, mocks.TCPRouteName), desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
 
 	// Canceling should cause an exit
@@ -115,10 +124,15 @@ func TestRunSuccessfully(t *testing.T) {
 	<-closeCh
 }
 
-func newRollout(stableSvc, canarySvc, httpRouteName string) *v1alpha1.Rollout {
+func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rollout {
 	gatewayAPIConfig := GatewayAPITrafficRouting{
-		HTTPRoute: httpRouteName,
-		Namespace: "default",
+		Namespace: mocks.Namespace,
+	}
+	switch routeType {
+	case mocks.HTTPRoute:
+		gatewayAPIConfig.HTTPRoute = routeName
+	case mocks.TCPRoute:
+		gatewayAPIConfig.TCPRoute = routeName
 	}
 	encodedGatewayAPIConfig, err := json.Marshal(gatewayAPIConfig)
 	if err != nil {
@@ -127,7 +141,7 @@ func newRollout(stableSvc, canarySvc, httpRouteName string) *v1alpha1.Rollout {
 	return &v1alpha1.Rollout{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rollout",
-			Namespace: "default",
+			Namespace: mocks.Namespace,
 		},
 		Spec: v1alpha1.RolloutSpec{
 			Strategy: v1alpha1.RolloutStrategy{
@@ -136,7 +150,7 @@ func newRollout(stableSvc, canarySvc, httpRouteName string) *v1alpha1.Rollout {
 					CanaryService: canarySvc,
 					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
 						Plugins: map[string]json.RawMessage{
-							"argoproj-labs/gatewayAPI": encodedGatewayAPIConfig,
+							PluginName: encodedGatewayAPIConfig,
 						},
 					},
 				},

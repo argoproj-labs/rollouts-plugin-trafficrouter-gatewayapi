@@ -15,8 +15,8 @@ type RpcPlugin struct {
 	Client               *gatewayApiClientset.Clientset
 	UpdatedHTTPRouteMock *v1beta1.HTTPRoute
 	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
-	HttpRouteClient      gatewayApiv1beta1.HTTPRouteInterface
-	TcpRouteClient       gatewayApiv1alpha2.TCPRouteInterface
+	HTTPRouteClient      gatewayApiv1beta1.HTTPRouteInterface
+	TCPRouteClient       gatewayApiv1alpha2.TCPRouteInterface
 }
 
 type GatewayAPITrafficRouting struct {

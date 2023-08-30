@@ -12,7 +12,7 @@ import (
 
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	httpRouteClient := r.HttpRouteClient
+	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
 		gatewayV1beta1 := r.Client.GatewayV1beta1()
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
