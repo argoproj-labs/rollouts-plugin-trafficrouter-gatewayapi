@@ -1,0 +1,10 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: argo-rollouts-gateway
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - protocol: HTTP
+      name: web
+      port: 80 # one of Gateway entrypoint that we created at 1 step
