@@ -53,6 +53,7 @@ See end-to-end examples for:
 * [Google Cloud](examples/google-cloud)
 * [Kong](examples/kong)
 * [Traefik](examples/traefik/)
+* [NGINX](examples/nginx/)
 
 
 Note that these examples are included just for illustration purposes. You should be able
