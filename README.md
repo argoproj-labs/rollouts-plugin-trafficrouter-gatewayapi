@@ -52,8 +52,9 @@ See end-to-end examples for:
 * [Cilium](examples/cilium)
 * [Google Cloud](examples/google-cloud)
 * [Kong](examples/kong)
+* [NGINX Kubernetes Gateway](examples/nginx/)
 * [Traefik](examples/traefik/)
-* [NGINX](examples/nginx/)
+
 
 
 Note that these examples are included just for illustration purposes. You should be able
