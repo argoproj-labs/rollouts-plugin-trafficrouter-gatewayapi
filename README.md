@@ -50,6 +50,7 @@ The first 3 steps are specific to your provider/implementation of the Gateway AP
 See end-to-end examples for:
 
 * [Cilium](examples/cilium)
+* [EnvoyGateway](examples/envoygateway)
 * [Google Cloud](examples/google-cloud)
 * [Kong](examples/kong)
 * [NGINX Kubernetes Gateway](examples/nginx/)
