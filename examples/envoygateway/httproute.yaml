@@ -1,0 +1,23 @@
+---
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: argo-rollouts-http-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: eg
+  hostnames:
+  - "demo.example.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /  
+    backendRefs:
+    - name: argo-rollouts-stable-service
+      kind: Service
+      port: 80
+    - name: argo-rollouts-canary-service
+      kind: Service
+      port: 80
