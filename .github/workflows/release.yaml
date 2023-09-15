@@ -23,9 +23,9 @@ jobs:
       # Whether a draft release should be created, instead of public one
       IS_DRAFT_RELEASE: false
       # Name of the GitHub user for Git config
-      GIT_USERNAME: PhilippPlotnikov
+      GIT_USERNAME: Philipp-Plotnikov
       # E-Mail of the GitHub user for Git config
-      GIT_EMAIL: philipp.plotnikov@codefresh.io
+      GIT_EMAIL: philipp.plotnikov@icloud.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
