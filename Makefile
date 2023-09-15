@@ -12,3 +12,11 @@ release:
 .PHONY: gateway-api-plugin-build
 gateway-api-plugin-build:
 	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o ${DIST_DIR}/${BIN_NAME} .
+
+.PHONY: local-build
+local-build:
+	go build -gcflags=all="-N -l" -o gatewayapi-plugin
+
+.PHONY: lint
+lint:
+	golangci-lint run --fix
