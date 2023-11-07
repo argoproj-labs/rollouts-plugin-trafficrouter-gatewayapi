@@ -51,6 +51,7 @@ See end-to-end examples for:
 
 * [Cilium](examples/cilium)
 * [EnvoyGateway](examples/envoygateway)
+* [Gloo Gateway](examples/gloo-gateway/)
 * [Google Cloud](examples/google-cloud)
 * [Kong](examples/kong)
 * [NGINX Kubernetes Gateway](examples/nginx/)
