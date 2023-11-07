@@ -1,150 +1,151 @@
 # Using Gloo Gateway with Argo Rollouts
 
-[Gloo Gateway](https://docs.solo.io/gloo-gateway/v2/) is a cloud-native Layer 7 proxy that is based on the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/).
+[Gloo Gateway](https://docs.solo.io/gloo-gateway/v2/) is a powerful Kubernetes-native ingress controller and API gateway that is based on the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/). It excels in function-level routing, supports legacy apps, microservices and serverless, offers robust discovery capabilities, integrates seamlessly with open-source projects, and is designed to support hybrid applications with various technologies, architectures, protocols, and clouds. 
+
 ## Prerequisites
 
 * Kubernetes cluster with minimum version 1.23
 
-### Install K8s Gateway API CRDs
-```shell
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
-```
+## Step 1: Install the Kubernetes Gateway API and Gloo Gateway
 
-### Install Gloo Gateway
+1. Install the Kubernetes Gateway API CRDs. 
+   ```shell
+   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
+   ```
+   
+2. Install Gloo Gateway. 
+   ```shell
+   helm install default -n gloo-system --create-namespace \
+       oci://ghcr.io/solo-io/helm-charts/gloo-gateway \
+       --version 2.0.0-beta1 \
+       --wait --timeout 1m
+   ```
 
-```shell
-helm install default -n gloo-system --create-namespace \
-    oci://ghcr.io/solo-io/helm-charts/gloo-gateway \
-    --version 2.0.0-beta1 \
-    --wait --timeout 1m
-```
+3. Verify that the Gloo Gateway control plane is up and running.
+   ```shell
+   kubectl get pods -n gloo-system
+   ```
 
-The following `GatewayClass` resource is automatically created as part of the helm installion:
+4. Verify that the default `GatewayClass` resource is created.
+   ```shell
+   kubectl wait --timeout=1m -n gloo-system gatewayclass/gloo-gateway --for=condition=Accepted
+   ```
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: GatewayClass
-metadata:
-  name: gloo-gateway
-spec:
-  controllerName: solo.io/gloo-gateway
-```
+   During the Helm installation, a `GatewayClass` resource is automatically created for you with the following configuration
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1beta1
+   kind: GatewayClass
+   metadata:
+     name: gloo-gateway
+   spec:
+     controllerName: solo.io/gloo-gateway
+   ```
 
-The presence of this `GatewayClass` enables us to define `Gateways` which will then dynamically provision proxies to handle incoming traffic.
-
-Let's confirm that the `GatewayClass` resource is created correctly:
-
-```shell
-kubectl wait --timeout=1m -n gloo-system gatewayclass/gloo-gateway --for=condition=Accepted
-```
-
-### Install Argo Rollouts
-
-```shell
-kubectl create namespace argo-rollouts
-kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
-```
-See the [installation docs](https://argo-rollouts.readthedocs.io/en/stable/installation) for more detail.
-
-### Install Argo Rollout Gateway API Plugin
-
-```shell
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: argo-rollouts-config # must be so name
-  namespace: argo-rollouts # must be in this namespace
-data:
-  trafficRouterPlugins: |-
-    - name: "argoproj-labs/gatewayAPI"
-      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.0.0-rc1/gateway-api-plugin-linux-amd64"
-EOF
-```
-
-See the [project README](/README.md#installing-the-plugin) for more info.
-
-You may need to restart the Argo Rollouts pod for the plugin to take effect
-```shell
-kubectl rollout restart deployment -n argo-rollouts argo-rollouts
-```
+   You can use this `GatewayClass` to define `Gateway` resources that dynamically provision and configure Envoy proxies to handle incoming traffic.
 
 
-## Step 1 - Create Gateway object
+## Step 2: Set up Argo Rollouts
 
-Now we will actually configure Gloo Gateway and Argo Rollouts to manage the progressive deployment of a test application. All of the following resources are located in the `examples/gloo-gateway` directory.
+1. Install Argo Rollouts. 
+   ```shell
+   kubectl create namespace argo-rollouts
+   kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+   ```
+   
+   See the [installation docs](https://argo-rollouts.readthedocs.io/en/stable/installation) for more detail.
 
-```shell
-cd examples/gloo-gateway
-```
+2. Change the Argo Rollouts config map to install the Argo Rollout Gateway API Plugin. For more information, see the [project README](/README.md#installing-the-plugin).
+   ```yaml
+   cat <<EOF | kubectl apply -f -
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: argo-rollouts-config # must be so name
+     namespace: argo-rollouts # must be in this namespace
+   data:
+     trafficRouterPlugins: |-
+       - name: "argoproj-labs/gatewayAPI"
+         location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.0.0-rc1/gateway-api-plugin-linux-amd64"
+   EOF
+   ```
 
-Create a gateway:
+3. Restart the Argo Rollouts pod for the plug-in to take effect. 
+   ```shell
+   kubectl rollout restart deployment -n argo-rollouts argo-rollouts
+   ```
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: Gateway
-metadata:
-  name: gloo
-  namespace: default
-spec:
-  gatewayClassName: gloo-gateway
-  listeners:
-    - name: http
-      protocol: HTTP
-      port: 80
-```
+## Step 3: Set up RBAC permissions for Argo Rollouts
 
-Apply the file:
+1. Navigate to the `examples/gloo-gateway` directory.
+   ```shell
+   cd examples/gloo-gateway
+   ```
 
-```shell
-kubectl apply -f gateway.yaml
-```
+2. Create a `ClusterRole` resource with permissions to manage `HTTPRoute` resources and a corresponding `ClusterRoleBinding` to give the Argo Rollouts `ServiceAccount` these permissions.
+   ```shell
+   kubectl apply -f rbac.yaml
+   ```
 
-## Step 2 - Configure RBAC to allow Argo Rollouts to control HTTPRoute resources
+   The following resources are created for you:
+   
+   ```yaml
+   apiVersion: rbac.authorization.k8s.io/v1
+   kind: ClusterRole
+   metadata:
+     name: gateway-controller-role
+     namespace: argo-rollouts
+   rules:
+     - apiGroups:
+         - "*"
+       resources:
+         - "*"
+       verbs:
+         - "*"
+   ---
+   apiVersion: rbac.authorization.k8s.io/v1
+   kind: ClusterRoleBinding
+   metadata:
+     name: gateway-admin
+   roleRef:
+     apiGroup: rbac.authorization.k8s.io
+     kind: ClusterRole
+     name: gateway-controller-role
+   subjects:
+     - namespace: argo-rollouts
+       kind: ServiceAccount
+       name: argo-rollouts
+   ```
 
-Create a `ClusterRole` resource with permissions to manage `HTTPRoute` resources:
+   __Note:__ This `ClusterRole` is overly permissive and is provided __only for demo purposes__.
 
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: gateway-controller-role
-  namespace: argo-rollouts
-rules:
-  - apiGroups:
-      - "*"
-    resources:
-      - "*"
-    verbs:
-      - "*"
-```
 
-__Note:__ This `ClusterRole` is overly permissive and is provided __only for demo purposes__.
+## Step 4: Create an HTTP Gateway object
 
-Now we will create a binding to give the Argo Rollouts `ServiceAccount` these permissions:
+Create an HTTP `Gateway` resource that manages the progressive deployment of a test application. 
 
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: gateway-admin
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: gateway-controller-role
-subjects:
-  - namespace: argo-rollouts
-    kind: ServiceAccount
-    name: argo-rollouts
-```
+1. Create the HTTP Gateway in your cluster.
+   ```shell
+   kubectl apply -f gateway.yaml
+   ```
 
-Apply the file:
+   The following `Gateway` resource is created for you:
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1beta1
+   kind: Gateway
+   metadata:
+     name: gloo
+     namespace: default
+   spec:
+     gatewayClassName: gloo-gateway
+     listeners:
+       - name: http
+         protocol: HTTP
+         port: 80
+   ```
 
-```shell
-kubectl apply -f rbac.yaml
-```
+2. WILL CONTINUE LATER
 
-## Step 4 - Create HTTPRoute to route to a stable and canary service
+## Step 4: Create an HTTPRoute to route to a stable and canary service
 Create HTTPRoute associated with the `Gateway` to be managed by Argo Rollouts:
 
 ```yaml
