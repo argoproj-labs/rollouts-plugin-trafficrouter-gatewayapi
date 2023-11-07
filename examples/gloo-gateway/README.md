@@ -247,6 +247,7 @@
 1. Get the IP address of the gateway. 
    ```shell
    export GATEWAY_IP=$(kubectl get gateway gloo -o=jsonpath="{.status.addresses[0].value}")
+   echo $GATEWAY_IP
    ```
 
    If you try out this guide in a test setup, such as kind, you must port-forward the gateway pod instead. 
