@@ -7,7 +7,7 @@ Note that Argo Rollouts also [supports NGINX natively](https://argoproj.github.i
 
 ## Step 1 - Enable Gateway Provider and create Gateway entrypoint
 
-Before enabling a Gateway Provider you also need to install NGINX Kubernetes Gateway. Follow the official [installation instructions](https://github.com/nginxinc/nginx-kubernetes-gateway/blob/main/docs/installation.md).
+Before enabling a Gateway Provider you also need to install NGINX Kubernetes Gateway. Follow the official [installation instructions](https://docs.nginx.com/nginx-gateway-fabric/installation/installing-ngf/helm/).
 
 This installation will create an `nginx` gateway class that we can use later on.
 
