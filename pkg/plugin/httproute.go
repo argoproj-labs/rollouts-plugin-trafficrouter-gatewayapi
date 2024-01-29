@@ -103,15 +103,15 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 		switch {
 		case headerRule.HeaderValue.Exact != "":
-			headerMatchType := v1beta1.HeaderMatchType(v1beta1.HeaderMatchExact)
+			headerMatchType := v1beta1.HeaderMatchExact
 			httpHeaderRouteRule.Type = &headerMatchType
 			httpHeaderRouteRule.Value = headerRule.HeaderValue.Exact
 		case headerRule.HeaderValue.Prefix != "":
-			headerMatchType := v1beta1.HeaderMatchType(v1beta1.HeaderMatchRegularExpression)
+			headerMatchType := v1beta1.HeaderMatchRegularExpression
 			httpHeaderRouteRule.Type = &headerMatchType
 			httpHeaderRouteRule.Value = headerRule.HeaderValue.Prefix + "*"
 		case headerRule.HeaderValue.Regex != "":
-			headerMatchType := v1beta1.HeaderMatchType(v1beta1.HeaderMatchRegularExpression)
+			headerMatchType := v1beta1.HeaderMatchRegularExpression
 			httpHeaderRouteRule.Type = &headerMatchType
 			httpHeaderRouteRule.Value = headerRule.HeaderValue.Regex
 		default:
