@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"sync"
+
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -28,6 +30,12 @@ type GatewayAPITrafficRouting struct {
 	TCPRoute string `json:"tcpRoute,omitempty"`
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace"`
+}
+
+type HTTPHeaderRoute struct {
+	mu                        sync.Mutex
+	httpHeaderManagedRouteMap map[string]int
+	httpHeaderRouteRule       v1beta1.HTTPRouteRule
 }
 
 type HTTPBackendRef v1beta1.HTTPBackendRef

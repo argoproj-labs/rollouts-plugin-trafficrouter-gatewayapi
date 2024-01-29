@@ -35,6 +35,7 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 		}
 	}
 	r.Client = clientset
+
 	return pluginTypes.RpcError{}
 }
 
@@ -50,18 +51,47 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 			ErrorString: err.Error(),
 		}
 	}
-	if gatewayAPIConfig.HTTPRoute != "" {
-		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+	switch {
+	case gatewayAPIConfig.HTTPRoute != "":
+		rpcError := r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			return rpcError
+		}
+	case gatewayAPIConfig.TCPRoute != "":
+		rpcError := r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			return rpcError
+		}
+	default:
+		return pluginTypes.RpcError{
+			ErrorString: GatewayAPIManifestError,
+		}
 	}
-	if gatewayAPIConfig.TCPRoute != "" {
-		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
-	}
-	return pluginTypes.RpcError{
-		ErrorString: GatewayAPIManifestError,
-	}
+	return pluginTypes.RpcError{}
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
+	gatewayAPIConfig := GatewayAPITrafficRouting{}
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	switch {
+	case gatewayAPIConfig.HTTPRoute != "":
+		httpHeaderRoute.mu.Lock()
+		rpcError := r.setHTTPHeaderRoute(rollout, headerRouting, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			httpHeaderRoute.mu.Unlock()
+			return rpcError
+		}
+		httpHeaderRoute.mu.Unlock()
+	default:
+		return pluginTypes.RpcError{
+			ErrorString: "httpRoute field is empty. It has to be set to use setHeadRoute functionality",
+		}
+	}
 	return pluginTypes.RpcError{}
 }
 
@@ -74,6 +104,27 @@ func (r *RpcPlugin) VerifyWeight(rollout *v1alpha1.Rollout, desiredWeight int32,
 }
 
 func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.RpcError {
+	gatewayAPIConfig := GatewayAPITrafficRouting{}
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	switch {
+	case gatewayAPIConfig.HTTPRoute != "":
+		httpHeaderRoute.mu.Lock()
+		rpcError := r.removeHTTPManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			httpHeaderRoute.mu.Unlock()
+			return rpcError
+		}
+		httpHeaderRoute.mu.Unlock()
+	default:
+		return pluginTypes.RpcError{
+			ErrorString: "httpRoute field is empty. It has to be set to remove managed routes",
+		}
+	}
 	return pluginTypes.RpcError{}
 }
 
