@@ -10,12 +10,8 @@ import (
 )
 
 const (
-	// Type holds this controller type
 	Type       = "GatewayAPI"
 	PluginName = "argoproj-labs/gatewayAPI"
-
-	GatewayAPIUpdateError   = "GatewayAPIUpdateError"
-	GatewayAPIManifestError = "httpRoute and tcpRoute fields are empty. tcpRoute or httpRoute should be set"
 )
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
@@ -89,7 +85,7 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 		httpHeaderRoute.mu.Unlock()
 	default:
 		return pluginTypes.RpcError{
-			ErrorString: "httpRoute field is empty. It has to be set to use setHeadRoute functionality",
+			ErrorString: HTTPRouteFieldIsEmptyError,
 		}
 	}
 	return pluginTypes.RpcError{}
@@ -122,7 +118,7 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 		httpHeaderRoute.mu.Unlock()
 	default:
 		return pluginTypes.RpcError{
-			ErrorString: "httpRoute field is empty. It has to be set to remove managed routes",
+			ErrorString: HTTPRouteFieldIsEmptyError,
 		}
 	}
 	return pluginTypes.RpcError{}

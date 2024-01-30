@@ -46,7 +46,7 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		r.UpdatedTCPRouteMock = updatedTCPRoute
 	}
 	if err != nil {
-		msg := fmt.Sprintf("Error updating Gateway API %q: %s", tcpRoute.GetName(), err)
+		msg := fmt.Sprintf(GatewayAPIUpdateError, tcpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
 	}
 	return pluginTypes.RpcError{}
@@ -67,7 +67,7 @@ func (r TCPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[*TCPBackendRef
 }
 
 func (r TCPRouteRuleList) Error() error {
-	return errors.New("backendRefs was not found in tcpRoute")
+	return errors.New(BackendRefListWasNotFoundInTCPRouteError)
 }
 
 func (r TCPBackendRefList) Iterator() (GatewayAPIBackendRefIterator[*TCPBackendRef], bool) {
@@ -85,7 +85,7 @@ func (r TCPBackendRefList) Iterator() (GatewayAPIBackendRefIterator[*TCPBackendR
 }
 
 func (r TCPBackendRefList) Error() error {
-	return errors.New("backendRef was not found in tcpRoute")
+	return errors.New(BackendRefWasNotFoundInTCPRouteError)
 }
 
 func (r *TCPBackendRef) GetName() string {

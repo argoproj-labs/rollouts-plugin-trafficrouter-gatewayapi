@@ -59,7 +59,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		r.UpdatedHTTPRouteMock = updatedHTTPRoute
 	}
 	if err != nil {
-		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
+		msg := fmt.Sprintf(GatewayAPIUpdateError, httpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
 	}
 	return pluginTypes.RpcError{}
@@ -127,7 +127,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		r.UpdatedHTTPRouteMock = updatedHTTPRoute
 	}
 	if err != nil {
-		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
+		msg := fmt.Sprintf(GatewayAPIUpdateError, httpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
 	} else {
 		httpHeaderRoute.managedRouteMap[headerRouting.Name] = len(routeRuleList) - 1
@@ -157,7 +157,7 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]v1bet
 			httpHeaderRouteRule.Value = headerRule.HeaderValue.Regex
 		default:
 			return nil, pluginTypes.RpcError{
-				ErrorString: "Not found header match type",
+				ErrorString: InvalidHeaderMatchTypeError,
 			}
 		}
 		httpHeaderRouteRuleList = append(httpHeaderRouteRuleList, httpHeaderRouteRule)
@@ -198,7 +198,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			r.UpdatedHTTPRouteMock = updatedHTTPRoute
 		}
 		if err != nil {
-			msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
+			msg := fmt.Sprintf(GatewayAPIUpdateError, httpRoute.GetName(), err)
 			r.LogCtx.Error(msg)
 		} else {
 			delete(httpHeaderManagedRouteMap, managedRouteName)
@@ -222,7 +222,7 @@ func (r HTTPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[*HTTPBackendR
 }
 
 func (r HTTPRouteRuleList) Error() error {
-	return errors.New("backendRefs was not found in httpRoute")
+	return errors.New(BackendRefListWasNotFoundInHTTPRouteError)
 }
 
 func (r HTTPBackendRefList) Iterator() (GatewayAPIBackendRefIterator[*HTTPBackendRef], bool) {
@@ -240,7 +240,7 @@ func (r HTTPBackendRefList) Iterator() (GatewayAPIBackendRefIterator[*HTTPBacken
 }
 
 func (r HTTPBackendRefList) Error() error {
-	return errors.New("backendRef was not found in httpRoute")
+	return errors.New(BackendRefWasNotFoundInHTTPRouteError)
 }
 
 func (r *HTTPBackendRef) GetName() string {
