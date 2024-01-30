@@ -14,9 +14,9 @@ import (
 
 var (
 	httpHeaderRoute = HTTPHeaderRoute{
-		mu:                        sync.Mutex{},
-		httpHeaderManagedRouteMap: make(map[string]int),
-		httpHeaderRouteRule: v1beta1.HTTPRouteRule{
+		mu:              sync.Mutex{},
+		managedRouteMap: make(map[string]int),
+		rule: v1beta1.HTTPRouteRule{
 			Matches:     []v1beta1.HTTPRouteMatch{},
 			BackendRefs: []v1beta1.HTTPBackendRef{},
 		},
@@ -39,20 +39,14 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	backendRefList, err := getBackendRefList[HTTPBackendRefList](routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	canaryBackendRef, err := getBackendRef[*HTTPBackendRef](canaryServiceName, backendRefList)
+	canaryBackendRef, err := getBackendRef[*HTTPBackendRef, HTTPBackendRefList](canaryServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	canaryBackendRef.Weight = &desiredWeight
-	stableBackendRef, err := getBackendRef[*HTTPBackendRef](stableServiceName, backendRefList)
+	stableBackendRef, err := getBackendRef[*HTTPBackendRef, HTTPBackendRefList](stableServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -96,45 +90,18 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	canaryServiceName := v1beta1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
 	canaryServiceKind := v1beta1.Kind("Service")
 	canaryServiceGroup := v1beta1.Group("")
-	httpHeaderRouteRuleList := []v1beta1.HTTPHeaderMatch{}
-	for _, headerRule := range headerRouting.Match {
-		httpHeaderRouteRule := v1beta1.HTTPHeaderMatch{
-			Name: v1beta1.HTTPHeaderName(headerRule.HeaderName),
-		}
-		switch {
-		case headerRule.HeaderValue.Exact != "":
-			headerMatchType := v1beta1.HeaderMatchExact
-			httpHeaderRouteRule.Type = &headerMatchType
-			httpHeaderRouteRule.Value = headerRule.HeaderValue.Exact
-		case headerRule.HeaderValue.Prefix != "":
-			headerMatchType := v1beta1.HeaderMatchRegularExpression
-			httpHeaderRouteRule.Type = &headerMatchType
-			httpHeaderRouteRule.Value = headerRule.HeaderValue.Prefix + "*"
-		case headerRule.HeaderValue.Regex != "":
-			headerMatchType := v1beta1.HeaderMatchRegularExpression
-			httpHeaderRouteRule.Type = &headerMatchType
-			httpHeaderRouteRule.Value = headerRule.HeaderValue.Regex
-		default:
-			return pluginTypes.RpcError{
-				ErrorString: "Not found header match type",
-			}
-		}
-		httpHeaderRouteRuleList = append(httpHeaderRouteRuleList, httpHeaderRouteRule)
+	httpHeaderRouteRuleList, rpcError := getHTTPHeaderRouteRuleList(headerRouting)
+	if rpcError.HasError() {
+		return rpcError
 	}
 	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	backendRefList, err := getBackendRefList[HTTPBackendRefList](routeRuleList)
+	canaryBackendRef, err := getBackendRef[*HTTPBackendRef, HTTPBackendRefList](string(canaryServiceName), routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	canaryBackendRef, err := getBackendRef[*HTTPBackendRef](string(canaryServiceName), backendRefList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	httpHeaderRouteRule := &httpHeaderRoute.httpHeaderRouteRule
+	httpHeaderRouteRule := &httpHeaderRoute.rule
 	httpHeaderRouteRule.Matches = []v1beta1.HTTPRouteMatch{
 		{
 			Path:    routeRuleList[0].Matches[0].Path,
@@ -163,9 +130,39 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		msg := fmt.Sprintf("Error updating Gateway API %q: %s", httpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
 	} else {
-		httpHeaderRoute.httpHeaderManagedRouteMap[headerRouting.Name] = len(routeRuleList) - 1
+		httpHeaderRoute.managedRouteMap[headerRouting.Name] = len(routeRuleList) - 1
 	}
 	return pluginTypes.RpcError{}
+}
+
+// TODO: Add tests
+func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]v1beta1.HTTPHeaderMatch, pluginTypes.RpcError) {
+	httpHeaderRouteRuleList := []v1beta1.HTTPHeaderMatch{}
+	for _, headerRule := range headerRouting.Match {
+		httpHeaderRouteRule := v1beta1.HTTPHeaderMatch{
+			Name: v1beta1.HTTPHeaderName(headerRule.HeaderName),
+		}
+		switch {
+		case headerRule.HeaderValue.Exact != "":
+			headerMatchType := v1beta1.HeaderMatchExact
+			httpHeaderRouteRule.Type = &headerMatchType
+			httpHeaderRouteRule.Value = headerRule.HeaderValue.Exact
+		case headerRule.HeaderValue.Prefix != "":
+			headerMatchType := v1beta1.HeaderMatchRegularExpression
+			httpHeaderRouteRule.Type = &headerMatchType
+			httpHeaderRouteRule.Value = headerRule.HeaderValue.Prefix + ".*"
+		case headerRule.HeaderValue.Regex != "":
+			headerMatchType := v1beta1.HeaderMatchRegularExpression
+			httpHeaderRouteRule.Type = &headerMatchType
+			httpHeaderRouteRule.Value = headerRule.HeaderValue.Regex
+		default:
+			return nil, pluginTypes.RpcError{
+				ErrorString: "Not found header match type",
+			}
+		}
+		httpHeaderRouteRuleList = append(httpHeaderRouteRuleList, httpHeaderRouteRule)
+	}
+	return httpHeaderRouteRuleList, pluginTypes.RpcError{}
 }
 
 // TODO: Add tests
@@ -183,7 +180,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 		}
 	}
 	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	httpHeaderManagedRouteMap := httpHeaderRoute.httpHeaderManagedRouteMap
+	httpHeaderManagedRouteMap := httpHeaderRoute.managedRouteMap
 	for _, managedRoute := range managedRouteNameList {
 		managedRouteName := managedRoute.Name
 		httpRouteRuleListIndex, isOk := httpHeaderManagedRouteMap[managedRouteName]
@@ -210,7 +207,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 	return pluginTypes.RpcError{}
 }
 
-func (r HTTPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[HTTPBackendRefList], bool) {
+func (r HTTPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[*HTTPBackendRef, HTTPBackendRefList], bool) {
 	ruleList := r
 	index := 0
 	next := func() (HTTPBackendRefList, bool) {

@@ -33,9 +33,9 @@ type GatewayAPITrafficRouting struct {
 }
 
 type HTTPHeaderRoute struct {
-	mu                        sync.Mutex
-	httpHeaderManagedRouteMap map[string]int
-	httpHeaderRouteRule       v1beta1.HTTPRouteRule
+	mu              sync.Mutex
+	managedRouteMap map[string]int
+	rule            v1beta1.HTTPRouteRule
 }
 
 type HTTPBackendRef v1beta1.HTTPBackendRef
@@ -55,12 +55,14 @@ type GatewayAPIBackendRef interface {
 	GetName() string
 }
 
-type GatewayAPIBackendRefList interface {
+type GatewayAPIBackendRefList[T GatewayAPIBackendRef] interface {
 	HTTPBackendRefList | TCPBackendRefList
+	Iterator() (GatewayAPIBackendRefIterator[T], bool)
+	Error() error
 }
 
-type GatewayAPIRouteRuleCollection[T GatewayAPIBackendRefList] interface {
-	Iterator() (GatewayAPIRouteRuleIterator[T], bool)
+type GatewayAPIRouteRuleCollection[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]] interface {
+	Iterator() (GatewayAPIRouteRuleIterator[T1, T2], bool)
 	Error() error
 }
 
@@ -69,6 +71,6 @@ type GatewayAPIBackendRefCollection[T GatewayAPIBackendRef] interface {
 	Error() error
 }
 
-type GatewayAPIRouteRuleIterator[T GatewayAPIBackendRefList] func() (T, bool)
+type GatewayAPIRouteRuleIterator[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]] func() (T2, bool)
 
 type GatewayAPIBackendRefIterator[T GatewayAPIBackendRef] func() (T, bool)

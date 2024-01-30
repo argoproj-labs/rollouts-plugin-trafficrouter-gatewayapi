@@ -132,8 +132,8 @@ func (r *RpcPlugin) Type() string {
 	return Type
 }
 
-func getBackendRefList[T GatewayAPIBackendRefList](ruleList GatewayAPIRouteRuleCollection[T]) (T, error) {
-	var backendRefList T
+func getBackendRefList[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]](ruleList GatewayAPIRouteRuleCollection[T1, T2]) (T2, error) {
+	var backendRefList T2
 	for next, hasNext := ruleList.Iterator(); hasNext; {
 		backendRefList, hasNext = next()
 		if backendRefList == nil {
@@ -144,8 +144,12 @@ func getBackendRefList[T GatewayAPIBackendRefList](ruleList GatewayAPIRouteRuleC
 	return nil, ruleList.Error()
 }
 
-func getBackendRef[T GatewayAPIBackendRef](backendRefName string, backendRefList GatewayAPIBackendRefCollection[T]) (T, error) {
-	var selectedService, backendRef T
+func getBackendRef[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]](backendRefName string, ruleList GatewayAPIRouteRuleCollection[T1, T2]) (T1, error) {
+	var selectedService, backendRef T1
+	backendRefList, err := getBackendRefList[T1, T2](ruleList)
+	if err != nil {
+		return nil, err
+	}
 	for next, hasNext := backendRefList.Iterator(); hasNext; {
 		backendRef, hasNext = next()
 		nameOfCurrentService := backendRef.GetName()

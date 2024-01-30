@@ -26,20 +26,14 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
-	backendRefList, err := getBackendRefList[TCPBackendRefList](routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	canaryBackendRef, err := getBackendRef[*TCPBackendRef](canaryServiceName, backendRefList)
+	canaryBackendRef, err := getBackendRef[*TCPBackendRef, TCPBackendRefList](canaryServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	canaryBackendRef.Weight = &desiredWeight
-	stableBackendRef, err := getBackendRef[*TCPBackendRef](stableServiceName, backendRefList)
+	stableBackendRef, err := getBackendRef[*TCPBackendRef, TCPBackendRefList](stableServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -58,7 +52,7 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	return pluginTypes.RpcError{}
 }
 
-func (r TCPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[TCPBackendRefList], bool) {
+func (r TCPRouteRuleList) Iterator() (GatewayAPIRouteRuleIterator[*TCPBackendRef, TCPBackendRefList], bool) {
 	ruleList := r
 	index := 0
 	next := func() (TCPBackendRefList, bool) {
