@@ -31,7 +31,6 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 		}
 	}
 	r.Client = clientset
-
 	return pluginTypes.RpcError{}
 }
 
@@ -76,13 +75,13 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 	}
 	switch {
 	case gatewayAPIConfig.HTTPRoute != "":
-		httpHeaderRoute.mu.Lock()
+		httpHeaderRoute.mutex.Lock()
 		rpcError := r.setHTTPHeaderRoute(rollout, headerRouting, &gatewayAPIConfig)
 		if rpcError.HasError() {
-			httpHeaderRoute.mu.Unlock()
+			httpHeaderRoute.mutex.Unlock()
 			return rpcError
 		}
-		httpHeaderRoute.mu.Unlock()
+		httpHeaderRoute.mutex.Unlock()
 	default:
 		return pluginTypes.RpcError{
 			ErrorString: HTTPRouteFieldIsEmptyError,
@@ -109,13 +108,13 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 	}
 	switch {
 	case gatewayAPIConfig.HTTPRoute != "":
-		httpHeaderRoute.mu.Lock()
+		httpHeaderRoute.mutex.Lock()
 		rpcError := r.removeHTTPManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, &gatewayAPIConfig)
 		if rpcError.HasError() {
-			httpHeaderRoute.mu.Unlock()
+			httpHeaderRoute.mutex.Unlock()
 			return rpcError
 		}
-		httpHeaderRoute.mu.Unlock()
+		httpHeaderRoute.mutex.Unlock()
 	default:
 		return pluginTypes.RpcError{
 			ErrorString: HTTPRouteFieldIsEmptyError,

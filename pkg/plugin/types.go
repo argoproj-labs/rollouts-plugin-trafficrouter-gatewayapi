@@ -33,7 +33,7 @@ type GatewayAPITrafficRouting struct {
 }
 
 type HTTPHeaderRoute struct {
-	mu              sync.Mutex
+	mutex           sync.Mutex
 	managedRouteMap map[string]int
 	rule            v1beta1.HTTPRouteRule
 }

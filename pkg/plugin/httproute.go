@@ -14,7 +14,7 @@ import (
 
 var (
 	httpHeaderRoute = HTTPHeaderRoute{
-		mu:              sync.Mutex{},
+		mutex:           sync.Mutex{},
 		managedRouteMap: make(map[string]int),
 		rule: v1beta1.HTTPRouteRule{
 			Matches:     []v1beta1.HTTPRouteMatch{},
