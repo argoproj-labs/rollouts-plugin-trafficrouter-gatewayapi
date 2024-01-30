@@ -65,7 +65,6 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	return pluginTypes.RpcError{}
 }
 
-// TODO: Add tests
 func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	if headerRouting.Match == nil {
 		managedRouteList := []v1alpha1.MangedRoutes{
@@ -135,7 +134,6 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	return pluginTypes.RpcError{}
 }
 
-// TODO: Add tests
 func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]v1beta1.HTTPHeaderMatch, pluginTypes.RpcError) {
 	httpHeaderRouteRuleList := []v1beta1.HTTPHeaderMatch{}
 	for _, headerRule := range headerRouting.Match {
@@ -165,7 +163,6 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]v1bet
 	return httpHeaderRouteRuleList, pluginTypes.RpcError{}
 }
 
-// TODO: Add tests
 func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient

@@ -12,6 +12,7 @@ import (
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	log "github.com/sirupsen/logrus"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
@@ -118,6 +119,36 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
+	t.Run("SetHTTPHeaderRoute", func(t *testing.T) {
+		headerName := "X-Test"
+		headerValue := "test"
+		headerValueType := v1beta1.HeaderMatchRegularExpression
+		prefixedHeaderValue := headerValue + ".*"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		err := pluginInstance.SetHeaderRoute(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName), &headerRouting)
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
+		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
+		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
+	})
+	t.Run("RemoveHTTPManagedRoutes", func(t *testing.T) {
+		err := pluginInstance.RemoveManagedRoutes(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName))
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 1, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
+	})
 
 	// Canceling should cause an exit
 	cancel()
@@ -149,6 +180,11 @@ func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rol
 					StableService: stableSvc,
 					CanaryService: canarySvc,
 					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+						ManagedRoutes: []v1alpha1.MangedRoutes{
+							{
+								Name: mocks.ManagedRouteName,
+							},
+						},
 						Plugins: map[string]json.RawMessage{
 							PluginName: encodedGatewayAPIConfig,
 						},

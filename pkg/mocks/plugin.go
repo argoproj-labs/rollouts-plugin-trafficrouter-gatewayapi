@@ -16,11 +16,18 @@ const (
 	HTTPRouteName     = "argo-rollouts-http-route"
 	TCPRouteName      = "argo-rollouts-tcp-route"
 	Namespace         = "default"
+	ManagedRouteName  = "test-http-header-route"
 )
 
 var (
-	port         = v1beta1.PortNumber(80)
-	weight int32 = 0
+	port                     = v1beta1.PortNumber(80)
+	weight             int32 = 0
+	httpPathMatchType        = v1beta1.PathMatchPathPrefix
+	httpPathMatchValue       = "/"
+	httpPathMatch            = v1beta1.HTTPPathMatch{
+		Type:  &httpPathMatchType,
+		Value: &httpPathMatchValue,
+	}
 )
 
 var HTTPRouteObj = v1beta1.HTTPRoute{
@@ -56,6 +63,11 @@ var HTTPRouteObj = v1beta1.HTTPRoute{
 							},
 							Weight: &weight,
 						},
+					},
+				},
+				Matches: []v1beta1.HTTPRouteMatch{
+					{
+						Path: &httpPathMatch,
 					},
 				},
 			},
