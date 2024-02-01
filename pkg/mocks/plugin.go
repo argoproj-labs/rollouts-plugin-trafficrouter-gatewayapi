@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -9,14 +10,15 @@ import (
 )
 
 const (
-	HTTPRoute         = "HTTPRoute"
-	TCPRoute          = "TCPRoute"
-	StableServiceName = "argo-rollouts-stable-service"
-	CanaryServiceName = "argo-rollouts-canary-service"
-	HTTPRouteName     = "argo-rollouts-http-route"
-	TCPRouteName      = "argo-rollouts-tcp-route"
-	Namespace         = "default"
-	ManagedRouteName  = "test-http-header-route"
+	HTTPRoute            = "HTTPRoute"
+	TCPRoute             = "TCPRoute"
+	StableServiceName    = "argo-rollouts-stable-service"
+	CanaryServiceName    = "argo-rollouts-canary-service"
+	HTTPRouteName        = "argo-rollouts-http-route"
+	TCPRouteName         = "argo-rollouts-tcp-route"
+	Namespace            = "default"
+	ConfigMapName        = "test-config"
+	HTTPManagedRouteName = "test-http-header-route"
 )
 
 var (
@@ -108,5 +110,12 @@ var TCPPRouteObj = v1alpha2.TCPRoute{
 				},
 			},
 		},
+	},
+}
+
+var ConfigMapObj = v1.ConfigMap{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      ConfigMapName,
+		Namespace: Namespace,
 	},
 }

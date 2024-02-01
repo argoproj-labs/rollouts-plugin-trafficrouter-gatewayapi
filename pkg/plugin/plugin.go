@@ -6,6 +6,7 @@ import (
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	"k8s.io/client-go/kubernetes"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
@@ -24,13 +25,20 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 			ErrorString: err.Error(),
 		}
 	}
-	clientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
+	gatewayAPIClientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	r.Client = clientset
+	clientset, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	r.GatewayAPIClientset = gatewayAPIClientset
+	r.Clientset = clientset
 	return pluginTypes.RpcError{}
 }
 
@@ -65,6 +73,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	return pluginTypes.RpcError{}
 }
 
+// TODO: Take path from rule where canary service and stable service
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
 	gatewayAPIConfig := GatewayAPITrafficRouting{}
 	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)

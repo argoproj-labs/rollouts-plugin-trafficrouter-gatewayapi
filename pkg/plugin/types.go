@@ -4,9 +4,11 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
-	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
+	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 	gatewayApiv1alpha2 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1alpha2"
 	gatewayApiv1beta1 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1beta1"
 )
@@ -14,7 +16,9 @@ import (
 type RpcPlugin struct {
 	IsTest               bool
 	LogCtx               *logrus.Entry
-	Client               *gatewayApiClientset.Clientset
+	GatewayAPIClientset  *gatewayAPIClientset.Clientset
+	Clientset            *kubernetes.Clientset
+	TestClientset        v1.ConfigMapInterface
 	UpdatedHTTPRouteMock *v1beta1.HTTPRoute
 	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
 	HTTPRouteClient      gatewayApiv1beta1.HTTPRouteInterface
@@ -30,6 +34,8 @@ type GatewayAPITrafficRouting struct {
 	TCPRoute string `json:"tcpRoute,omitempty"`
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace"`
+	// ConfigMap name refers to the config map where plugin stores data about managed routes
+	ConfigMap string `json:"configMap,omitempty"`
 }
 
 type HTTPHeaderRoute struct {

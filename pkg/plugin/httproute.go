@@ -6,10 +6,15 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
+)
+
+const (
+	HTTPConfigMapKey = "httpManagedRoutes"
 )
 
 var (
@@ -27,7 +32,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
-		gatewayV1beta1 := r.Client.GatewayV1beta1()
+		gatewayV1beta1 := r.GatewayAPIClientset.GatewayV1beta1()
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
@@ -76,9 +81,27 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	}
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
+	managedRouteMap := httpHeaderRoute.managedRouteMap
+	clientset := r.TestClientset
 	if !r.IsTest {
-		gatewayV1beta1 := r.Client.GatewayV1beta1()
+		gatewayV1beta1 := r.GatewayAPIClientset.GatewayV1beta1()
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
+	}
+	configMap, err := utils.CreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+		Clientset: clientset,
+		Ctx:       ctx,
+	})
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	err = utils.SetConfigMapData(configMap, HTTPConfigMapKey, &managedRouteMap)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
@@ -93,8 +116,8 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	if rpcError.HasError() {
 		return rpcError
 	}
-	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	canaryBackendRef, err := getBackendRef[*HTTPBackendRef, HTTPBackendRefList](string(canaryServiceName), routeRuleList)
+	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+	canaryBackendRef, err := getBackendRef[*HTTPBackendRef, HTTPBackendRefList](string(canaryServiceName), httpRouteRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -103,7 +126,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	httpHeaderRouteRule := &httpHeaderRoute.rule
 	httpHeaderRouteRule.Matches = []v1beta1.HTTPRouteMatch{
 		{
-			Path:    routeRuleList[0].Matches[0].Path,
+			Path:    httpRouteRuleList[0].Matches[0].Path,
 			Headers: httpHeaderRouteRuleList,
 		},
 	}
@@ -119,17 +142,71 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			},
 		},
 	}
-	routeRuleList = append(routeRuleList, *httpHeaderRouteRule)
-	httpRoute.Spec.Rules = routeRuleList
-	updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
-	if r.IsTest {
-		r.UpdatedHTTPRouteMock = updatedHTTPRoute
-	}
+	httpRouteRuleList = append(httpRouteRuleList, *httpHeaderRouteRule)
+	oldHTTPRuleList := httpRoute.Spec.Rules
+	httpRoute.Spec.Rules = httpRouteRuleList
+	oldConfigMapData := make(map[string]int)
+	err = utils.SetConfigMapData(configMap, HTTPConfigMapKey, &oldConfigMapData)
 	if err != nil {
-		msg := fmt.Sprintf(GatewayAPIUpdateError, httpRoute.GetName(), err)
-		r.LogCtx.Error(msg)
-	} else {
-		httpHeaderRoute.managedRouteMap[headerRouting.Name] = len(routeRuleList) - 1
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	taskList := []utils.Task{
+		{
+			Action: func() error {
+				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				if r.IsTest {
+					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+				}
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			ReverseAction: func() error {
+				httpRoute.Spec.Rules = oldHTTPRuleList
+				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				if r.IsTest {
+					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+				}
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+		{
+			Action: func() error {
+				managedRouteMap[headerRouting.Name] = len(httpRouteRuleList) - 1
+				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
+					Clientset:    clientset,
+					ConfigMapKey: HTTPConfigMapKey,
+					Ctx:          ctx,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			ReverseAction: func() error {
+				err = utils.UpdateConfigMapData(configMap, oldConfigMapData, utils.UpdateConfigMapOptions{
+					Clientset:    clientset,
+					ConfigMapKey: HTTPConfigMapKey,
+					Ctx:          ctx,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+	}
+	err = utils.DoTransaction(r.LogCtx, taskList...)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
 	}
 	return pluginTypes.RpcError{}
 }
@@ -166,9 +243,24 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]v1bet
 func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
+	clientset := r.TestClientset
+	managedRouteMap := httpHeaderRoute.managedRouteMap
 	if !r.IsTest {
-		gatewayV1beta1 := r.Client.GatewayV1beta1()
+		gatewayV1beta1 := r.GatewayAPIClientset.GatewayV1beta1()
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
+	}
+	configMap, err := clientset.Get(ctx, gatewayAPIConfig.ConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	err = utils.SetConfigMapData(configMap, HTTPConfigMapKey, &managedRouteMap)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
@@ -177,28 +269,78 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 		}
 	}
 	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	httpHeaderManagedRouteMap := httpHeaderRoute.managedRouteMap
 	for _, managedRoute := range managedRouteNameList {
 		managedRouteName := managedRoute.Name
-		httpRouteRuleListIndex, isOk := httpHeaderManagedRouteMap[managedRouteName]
+		httpRouteRuleListIndex, isOk := managedRouteMap[managedRouteName]
 		if !isOk {
 			r.LogCtx.Logger.Info(fmt.Sprintf("%s is not in httpHeaderManagedRouteMap", managedRouteName))
-			return pluginTypes.RpcError{}
+			continue
 		}
-		updatedHTTPRouteRuleList := httpRouteRuleList[:httpRouteRuleListIndex]
-		if httpRouteRuleListIndex+1 < len(httpRouteRuleList) {
-			updatedHTTPRouteRuleList = append(updatedHTTPRouteRuleList, httpRouteRuleList[httpRouteRuleListIndex+1:]...)
+		httpRouteRuleList = utils.RemoveIndex(httpRouteRuleList, httpRouteRuleListIndex)
+		delete(managedRouteMap, managedRouteName)
+	}
+	oldHTTPRuleList := httpRoute.Spec.Rules
+	httpRoute.Spec.Rules = httpRouteRuleList
+	oldConfigMapData := make(map[string]int)
+	err = utils.SetConfigMapData(configMap, HTTPConfigMapKey, &oldConfigMapData)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
 		}
-		httpRoute.Spec.Rules = updatedHTTPRouteRuleList
-		updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
-		if r.IsTest {
-			r.UpdatedHTTPRouteMock = updatedHTTPRoute
-		}
-		if err != nil {
-			msg := fmt.Sprintf(GatewayAPIUpdateError, httpRoute.GetName(), err)
-			r.LogCtx.Error(msg)
-		} else {
-			delete(httpHeaderManagedRouteMap, managedRouteName)
+	}
+	taskList := []utils.Task{
+		{
+			Action: func() error {
+				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				if r.IsTest {
+					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+				}
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			ReverseAction: func() error {
+				httpRoute.Spec.Rules = oldHTTPRuleList
+				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				if r.IsTest {
+					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+				}
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+		{
+			Action: func() error {
+				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
+					Clientset:    clientset,
+					ConfigMapKey: HTTPConfigMapKey,
+					Ctx:          ctx,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			ReverseAction: func() error {
+				err = utils.UpdateConfigMapData(configMap, oldConfigMapData, utils.UpdateConfigMapOptions{
+					Clientset:    clientset,
+					ConfigMapKey: HTTPConfigMapKey,
+					Ctx:          ctx,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+	}
+	err = utils.DoTransaction(r.LogCtx, taskList...)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
 		}
 	}
 	return pluginTypes.RpcError{}

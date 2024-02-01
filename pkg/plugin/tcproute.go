@@ -14,7 +14,7 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	ctx := context.TODO()
 	tcpRouteClient := r.TCPRouteClient
 	if !r.IsTest {
-		gatewayV1alpha2 := r.Client.GatewayV1alpha2()
+		gatewayV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
 		tcpRouteClient = gatewayV1alpha2.TCPRoutes(gatewayAPIConfig.Namespace)
 	}
 	tcpRoute, err := tcpRouteClient.Get(ctx, gatewayAPIConfig.TCPRoute, metav1.GetOptions{})
