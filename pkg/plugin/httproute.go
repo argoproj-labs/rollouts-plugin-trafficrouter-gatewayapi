@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
