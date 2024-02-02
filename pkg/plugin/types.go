@@ -41,42 +41,36 @@ type GatewayAPITrafficRouting struct {
 type HTTPHeaderRoute struct {
 	mutex           sync.Mutex
 	managedRouteMap map[string]int
-	rule            v1beta1.HTTPRouteRule
 }
 
-type HTTPBackendRef v1beta1.HTTPBackendRef
+type HTTPRouteRule v1beta1.HTTPRouteRule
 
-type TCPBackendRef v1beta1.BackendRef
+type TCPRouteRule v1alpha2.TCPRouteRule
 
 type HTTPRouteRuleList []v1beta1.HTTPRouteRule
 
 type TCPRouteRuleList []v1alpha2.TCPRouteRule
 
-type HTTPBackendRefList []v1beta1.HTTPBackendRef
+type HTTPBackendRef v1beta1.HTTPBackendRef
 
-type TCPBackendRefList []v1beta1.BackendRef
+type TCPBackendRef v1beta1.BackendRef
+
+type GatewayAPIRouteRule[T1 GatewayAPIBackendRef] interface {
+	*HTTPRouteRule | *TCPRouteRule
+	Iterator() (GatewayAPIRouteRuleIterator[T1], bool)
+}
+
+type GatewayAPIRouteRuleList[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]] interface {
+	HTTPRouteRuleList | TCPRouteRuleList
+	Iterator() (GatewayAPIRouteRuleListIterator[T1, T2], bool)
+	Error() error
+}
 
 type GatewayAPIBackendRef interface {
 	*HTTPBackendRef | *TCPBackendRef
 	GetName() string
 }
 
-type GatewayAPIBackendRefList[T GatewayAPIBackendRef] interface {
-	HTTPBackendRefList | TCPBackendRefList
-	Iterator() (GatewayAPIBackendRefIterator[T], bool)
-	Error() error
-}
+type GatewayAPIRouteRuleListIterator[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]] func() (T2, bool)
 
-type GatewayAPIRouteRuleCollection[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]] interface {
-	Iterator() (GatewayAPIRouteRuleIterator[T1, T2], bool)
-	Error() error
-}
-
-type GatewayAPIBackendRefCollection[T GatewayAPIBackendRef] interface {
-	Iterator() (GatewayAPIBackendRefIterator[T], bool)
-	Error() error
-}
-
-type GatewayAPIRouteRuleIterator[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]] func() (T2, bool)
-
-type GatewayAPIBackendRefIterator[T GatewayAPIBackendRef] func() (T, bool)
+type GatewayAPIRouteRuleIterator[T1 GatewayAPIBackendRef] func() (T1, bool)

@@ -73,7 +73,6 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	return pluginTypes.RpcError{}
 }
 
-// TODO: Take path from rule where canary service and stable service
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
 	gatewayAPIConfig := GatewayAPITrafficRouting{}
 	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
@@ -136,34 +135,45 @@ func (r *RpcPlugin) Type() string {
 	return Type
 }
 
-func getBackendRefList[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]](ruleList GatewayAPIRouteRuleCollection[T1, T2]) (T2, error) {
-	var backendRefList T2
-	for next, hasNext := ruleList.Iterator(); hasNext; {
-		backendRefList, hasNext = next()
-		if backendRefList == nil {
+func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](routeRuleList T3, backendRefNameList ...string) (T2, error) {
+	var backendRef T1
+	var routeRule T2
+	isFound := false
+	for next, hasNext := routeRuleList.Iterator(); hasNext; {
+		routeRule, hasNext = next()
+		_, hasNext := routeRule.Iterator()
+		if !hasNext {
 			continue
 		}
-		return backendRefList, nil
+		for _, backendRefName := range backendRefNameList {
+			isFound = false
+			for next, hasNext := routeRule.Iterator(); hasNext; {
+				backendRef, hasNext = next()
+				if backendRefName == backendRef.GetName() {
+					isFound = true
+					continue
+				}
+			}
+			if !isFound {
+				break
+			}
+		}
+		return routeRule, nil
 	}
-	return nil, ruleList.Error()
+	return nil, routeRuleList.Error()
 }
 
-func getBackendRef[T1 GatewayAPIBackendRef, T2 GatewayAPIBackendRefList[T1]](backendRefName string, ruleList GatewayAPIRouteRuleCollection[T1, T2]) (T1, error) {
-	var selectedService, backendRef T1
-	backendRefList, err := getBackendRefList[T1, T2](ruleList)
-	if err != nil {
-		return nil, err
-	}
-	for next, hasNext := backendRefList.Iterator(); hasNext; {
-		backendRef, hasNext = next()
-		nameOfCurrentService := backendRef.GetName()
-		if nameOfCurrentService == backendRefName {
-			selectedService = backendRef
-			break
+func getBackendRef[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3) (T1, error) {
+	var backendRef T1
+	var routeRule T2
+	for next, hasNext := routeRuleList.Iterator(); hasNext; {
+		routeRule, hasNext = next()
+		for next, hasNext := routeRule.Iterator(); hasNext; {
+			backendRef, hasNext = next()
+			if backendRefName == backendRef.GetName() {
+				return backendRef, nil
+			}
 		}
 	}
-	if selectedService == nil {
-		return nil, backendRefList.Error()
-	}
-	return selectedService, nil
+	return nil, routeRuleList.Error()
 }

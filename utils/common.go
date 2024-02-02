@@ -71,7 +71,7 @@ func CreateConfigMap(name string, options CreateConfigMapOptions) (*v1.ConfigMap
 	return configMap, err
 }
 
-func SetConfigMapData(configMap *v1.ConfigMap, configMapKey string, destination any) error {
+func GetConfigMapData(configMap *v1.ConfigMap, configMapKey string, destination any) error {
 	if configMap.Data != nil && configMap.Data[configMapKey] != "" {
 		err := json.Unmarshal([]byte(configMap.Data[configMapKey]), &destination)
 		if err != nil {
