@@ -49,7 +49,6 @@ func CreateFormatter(logFormat string) log.Formatter {
 			FullTimestamp: true,
 		}
 	}
-
 	return formatType
 }
 

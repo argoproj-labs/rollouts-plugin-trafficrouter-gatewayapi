@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
@@ -182,4 +183,19 @@ func getBackendRef[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gatew
 		}
 	}
 	return nil, routeRuleList.Error()
+}
+
+func removeManagedRouteEntry(managedRouteMap map[string]int, routeRuleList HTTPRouteRuleList, managedRouteName string) (HTTPRouteRuleList, error) {
+	managedRouteIndex, isOk := managedRouteMap[managedRouteName]
+	if !isOk {
+		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteName, managedRouteName)
+	}
+	delete(managedRouteMap, managedRouteName)
+	for key, value := range managedRouteMap {
+		if value > managedRouteIndex {
+			managedRouteMap[key]--
+		}
+	}
+	routeRuleList = utils.RemoveIndex(routeRuleList, managedRouteIndex)
+	return routeRuleList, nil
 }
