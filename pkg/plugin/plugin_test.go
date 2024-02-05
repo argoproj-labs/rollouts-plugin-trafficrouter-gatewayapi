@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
 
 	goPlugin "github.com/hashicorp/go-plugin"
@@ -104,7 +105,10 @@ func TestRunSuccessfully(t *testing.T) {
 	}
 	t.Run("SetHTTPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
-		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName), desiredWeight, []v1alpha1.WeightDestination{})
+		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.Namespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		}), desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
@@ -112,9 +116,36 @@ func TestRunSuccessfully(t *testing.T) {
 	})
 	t.Run("SetTCPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
-		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.TCPRoute, mocks.TCPRouteName), desiredWeight, []v1alpha1.WeightDestination{})
+		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.Namespace,
+				TCPRoute:  mocks.TCPRouteName,
+			}), desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
+	t.Run("SetWeightViaRoutes", func(t *testing.T) {
+		var desiredWeight int32 = 30
+		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.Namespace,
+				Routes: []v1beta1.LocalObjectReference{
+					{
+						Kind: HTTPRouteKind,
+						Name: mocks.HTTPRouteName,
+					},
+					{
+						Kind: TCPRouteKind,
+						Name: mocks.TCPRouteName,
+					},
+				},
+			}), desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
@@ -124,17 +155,8 @@ func TestRunSuccessfully(t *testing.T) {
 	<-closeCh
 }
 
-func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rollout {
-	gatewayAPIConfig := GatewayAPITrafficRouting{
-		Namespace: mocks.Namespace,
-	}
-	switch routeType {
-	case mocks.HTTPRoute:
-		gatewayAPIConfig.HTTPRoute = routeName
-	case mocks.TCPRoute:
-		gatewayAPIConfig.TCPRoute = routeName
-	}
-	encodedGatewayAPIConfig, err := json.Marshal(gatewayAPIConfig)
+func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
+	encodedConfig, err := json.Marshal(config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -150,7 +172,7 @@ func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rol
 					CanaryService: canarySvc,
 					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
 						Plugins: map[string]json.RawMessage{
-							PluginName: encodedGatewayAPIConfig,
+							PluginName: encodedConfig,
 						},
 					},
 				},

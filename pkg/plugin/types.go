@@ -20,6 +20,9 @@ type RpcPlugin struct {
 }
 
 type GatewayAPITrafficRouting struct {
+	// Routes refers to HTTPRoute and TCPRoute resources used to route traffic
+	// to the service
+	Routes []v1beta1.LocalObjectReference `json:"routes,omitempty"`
 	// HTTPRoute refers to the name of the HTTPRoute used to route traffic to the
 	// service
 	HTTPRoute string `json:"httpRoute,omitempty"`

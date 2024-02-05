@@ -2,10 +2,12 @@ package plugin
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
@@ -15,7 +17,10 @@ const (
 	PluginName = "argoproj-labs/gatewayAPI"
 
 	GatewayAPIUpdateError   = "GatewayAPIUpdateError"
-	GatewayAPIManifestError = "httpRoute and tcpRoute fields are empty. tcpRoute or httpRoute should be set"
+	GatewayAPIManifestError = "No routes configured. One of 'routes', 'tcpRoute' or 'httpRoute' should be set"
+
+	HTTPRouteKind = "HTTPRoute"
+	TCPRouteKind  = "TCPRoute"
 )
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
@@ -43,22 +48,56 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 }
 
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
-	gatewayAPIConfig := GatewayAPITrafficRouting{}
-	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
-	if err != nil {
+	gatewayAPIConfig := &GatewayAPITrafficRouting{}
+	if err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], gatewayAPIConfig); err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
+
 	if gatewayAPIConfig.HTTPRoute != "" {
-		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+		gatewayAPIConfig.Routes = append(gatewayAPIConfig.Routes, v1beta1.LocalObjectReference{
+			Kind: HTTPRouteKind,
+			Name: v1beta1.ObjectName(gatewayAPIConfig.HTTPRoute),
+		})
 	}
+
 	if gatewayAPIConfig.TCPRoute != "" {
-		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+		gatewayAPIConfig.Routes = append(gatewayAPIConfig.Routes, v1beta1.LocalObjectReference{
+			Kind: TCPRouteKind,
+			Name: v1beta1.ObjectName(gatewayAPIConfig.TCPRoute),
+		})
 	}
-	return pluginTypes.RpcError{
-		ErrorString: GatewayAPIManifestError,
+
+	if len(gatewayAPIConfig.Routes) == 0 {
+		return pluginTypes.RpcError{
+			ErrorString: GatewayAPIManifestError,
+		}
 	}
+
+	var err pluginTypes.RpcError
+	for _, ref := range gatewayAPIConfig.Routes {
+		if ref.Kind == "" {
+			// Assume HTTPRoute by default
+			ref.Kind = HTTPRouteKind
+		}
+
+		switch ref.Kind {
+		case HTTPRouteKind:
+			err = r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig, string(ref.Name))
+		case TCPRouteKind:
+			err = r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig, string(ref.Name))
+		default:
+			r.LogCtx.Warnf("unsupported kind %q for route %q, supported values: %q, %q", ref.Kind, ref.Name, HTTPRouteKind, TCPRouteKind)
+		}
+		if err.HasError() {
+			return pluginTypes.RpcError{
+				ErrorString: fmt.Sprintf("set weight for %s %q: %s", ref.Kind, ref.Name, err),
+			}
+		}
+	}
+
+	return err
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
