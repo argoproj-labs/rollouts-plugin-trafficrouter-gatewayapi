@@ -10,14 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting, routeName string) pluginTypes.RpcError {
+func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	tcpRouteClient := r.TCPRouteClient
 	if !r.IsTest {
 		gatewayV1alpha2 := r.Client.GatewayV1alpha2()
 		tcpRouteClient = gatewayV1alpha2.TCPRoutes(gatewayAPIConfig.Namespace)
 	}
-	tcpRoute, err := tcpRouteClient.Get(ctx, routeName, metav1.GetOptions{})
+	tcpRoute, err := tcpRouteClient.Get(ctx, gatewayAPIConfig.TCPRoute, metav1.GetOptions{})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

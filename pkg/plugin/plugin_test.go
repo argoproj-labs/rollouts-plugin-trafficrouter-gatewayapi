@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
 
 	goPlugin "github.com/hashicorp/go-plugin"
@@ -131,7 +130,7 @@ func TestRunSuccessfully(t *testing.T) {
 		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
 			&GatewayAPITrafficRouting{
 				Namespace: mocks.Namespace,
-				Routes: []v1beta1.LocalObjectReference{
+				Routes: []GatewayAPIRouteReference{
 					{
 						Kind: HTTPRouteKind,
 						Name: mocks.HTTPRouteName,

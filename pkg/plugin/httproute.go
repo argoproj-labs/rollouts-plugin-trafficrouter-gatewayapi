@@ -10,14 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting, routeName string) pluginTypes.RpcError {
+func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
 		gatewayV1beta1 := r.Client.GatewayV1beta1()
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	}
-	httpRoute, err := httpRouteClient.Get(ctx, routeName, metav1.GetOptions{})
+	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
