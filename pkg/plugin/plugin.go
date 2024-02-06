@@ -67,7 +67,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 
 	for _, name := range gatewayAPIConfig.HTTPRoutes {
-		err := r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, GatewayAPITrafficRouting{
+		err := r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
 			Namespace: gatewayAPIConfig.Namespace,
 			HTTPRoute: name,
 		})
@@ -78,7 +78,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		}
 	}
 	for _, name := range gatewayAPIConfig.TCPRoutes {
-		err := r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, GatewayAPITrafficRouting{
+		err := r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
 			Namespace: gatewayAPIConfig.Namespace,
 			TCPRoute:  name,
 		})
