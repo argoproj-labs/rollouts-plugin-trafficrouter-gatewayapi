@@ -16,7 +16,7 @@ const (
 	PluginName = "argoproj-labs/gatewayAPI"
 
 	GatewayAPIUpdateError   = "GatewayAPIUpdateError"
-	GatewayAPIManifestError = "No routes configured. One of 'routes', 'tcpRoute' or 'httpRoute' should be set"
+	GatewayAPIManifestError = "No routes configured. One of 'tcpRoutes', 'httpRoutes', 'tcpRoute' or 'httpRoute' should be set"
 )
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
