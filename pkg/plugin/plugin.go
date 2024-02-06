@@ -55,38 +55,30 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	if gatewayAPIConfig.HTTPRoute != "" {
 		gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, gatewayAPIConfig.HTTPRoute)
 	}
-
 	if gatewayAPIConfig.TCPRoute != "" {
 		gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, gatewayAPIConfig.TCPRoute)
 	}
-
-	if len(gatewayAPIConfig.HTTPRoutes) == 0 && len(gatewayAPIConfig.TCPRoutes) == 0 {
+	if configHasNoRoutesConfigured(&gatewayAPIConfig) {
 		return pluginTypes.RpcError{
 			ErrorString: GatewayAPIManifestError,
 		}
 	}
 
-	for _, name := range gatewayAPIConfig.HTTPRoutes {
-		err := r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
+	if err := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(routeName string) pluginTypes.RpcError {
+		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
 			Namespace: gatewayAPIConfig.Namespace,
-			HTTPRoute: name,
+			HTTPRoute: routeName,
 		})
-		if err.HasError() {
-			return pluginTypes.RpcError{
-				ErrorString: fmt.Sprintf("set weight for HTTPRoute %q: %s", name, err),
-			}
-		}
+	}); err.HasError() {
+		return err
 	}
-	for _, name := range gatewayAPIConfig.TCPRoutes {
-		err := r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
+	if err := forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(routeName string) pluginTypes.RpcError {
+		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
 			Namespace: gatewayAPIConfig.Namespace,
-			TCPRoute:  name,
+			TCPRoute:  routeName,
 		})
-		if err.HasError() {
-			return pluginTypes.RpcError{
-				ErrorString: fmt.Sprintf("set weight for TCPRoute %q: %s", name, err),
-			}
-		}
+	}); err.HasError() {
+		return err
 	}
 	return pluginTypes.RpcError{}
 }
@@ -137,4 +129,19 @@ func getBackendRef[T GatewayAPIBackendRef](backendRefName string, backendRefList
 		return nil, backendRefList.Error()
 	}
 	return selectedService, nil
+}
+
+func configHasNoRoutesConfigured(config *GatewayAPITrafficRouting) bool {
+	return len(config.HTTPRoutes) == 0 && len(config.TCPRoutes) == 0
+}
+
+func forEachGatewayAPIRoute(names []string, fn func(routeName string) pluginTypes.RpcError) pluginTypes.RpcError {
+	for _, name := range names {
+		if err := fn(name); err.HasError() {
+			return pluginTypes.RpcError{
+				ErrorString: fmt.Sprintf("set weight for route %q: %s", name, err),
+			}
+		}
+	}
+	return pluginTypes.RpcError{}
 }
