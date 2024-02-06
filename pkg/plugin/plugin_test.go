@@ -129,17 +129,9 @@ func TestRunSuccessfully(t *testing.T) {
 		var desiredWeight int32 = 30
 		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
 			&GatewayAPITrafficRouting{
-				Namespace: mocks.Namespace,
-				Routes: []GatewayAPIRouteReference{
-					{
-						Kind: HTTPRouteKind,
-						Name: mocks.HTTPRouteName,
-					},
-					{
-						Kind: TCPRouteKind,
-						Name: mocks.TCPRouteName,
-					},
-				},
+				Namespace:  mocks.Namespace,
+				HTTPRoutes: []string{mocks.HTTPRouteName},
+				TCPRoutes:  []string{mocks.TCPRouteName},
 			}), desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())

@@ -9,11 +9,6 @@ import (
 	gatewayApiv1beta1 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1beta1"
 )
 
-const (
-	HTTPRouteKind = "HTTPRoute"
-	TCPRouteKind  = "TCPRoute"
-)
-
 type RpcPlugin struct {
 	IsTest               bool
 	LogCtx               *logrus.Entry
@@ -24,17 +19,13 @@ type RpcPlugin struct {
 	TCPRouteClient       gatewayApiv1alpha2.TCPRouteInterface
 }
 
-type GatewayAPIRouteReference struct {
-	// Kind is kind of the route resource. For example "HTTPRoute" or "TCPRoute".
-	Kind string
-	// Name is the name of the route resource.
-	Name string
-}
-
 type GatewayAPITrafficRouting struct {
-	// Routes refers to HTTPRoute and TCPRoute resources used to route traffic
-	// to the service
-	Routes []GatewayAPIRouteReference `json:"routes,omitempty"`
+	// HTTPRoutes refer to names of HTTPRoute resources used to route traffic to the
+	// service
+	HTTPRoutes []string `json:"httpRoutes,omitempty"`
+	// TCPRoutes refer to names of TCPRoute resources used to route traffic to the
+	// service
+	TCPRoutes []string `json:"tcpRoutes,omitempty"`
 	// HTTPRoute refers to the name of the HTTPRoute used to route traffic to the
 	// service
 	HTTPRoute string `json:"httpRoute,omitempty"`

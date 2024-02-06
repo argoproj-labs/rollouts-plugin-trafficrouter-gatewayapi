@@ -44,8 +44,8 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 }
 
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
-	gatewayAPIConfig := &GatewayAPITrafficRouting{}
-	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], gatewayAPIConfig)
+	gatewayAPIConfig := GatewayAPITrafficRouting{}
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -53,54 +53,42 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 
 	if gatewayAPIConfig.HTTPRoute != "" {
-		gatewayAPIConfig.Routes = append(gatewayAPIConfig.Routes, GatewayAPIRouteReference{
-			Kind: HTTPRouteKind,
-			Name: gatewayAPIConfig.HTTPRoute,
-		})
+		gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, gatewayAPIConfig.HTTPRoute)
 	}
 
 	if gatewayAPIConfig.TCPRoute != "" {
-		gatewayAPIConfig.Routes = append(gatewayAPIConfig.Routes, GatewayAPIRouteReference{
-			Kind: TCPRouteKind,
-			Name: gatewayAPIConfig.TCPRoute,
-		})
+		gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, gatewayAPIConfig.TCPRoute)
 	}
 
-	if len(gatewayAPIConfig.Routes) == 0 {
+	if len(gatewayAPIConfig.HTTPRoutes) == 0 && len(gatewayAPIConfig.TCPRoutes) == 0 {
 		return pluginTypes.RpcError{
 			ErrorString: GatewayAPIManifestError,
 		}
 	}
 
-	var rpcErr pluginTypes.RpcError
-	for _, ref := range gatewayAPIConfig.Routes {
-		if ref.Kind == "" {
-			// Assume HTTPRoute by default
-			ref.Kind = HTTPRouteKind
-		}
-
-		switch ref.Kind {
-		case HTTPRouteKind:
-			rpcErr = r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, GatewayAPITrafficRouting{
-				Namespace: gatewayAPIConfig.Namespace,
-				HTTPRoute: ref.Name,
-			})
-		case TCPRouteKind:
-			rpcErr = r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, GatewayAPITrafficRouting{
-				Namespace: gatewayAPIConfig.Namespace,
-				TCPRoute:  ref.Name,
-			})
-		default:
-			r.LogCtx.Warnf("unsupported kind %q for route %q, supported values: %q, %q", ref.Kind, ref.Name, HTTPRouteKind, TCPRouteKind)
-		}
-		if rpcErr.HasError() {
+	for _, name := range gatewayAPIConfig.HTTPRoutes {
+		err := r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, GatewayAPITrafficRouting{
+			Namespace: gatewayAPIConfig.Namespace,
+			HTTPRoute: name,
+		})
+		if err.HasError() {
 			return pluginTypes.RpcError{
-				ErrorString: fmt.Sprintf("set weight for %s %q: %s", ref.Kind, ref.Name, err),
+				ErrorString: fmt.Sprintf("set weight for HTTPRoute %q: %s", name, err),
 			}
 		}
 	}
-
-	return rpcErr
+	for _, name := range gatewayAPIConfig.TCPRoutes {
+		err := r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, GatewayAPITrafficRouting{
+			Namespace: gatewayAPIConfig.Namespace,
+			TCPRoute:  name,
+		})
+		if err.HasError() {
+			return pluginTypes.RpcError{
+				ErrorString: fmt.Sprintf("set weight for TCPRoute %q: %s", name, err),
+			}
+		}
+	}
+	return pluginTypes.RpcError{}
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
