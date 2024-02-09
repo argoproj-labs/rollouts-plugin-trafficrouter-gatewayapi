@@ -2,20 +2,19 @@ package plugin
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	"k8s.io/client-go/kubernetes"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
 const (
-	// Type holds this controller type
 	Type       = "GatewayAPI"
 	PluginName = "argoproj-labs/gatewayAPI"
-
-	GatewayAPIUpdateError   = "GatewayAPIUpdateError"
-	GatewayAPIManifestError = "httpRoute and tcpRoute fields are empty. tcpRoute or httpRoute should be set"
 )
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
@@ -28,13 +27,20 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 			ErrorString: err.Error(),
 		}
 	}
-	clientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
+	gatewayAPIClientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	r.Client = clientset
+	clientset, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	r.GatewayAPIClientset = gatewayAPIClientset
+	r.Clientset = clientset
 	return pluginTypes.RpcError{}
 }
 
@@ -43,25 +49,52 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 }
 
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
-	gatewayAPIConfig := GatewayAPITrafficRouting{}
-	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
+	gatewayAPIConfig, err := getGatewayAPITracfficRoutingConfig(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
-	if gatewayAPIConfig.HTTPRoute != "" {
-		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+	switch {
+	case gatewayAPIConfig.HTTPRoute != "":
+		rpcError := r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			return rpcError
+		}
+	case gatewayAPIConfig.TCPRoute != "":
+		rpcError := r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			return rpcError
+		}
+	default:
+		return pluginTypes.RpcError{
+			ErrorString: GatewayAPIManifestError,
+		}
 	}
-	if gatewayAPIConfig.TCPRoute != "" {
-		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &gatewayAPIConfig)
-	}
-	return pluginTypes.RpcError{
-		ErrorString: GatewayAPIManifestError,
-	}
+	return pluginTypes.RpcError{}
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
+	gatewayAPIConfig, err := getGatewayAPITracfficRoutingConfig(rollout)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	switch {
+	case gatewayAPIConfig.HTTPRoute != "":
+		httpHeaderRoute.mutex.Lock()
+		rpcError := r.setHTTPHeaderRoute(rollout, headerRouting, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			httpHeaderRoute.mutex.Unlock()
+			return rpcError
+		}
+		httpHeaderRoute.mutex.Unlock()
+	default:
+		return pluginTypes.RpcError{
+			ErrorString: HTTPRouteFieldIsEmptyError,
+		}
+	}
 	return pluginTypes.RpcError{}
 }
 
@@ -74,6 +107,26 @@ func (r *RpcPlugin) VerifyWeight(rollout *v1alpha1.Rollout, desiredWeight int32,
 }
 
 func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.RpcError {
+	gatewayAPIConfig, err := getGatewayAPITracfficRoutingConfig(rollout)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	switch {
+	case gatewayAPIConfig.HTTPRoute != "":
+		httpHeaderRoute.mutex.Lock()
+		rpcError := r.removeHTTPManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, &gatewayAPIConfig)
+		if rpcError.HasError() {
+			httpHeaderRoute.mutex.Unlock()
+			return rpcError
+		}
+		httpHeaderRoute.mutex.Unlock()
+	default:
+		return pluginTypes.RpcError{
+			ErrorString: HTTPRouteFieldIsEmptyError,
+		}
+	}
 	return pluginTypes.RpcError{}
 }
 
@@ -81,30 +134,68 @@ func (r *RpcPlugin) Type() string {
 	return Type
 }
 
-func getBackendRefList[T GatewayAPIBackendRefList](ruleList GatewayAPIRouteRuleCollection[T]) (T, error) {
-	var backendRefList T
-	for next, hasNext := ruleList.Iterator(); hasNext; {
-		backendRefList, hasNext = next()
-		if backendRefList == nil {
-			continue
-		}
-		return backendRefList, nil
+func getGatewayAPITracfficRoutingConfig(rollout *v1alpha1.Rollout) (GatewayAPITrafficRouting, error) {
+	gatewayAPIConfig := GatewayAPITrafficRouting{
+		ConfigMap: defaults.ConfigMap,
 	}
-	return nil, ruleList.Error()
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
+	return gatewayAPIConfig, err
 }
 
-func getBackendRef[T GatewayAPIBackendRef](backendRefName string, backendRefList GatewayAPIBackendRefCollection[T]) (T, error) {
-	var selectedService, backendRef T
-	for next, hasNext := backendRefList.Iterator(); hasNext; {
-		backendRef, hasNext = next()
-		nameOfCurrentService := backendRef.GetName()
-		if nameOfCurrentService == backendRefName {
-			selectedService = backendRef
-			break
+func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](routeRuleList T3, backendRefNameList ...string) (T2, error) {
+	var backendRef T1
+	var routeRule T2
+	isFound := false
+	for next, hasNext := routeRuleList.Iterator(); hasNext; {
+		routeRule, hasNext = next()
+		_, hasNext := routeRule.Iterator()
+		if !hasNext {
+			continue
+		}
+		for _, backendRefName := range backendRefNameList {
+			isFound = false
+			for next, hasNext := routeRule.Iterator(); hasNext; {
+				backendRef, hasNext = next()
+				if backendRefName == backendRef.GetName() {
+					isFound = true
+					continue
+				}
+			}
+			if !isFound {
+				break
+			}
+		}
+		return routeRule, nil
+	}
+	return nil, routeRuleList.Error()
+}
+
+func getBackendRef[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3) (T1, error) {
+	var backendRef T1
+	var routeRule T2
+	for next, hasNext := routeRuleList.Iterator(); hasNext; {
+		routeRule, hasNext = next()
+		for next, hasNext := routeRule.Iterator(); hasNext; {
+			backendRef, hasNext = next()
+			if backendRefName == backendRef.GetName() {
+				return backendRef, nil
+			}
 		}
 	}
-	if selectedService == nil {
-		return nil, backendRefList.Error()
+	return nil, routeRuleList.Error()
+}
+
+func removeManagedRouteEntry(managedRouteMap map[string]int, routeRuleList HTTPRouteRuleList, managedRouteName string) (HTTPRouteRuleList, error) {
+	managedRouteIndex, isOk := managedRouteMap[managedRouteName]
+	if !isOk {
+		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteName, managedRouteName)
 	}
-	return selectedService, nil
+	delete(managedRouteMap, managedRouteName)
+	for key, value := range managedRouteMap {
+		if value > managedRouteIndex {
+			managedRouteMap[key]--
+		}
+	}
+	routeRuleList = utils.RemoveIndex(routeRuleList, managedRouteIndex)
+	return routeRuleList, nil
 }

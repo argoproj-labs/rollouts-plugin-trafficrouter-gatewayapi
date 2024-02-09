@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -9,18 +10,26 @@ import (
 )
 
 const (
-	HTTPRoute         = "HTTPRoute"
-	TCPRoute          = "TCPRoute"
-	StableServiceName = "argo-rollouts-stable-service"
-	CanaryServiceName = "argo-rollouts-canary-service"
-	HTTPRouteName     = "argo-rollouts-http-route"
-	TCPRouteName      = "argo-rollouts-tcp-route"
-	Namespace         = "default"
+	HTTPRoute            = "HTTPRoute"
+	TCPRoute             = "TCPRoute"
+	StableServiceName    = "argo-rollouts-stable-service"
+	CanaryServiceName    = "argo-rollouts-canary-service"
+	HTTPRouteName        = "argo-rollouts-http-route"
+	TCPRouteName         = "argo-rollouts-tcp-route"
+	Namespace            = "default"
+	ConfigMapName        = "test-config"
+	HTTPManagedRouteName = "test-http-header-route"
 )
 
 var (
-	port         = v1beta1.PortNumber(80)
-	weight int32 = 0
+	port                     = v1beta1.PortNumber(80)
+	weight             int32 = 0
+	httpPathMatchType        = v1beta1.PathMatchPathPrefix
+	httpPathMatchValue       = "/"
+	httpPathMatch            = v1beta1.HTTPPathMatch{
+		Type:  &httpPathMatchType,
+		Value: &httpPathMatchValue,
+	}
 )
 
 var HTTPRouteObj = v1beta1.HTTPRoute{
@@ -56,6 +65,11 @@ var HTTPRouteObj = v1beta1.HTTPRoute{
 							},
 							Weight: &weight,
 						},
+					},
+				},
+				Matches: []v1beta1.HTTPRouteMatch{
+					{
+						Path: &httpPathMatch,
 					},
 				},
 			},
@@ -96,5 +110,12 @@ var TCPPRouteObj = v1alpha2.TCPRoute{
 				},
 			},
 		},
+	},
+}
+
+var ConfigMapObj = v1.ConfigMap{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      ConfigMapName,
+		Namespace: Namespace,
 	},
 }

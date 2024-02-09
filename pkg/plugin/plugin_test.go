@@ -6,12 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/mocks"
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	"sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	log "github.com/sirupsen/logrus"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
@@ -36,8 +38,9 @@ func TestRunSuccessfully(t *testing.T) {
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          logCtx,
 		IsTest:          true,
-		HTTPRouteClient: gwFake.NewSimpleClientset(&(mocks.HTTPRouteObj)).GatewayV1beta1().HTTPRoutes(mocks.Namespace),
-		TCPRouteClient:  gwFake.NewSimpleClientset(&(mocks.TCPPRouteObj)).GatewayV1alpha2().TCPRoutes(mocks.Namespace),
+		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1beta1().HTTPRoutes(mocks.Namespace),
+		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.Namespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.Namespace),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -118,6 +121,36 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
+	t.Run("SetHTTPHeaderRoute", func(t *testing.T) {
+		headerName := "X-Test"
+		headerValue := "test"
+		headerValueType := v1beta1.HeaderMatchRegularExpression
+		prefixedHeaderValue := headerValue + ".*"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.HTTPManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		err := pluginInstance.SetHeaderRoute(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName), &headerRouting)
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
+		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
+		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
+	})
+	t.Run("RemoveHTTPManagedRoutes", func(t *testing.T) {
+		err := pluginInstance.RemoveManagedRoutes(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName))
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 1, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
+	})
 
 	// Canceling should cause an exit
 	cancel()
@@ -127,6 +160,7 @@ func TestRunSuccessfully(t *testing.T) {
 func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rollout {
 	gatewayAPIConfig := GatewayAPITrafficRouting{
 		Namespace: mocks.Namespace,
+		ConfigMap: mocks.ConfigMapName,
 	}
 	switch routeType {
 	case mocks.HTTPRoute:
@@ -149,6 +183,11 @@ func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rol
 					StableService: stableSvc,
 					CanaryService: canarySvc,
 					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+						ManagedRoutes: []v1alpha1.MangedRoutes{
+							{
+								Name: mocks.HTTPManagedRouteName,
+							},
+						},
 						Plugins: map[string]json.RawMessage{
 							PluginName: encodedGatewayAPIConfig,
 						},
