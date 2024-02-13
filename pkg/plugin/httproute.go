@@ -259,7 +259,10 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
-	configMap, err := clientset.Get(ctx, gatewayAPIConfig.ConfigMap, metav1.GetOptions{})
+	configMap, err := utils.CreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+		Clientset: clientset,
+		Ctx:       ctx,
+	})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
