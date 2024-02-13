@@ -281,6 +281,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 		}
 	}
 	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+	isHTTPRouteRuleListChanged := false
 	for _, managedRoute := range managedRouteNameList {
 		managedRouteName := managedRoute.Name
 		_, isOk := managedRouteMap[managedRouteName]
@@ -288,12 +289,16 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			r.LogCtx.Logger.Info(fmt.Sprintf("%s is not in httpHeaderManagedRouteMap", managedRouteName))
 			continue
 		}
+		isHTTPRouteRuleListChanged = true
 		httpRouteRuleList, err = removeManagedRouteEntry(managedRouteMap, httpRouteRuleList, managedRouteName)
 		if err != nil {
 			return pluginTypes.RpcError{
 				ErrorString: err.Error(),
 			}
 		}
+	}
+	if !isHTTPRouteRuleListChanged {
+		return pluginTypes.RpcError{}
 	}
 	oldHTTPRuleList := httpRoute.Spec.Rules
 	httpRoute.Spec.Rules = httpRouteRuleList
