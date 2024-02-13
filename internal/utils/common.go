@@ -52,7 +52,7 @@ func CreateFormatter(logFormat string) log.Formatter {
 	return formatType
 }
 
-func CreateConfigMap(name string, options CreateConfigMapOptions) (*v1.ConfigMap, error) {
+func GetOrCreateConfigMap(name string, options CreateConfigMapOptions) (*v1.ConfigMap, error) {
 	clientset := options.Clientset
 	ctx := options.Ctx
 	configMap, err := clientset.Get(ctx, name, metav1.GetOptions{})

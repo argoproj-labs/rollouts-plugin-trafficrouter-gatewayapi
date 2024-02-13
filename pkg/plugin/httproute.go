@@ -84,7 +84,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
-	configMap, err := utils.CreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
 		Clientset: clientset,
 		Ctx:       ctx,
 	})
@@ -259,7 +259,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
-	configMap, err := utils.CreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
 		Clientset: clientset,
 		Ctx:       ctx,
 	})
