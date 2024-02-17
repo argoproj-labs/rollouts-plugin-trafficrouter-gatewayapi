@@ -81,6 +81,11 @@ data:
 
 Deploy this file with `kubectl` or Argo CD or any other deployment method you use for your cluster.
 
+Restart the Argo Rollouts pod for the plug-in to take effect.
+```shell
+kubectl rollout restart deployment -n argo-rollouts argo-rollouts
+```
+
 For more details see the [Plugin documentation](https://argoproj.github.io/argo-rollouts/features/traffic-management/plugins/) at Argo Rollouts.
 
 ## Feedback needed
