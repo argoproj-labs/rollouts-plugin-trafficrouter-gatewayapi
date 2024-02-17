@@ -13,8 +13,6 @@ import (
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
-// TODO: think about reference of GatewayAPI or simply structure
-
 const (
 	Type       = "GatewayAPI"
 	PluginName = "argoproj-labs/gatewayAPI"
@@ -63,7 +61,6 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 			ErrorString: GatewayAPIManifestError,
 		}
 	}
-	// TODO: Add at the begining how many routes we accepted
 	rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
 			Namespace: gatewayAPIConfig.Namespace,
