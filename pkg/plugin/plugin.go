@@ -61,6 +61,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 			ErrorString: GatewayAPIManifestError,
 		}
 	}
+	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 	rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 		gatewayAPIConfig.HTTPRoute = route.Name
 		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
@@ -68,6 +69,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	if rpcError.HasError() {
 		return rpcError
 	}
+	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
 	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
 		gatewayAPIConfig.TCPRoute = route.Name
 		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
@@ -84,6 +86,7 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
 		gatewayAPIConfig.ConfigMapRWMutex.Lock()
+		r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
@@ -117,6 +120,7 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
 		gatewayAPIConfig.ConfigMapRWMutex.Lock()
+		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
@@ -139,19 +143,19 @@ func (r *RpcPlugin) Type() string {
 
 func getGatewayAPITracfficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
-	gatewayAPIConfig := GatewayAPITrafficRouting{
+	gatewayAPIConfig := &GatewayAPITrafficRouting{
 		ConfigMap: defaults.ConfigMap,
 	}
 	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
 	if err != nil {
-		return &gatewayAPIConfig, err
+		return gatewayAPIConfig, err
 	}
-	insertGatewayAPIRouteLists(&gatewayAPIConfig)
-	err = validate.Struct(&gatewayAPIConfig)
+	insertGatewayAPIRouteLists(gatewayAPIConfig)
+	err = validate.Struct(gatewayAPIConfig)
 	if err != nil {
-		return &gatewayAPIConfig, err
+		return gatewayAPIConfig, err
 	}
-	return &gatewayAPIConfig, err
+	return gatewayAPIConfig, err
 }
 
 func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
@@ -248,4 +252,12 @@ func forEachGatewayAPIRoute[T1 GatewayAPIRoute](routeList []T1, fn func(route T1
 		}
 	}
 	return pluginTypes.RpcError{}
+}
+
+func getGatewayAPIRouteNameList[T1 GatewayAPIRoute](gatewayAPIRouteList []T1) []string {
+	gatewayAPIRouteNameList := make([]string, len(gatewayAPIRouteList))
+	for index, value := range gatewayAPIRouteList {
+		gatewayAPIRouteNameList[index] = value.GetName()
+	}
+	return gatewayAPIRouteNameList
 }

@@ -79,6 +79,7 @@ type TCPBackendRef v1beta1.BackendRef
 
 type GatewayAPIRoute interface {
 	HTTPRoute | TCPRoute
+	GetName() string
 }
 
 type GatewayAPIRouteRule[T1 GatewayAPIBackendRef] interface {

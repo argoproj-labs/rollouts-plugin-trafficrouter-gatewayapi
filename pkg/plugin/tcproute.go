@@ -87,3 +87,7 @@ func (r TCPRouteRuleList) Error() error {
 func (r *TCPBackendRef) GetName() string {
 	return string(r.Name)
 }
+
+func (r TCPRoute) GetName() string {
+	return r.Name
+}

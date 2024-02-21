@@ -30,7 +30,6 @@ func main() {
 	var pluginMap = map[string]goPlugin.Plugin{
 		"RpcTrafficRouterPlugin": &rolloutsPlugin.RpcTrafficRouterPlugin{Impl: rpcPluginImp},
 	}
-	logCtx.Debug("message from plugin", "foo", "bar")
 	goPlugin.Serve(&goPlugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,

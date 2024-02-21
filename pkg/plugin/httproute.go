@@ -400,3 +400,7 @@ func (r HTTPRouteRuleList) Error() error {
 func (r *HTTPBackendRef) GetName() string {
 	return string(r.Name)
 }
+
+func (r HTTPRoute) GetName() string {
+	return r.Name
+}
