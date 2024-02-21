@@ -342,4 +342,4 @@ plugins:
 ```
 You can control for what routes you need to add header routes during step of setHeaderRoute in Argo Rollout.
 
-**Notice** All these features work also with TCPRoutes 
+**Notice** All these features except traffic routing based on a header values for canary work also with TCPRoutes 
