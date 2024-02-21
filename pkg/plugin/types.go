@@ -39,7 +39,7 @@ type GatewayAPITrafficRouting struct {
 	// service
 	TCPRoutes []TCPRoute `json:"tcpRoutes,omitempty"`
 	// Namespace refers to the namespace of the specified resource
-	Namespace string `json:"namespace" validate:"required"`
+	Namespace string `json:"namespace,omitempty"`
 	// ConfigMap refers to the config map where plugin stores data about managed routes
 	ConfigMap string `json:"configMap,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section

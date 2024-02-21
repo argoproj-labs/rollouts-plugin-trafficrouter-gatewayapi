@@ -271,6 +271,75 @@ Apply all the yaml files to your cluster
 
 ## Step 8 - Test the canary
 
-Perform a deployment like any other Rollout and the Gateway plugin will split the traffic to your canary by instructing Traefik proxy via the Gateway API
+Perform a deployment like any other Rollout and the Gateway plugin will split the traffic to your canary by instructing Traefik proxy via the Gateway API.
 
+### Notice
 
+GatewayAPI plugin supports traffic routing based on a header values for canary, so you can also use setHeaderRoute step in Argo Rollouts manifest. It also means that plugin should control managed routes. It creates ConfigMap in the specified namespace in **namespace** field with specified name in **configMap** field for that.
+```yaml
+plugins:
+  argoproj-labs/gatewayAPI:
+    namespace: test
+    httpRoute: http-route
+    configMap: test-gateway # default value is argo-gatewayapi-configmap
+```
+
+## How to use  multiple routes per rollout
+
+## Step 1 - Create several routes
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: first-route
+spec:
+  parentRefs:
+    - name: gateway
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /first
+    backendRefs:
+    - name: argo-rollouts-stable-service
+      kind: Service
+      port: 80
+    - name: argo-rollouts-canary-service
+      kind: Service
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: second-route
+spec:
+  parentRefs:
+    - name: gateway
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /second  
+    backendRefs:
+    - name: argo-rollouts-stable-service
+      kind: Service
+      port: 80
+    - name: argo-rollouts-canary-service
+      kind: Service
+      port: 80
+```
+
+## Step 2 - Change argoproj-labs/gatewayAPI field in Argo Rollout manifest
+
+```yaml
+plugins:
+  argoproj-labs/gatewayAPI:
+    httpRoutes:
+       - name: first-route # required
+         useHeaderRoutes: true
+       - name: second-route
+```
+You can control for what routes you need to add header routes during step of setHeaderRoute in Argo Rollout.
+
+**Notice** All these features work also with TCPRoutes 
