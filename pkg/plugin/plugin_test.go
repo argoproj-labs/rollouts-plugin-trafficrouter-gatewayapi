@@ -38,9 +38,9 @@ func TestRunSuccessfully(t *testing.T) {
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          logCtx,
 		IsTest:          true,
-		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1beta1().HTTPRoutes(mocks.Namespace),
-		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.Namespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.Namespace),
+		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1beta1().HTTPRoutes(mocks.RolloutNamespace),
+		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -108,7 +108,7 @@ func TestRunSuccessfully(t *testing.T) {
 	t.Run("SetHTTPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
-			Namespace: mocks.Namespace,
+			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
 		})
 		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
@@ -121,7 +121,7 @@ func TestRunSuccessfully(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
 			&GatewayAPITrafficRouting{
-				Namespace: mocks.Namespace,
+				Namespace: mocks.RolloutNamespace,
 				TCPRoute:  mocks.TCPRouteName,
 			})
 		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
@@ -134,7 +134,7 @@ func TestRunSuccessfully(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
 			&GatewayAPITrafficRouting{
-				Namespace: mocks.Namespace,
+				Namespace: mocks.RolloutNamespace,
 				HTTPRoutes: []HTTPRoute{
 					{
 						Name:            mocks.HTTPRouteName,
@@ -174,7 +174,7 @@ func TestRunSuccessfully(t *testing.T) {
 			},
 		}
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
-			Namespace: mocks.Namespace,
+			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
 			ConfigMap: mocks.ConfigMapName,
 		})
@@ -187,7 +187,7 @@ func TestRunSuccessfully(t *testing.T) {
 	})
 	t.Run("RemoveHTTPManagedRoutes", func(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
-			Namespace: mocks.Namespace,
+			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
 			ConfigMap: mocks.ConfigMapName,
 		})
@@ -210,7 +210,7 @@ func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *
 	return &v1alpha1.Rollout{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rollout",
-			Namespace: mocks.Namespace,
+			Namespace: mocks.RolloutNamespace,
 		},
 		Spec: v1alpha1.RolloutSpec{
 			Strategy: v1alpha1.RolloutStrategy{

@@ -62,19 +62,15 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		}
 	}
 	rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
-		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
-			Namespace: gatewayAPIConfig.Namespace,
-			HTTPRoute: route.Name,
-		})
+		gatewayAPIConfig.HTTPRoute = route.Name
+		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
 	})
 	if rpcError.HasError() {
 		return rpcError
 	}
 	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
-		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, &GatewayAPITrafficRouting{
-			Namespace: gatewayAPIConfig.Namespace,
-			TCPRoute:  route.Name,
-		})
+		gatewayAPIConfig.TCPRoute = route.Name
+		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
 	})
 	return rpcError
 }
@@ -87,16 +83,19 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 		}
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		httpHeaderRoute.mutex.Lock()
+		gatewayAPIConfig.ConfigMapRWMutex.Lock()
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
+			if !route.UseHeaderRoutes {
+				return pluginTypes.RpcError{}
+			}
 			gatewayAPIConfig.HTTPRoute = route.Name
-			return r.setHTTPHeaderRoute(rollout, headerRouting, &gatewayAPIConfig)
+			return r.setHTTPHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
-			httpHeaderRoute.mutex.Unlock()
+			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 			return rpcError
 		}
-		httpHeaderRoute.mutex.Unlock()
+		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
 	return pluginTypes.RpcError{}
 }
@@ -117,16 +116,19 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 		}
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		httpHeaderRoute.mutex.Lock()
+		gatewayAPIConfig.ConfigMapRWMutex.Lock()
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
+			if !route.UseHeaderRoutes {
+				return pluginTypes.RpcError{}
+			}
 			gatewayAPIConfig.HTTPRoute = route.Name
-			return r.removeHTTPManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, &gatewayAPIConfig)
+			return r.removeHTTPManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
-			httpHeaderRoute.mutex.Unlock()
+			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 			return rpcError
 		}
-		httpHeaderRoute.mutex.Unlock()
+		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
 	return pluginTypes.RpcError{}
 }
@@ -135,24 +137,24 @@ func (r *RpcPlugin) Type() string {
 	return Type
 }
 
-func getGatewayAPITracfficRoutingConfig(rollout *v1alpha1.Rollout) (GatewayAPITrafficRouting, error) {
+func getGatewayAPITracfficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	gatewayAPIConfig := GatewayAPITrafficRouting{
 		ConfigMap: defaults.ConfigMap,
 	}
 	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
 	if err != nil {
-		return gatewayAPIConfig, err
+		return &gatewayAPIConfig, err
 	}
-	gatewayAPIConfig = insertGatewayAPIRouteLists(gatewayAPIConfig)
+	insertGatewayAPIRouteLists(&gatewayAPIConfig)
 	err = validate.Struct(&gatewayAPIConfig)
 	if err != nil {
-		return gatewayAPIConfig, err
+		return &gatewayAPIConfig, err
 	}
-	return gatewayAPIConfig, err
+	return &gatewayAPIConfig, err
 }
 
-func insertGatewayAPIRouteLists(gatewayAPIConfig GatewayAPITrafficRouting) GatewayAPITrafficRouting {
+func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 	if gatewayAPIConfig.HTTPRoute != "" {
 		gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, HTTPRoute{
 			Name:            gatewayAPIConfig.HTTPRoute,
@@ -165,7 +167,6 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig GatewayAPITrafficRouting) Gatew
 			UseHeaderRoutes: true,
 		})
 	}
-	return gatewayAPIConfig
 }
 
 func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](routeRuleList T3, backendRefNameList ...string) (T2, error) {
@@ -211,22 +212,31 @@ func getBackendRef[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gatew
 	return nil, routeRuleList.Error()
 }
 
-func removeManagedRouteEntry(managedRouteMap map[string]int, routeRuleList HTTPRouteRuleList, managedRouteName string) (HTTPRouteRuleList, error) {
-	managedRouteIndex, isOk := managedRouteMap[managedRouteName]
+func removeManagedRouteEntry(managedRouteMap ManagedRouteMap, routeRuleList HTTPRouteRuleList, managedRouteName string, httpRouteName string) (HTTPRouteRuleList, error) {
+	routeManagedRouteMap, isOk := managedRouteMap[managedRouteName]
 	if !isOk {
 		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteName, managedRouteName)
 	}
-	delete(managedRouteMap, managedRouteName)
-	for key, value := range managedRouteMap {
+	managedRouteIndex, isOk := routeManagedRouteMap[httpRouteName]
+	if !isOk {
+		managedRouteMapKey := managedRouteName + "." + httpRouteName
+		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteMapKey, managedRouteMapKey)
+	}
+	delete(routeManagedRouteMap, httpRouteName)
+	if len(managedRouteMap[managedRouteName]) == 0 {
+		delete(managedRouteMap, managedRouteName)
+	}
+	for _, currentRouteManagedRouteMap := range managedRouteMap {
+		value := currentRouteManagedRouteMap[httpRouteName]
 		if value > managedRouteIndex {
-			managedRouteMap[key]--
+			currentRouteManagedRouteMap[httpRouteName]--
 		}
 	}
 	routeRuleList = utils.RemoveIndex(routeRuleList, managedRouteIndex)
 	return routeRuleList, nil
 }
 
-func isConfigHasRoutes(config GatewayAPITrafficRouting) bool {
+func isConfigHasRoutes(config *GatewayAPITrafficRouting) bool {
 	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0
 }
 

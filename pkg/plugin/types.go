@@ -40,8 +40,11 @@ type GatewayAPITrafficRouting struct {
 	TCPRoutes []TCPRoute `json:"tcpRoutes,omitempty"`
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace" validate:"required"`
-	// ConfigMap name refers to the config map where plugin stores data about managed routes
+	// ConfigMap refers to the config map where plugin stores data about managed routes
 	ConfigMap string `json:"configMap,omitempty"`
+	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
+	// critical section is config map
+	ConfigMapRWMutex sync.RWMutex
 }
 
 type HTTPRoute struct {
@@ -60,10 +63,7 @@ type TCPRoute struct {
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
 }
 
-type HTTPHeaderRoute struct {
-	mutex           sync.Mutex
-	managedRouteMap map[string]int
-}
+type ManagedRouteMap map[string]map[string]int
 
 type HTTPRouteRule v1beta1.HTTPRouteRule
 
