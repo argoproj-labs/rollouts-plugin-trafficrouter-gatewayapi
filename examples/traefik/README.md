@@ -279,7 +279,7 @@ GatewayAPI plugin supports traffic routing based on a header values for canary, 
 ```yaml
 plugins:
   argoproj-labs/gatewayAPI:
-    namespace: test
+    namespace: test # default value is default
     httpRoute: http-route
     configMap: test-gateway # default value is argo-gatewayapi-configmap
 ```
