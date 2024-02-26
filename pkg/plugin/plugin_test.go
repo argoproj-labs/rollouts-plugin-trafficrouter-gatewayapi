@@ -38,9 +38,9 @@ func TestRunSuccessfully(t *testing.T) {
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          logCtx,
 		IsTest:          true,
-		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1beta1().HTTPRoutes(mocks.Namespace),
-		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.Namespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.Namespace),
+		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1beta1().HTTPRoutes(mocks.RolloutNamespace),
+		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -107,7 +107,11 @@ func TestRunSuccessfully(t *testing.T) {
 	}
 	t.Run("SetHTTPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
-		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName), desiredWeight, []v1alpha1.WeightDestination{})
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
@@ -115,9 +119,40 @@ func TestRunSuccessfully(t *testing.T) {
 	})
 	t.Run("SetTCPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
-		err := pluginInstance.SetWeight(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.TCPRoute, mocks.TCPRouteName), desiredWeight, []v1alpha1.WeightDestination{})
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.RolloutNamespace,
+				TCPRoute:  mocks.TCPRouteName,
+			})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
+	t.Run("SetWeightViaRoutes", func(t *testing.T) {
+		var desiredWeight int32 = 30
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.RolloutNamespace,
+				HTTPRoutes: []HTTPRoute{
+					{
+						Name:            mocks.HTTPRouteName,
+						UseHeaderRoutes: true,
+					},
+				},
+				TCPRoutes: []TCPRoute{
+					{
+						Name:            mocks.TCPRouteName,
+						UseHeaderRoutes: true,
+					},
+				},
+			})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
@@ -138,7 +173,12 @@ func TestRunSuccessfully(t *testing.T) {
 				},
 			},
 		}
-		err := pluginInstance.SetHeaderRoute(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName), &headerRouting)
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
@@ -146,7 +186,12 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
 	})
 	t.Run("RemoveHTTPManagedRoutes", func(t *testing.T) {
-		err := pluginInstance.RemoveManagedRoutes(newRollout(mocks.StableServiceName, mocks.CanaryServiceName, mocks.HTTPRoute, mocks.HTTPRouteName))
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.RemoveManagedRoutes(rollout)
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 1, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
@@ -157,25 +202,15 @@ func TestRunSuccessfully(t *testing.T) {
 	<-closeCh
 }
 
-func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rollout {
-	gatewayAPIConfig := GatewayAPITrafficRouting{
-		Namespace: mocks.Namespace,
-		ConfigMap: mocks.ConfigMapName,
-	}
-	switch routeType {
-	case mocks.HTTPRoute:
-		gatewayAPIConfig.HTTPRoute = routeName
-	case mocks.TCPRoute:
-		gatewayAPIConfig.TCPRoute = routeName
-	}
-	encodedGatewayAPIConfig, err := json.Marshal(gatewayAPIConfig)
+func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
+	encodedConfig, err := json.Marshal(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return &v1alpha1.Rollout{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rollout",
-			Namespace: mocks.Namespace,
+			Namespace: mocks.RolloutNamespace,
 		},
 		Spec: v1alpha1.RolloutSpec{
 			Strategy: v1alpha1.RolloutStrategy{
@@ -189,7 +224,7 @@ func newRollout(stableSvc, canarySvc, routeType, routeName string) *v1alpha1.Rol
 							},
 						},
 						Plugins: map[string]json.RawMessage{
-							PluginName: encodedGatewayAPIConfig,
+							PluginName: encodedConfig,
 						},
 					},
 				},

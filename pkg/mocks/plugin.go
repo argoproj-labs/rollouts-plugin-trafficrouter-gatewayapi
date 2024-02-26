@@ -16,7 +16,7 @@ const (
 	CanaryServiceName    = "argo-rollouts-canary-service"
 	HTTPRouteName        = "argo-rollouts-http-route"
 	TCPRouteName         = "argo-rollouts-tcp-route"
-	Namespace            = "default"
+	RolloutNamespace     = "default"
 	ConfigMapName        = "test-config"
 	HTTPManagedRouteName = "test-http-header-route"
 )
@@ -35,7 +35,7 @@ var (
 var HTTPRouteObj = v1beta1.HTTPRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      HTTPRouteName,
-		Namespace: Namespace,
+		Namespace: RolloutNamespace,
 	},
 	Spec: v1beta1.HTTPRouteSpec{
 		CommonRouteSpec: v1beta1.CommonRouteSpec{
@@ -80,7 +80,7 @@ var HTTPRouteObj = v1beta1.HTTPRoute{
 var TCPPRouteObj = v1alpha2.TCPRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      TCPRouteName,
-		Namespace: Namespace,
+		Namespace: RolloutNamespace,
 	},
 	Spec: v1alpha2.TCPRouteSpec{
 		CommonRouteSpec: v1alpha2.CommonRouteSpec{
@@ -116,6 +116,6 @@ var TCPPRouteObj = v1alpha2.TCPRoute{
 var ConfigMapObj = v1.ConfigMap{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      ConfigMapName,
-		Namespace: Namespace,
+		Namespace: RolloutNamespace,
 	},
 }

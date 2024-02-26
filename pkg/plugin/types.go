@@ -32,16 +32,38 @@ type GatewayAPITrafficRouting struct {
 	// TCPRoute refers to the name of the TCPRoute used to route traffic to the
 	// service
 	TCPRoute string `json:"tcpRoute,omitempty"`
+	// HTTPRoutes refer to names of HTTPRoute resources used to route traffic to the
+	// service
+	HTTPRoutes []HTTPRoute `json:"httpRoutes,omitempty"`
+	// TCPRoutes refer to names of TCPRoute resources used to route traffic to the
+	// service
+	TCPRoutes []TCPRoute `json:"tcpRoutes,omitempty"`
 	// Namespace refers to the namespace of the specified resource
-	Namespace string `json:"namespace"`
-	// ConfigMap name refers to the config map where plugin stores data about managed routes
+	Namespace string `json:"namespace,omitempty"`
+	// ConfigMap refers to the config map where plugin stores data about managed routes
 	ConfigMap string `json:"configMap,omitempty"`
+	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
+	// critical section is config map
+	ConfigMapRWMutex sync.RWMutex
 }
 
-type HTTPHeaderRoute struct {
-	mutex           sync.Mutex
-	managedRouteMap map[string]int
+type HTTPRoute struct {
+	// Name refers to the HTTPRoute name
+	Name string `json:"name" validate:"required"`
+	// UseHeaderRoutes defines header routes will be added to this route or not
+	// during setHeaderRoute step
+	UseHeaderRoutes bool `json:"useHeaderRoutes,omitempty"`
 }
+
+type TCPRoute struct {
+	// Name refers to the TCPRoute name
+	Name string `json:"name" validate:"required"`
+	// UseHeaderRoutes indicates header routes will be added to this route or not
+	// during setHeaderRoute step
+	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+}
+
+type ManagedRouteMap map[string]map[string]int
 
 type HTTPRouteRule v1beta1.HTTPRouteRule
 
@@ -54,6 +76,11 @@ type TCPRouteRuleList []v1alpha2.TCPRouteRule
 type HTTPBackendRef v1beta1.HTTPBackendRef
 
 type TCPBackendRef v1beta1.BackendRef
+
+type GatewayAPIRoute interface {
+	HTTPRoute | TCPRoute
+	GetName() string
+}
 
 type GatewayAPIRouteRule[T1 GatewayAPIBackendRef] interface {
 	*HTTPRouteRule | *TCPRouteRule
