@@ -16,6 +16,13 @@ markdown_extensions:
     permalink: true
 nav:
 - Overview: index.md
+- Providers: provider-status.md
+- Features: 
+  - Advanced Deployments: features/advanced-deployments.md
+  - Multiple Routes: features/multiple-routes.md
+  - Header Based Routing: features/header-based-routing.md    
+  - TCP Routing: features/tcp.md  
+
 - Contributing: CONTRIBUTING.md
 repo_url: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi
 site_name: Argo Rollouts Gateway API plugin
