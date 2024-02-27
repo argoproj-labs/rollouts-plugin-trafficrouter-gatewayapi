@@ -1,0 +1,37 @@
+extra:
+  analytics:
+    property: G-5Z1VTPDL73
+    provider: google
+extra_css:
+- assets/versions.css
+extra_javascript:
+- assets/versions.js
+markdown_extensions:
+- codehilite
+- admonition
+- pymdownx.superfences
+- pymdownx.tabbed
+- footnotes
+- toc:
+    permalink: true
+nav:
+- Overview: index.md
+- Contributing: CONTRIBUTING.md
+repo_url: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi
+site_name: Argo Rollouts Gateway API plugin
+site_url: https://argo-rollouts.readthedocs.io/
+theme:
+  font:
+    text: Work Sans
+  logo: assets/logo.png
+  name: material
+  palette:
+  - primary: teal
+    scheme: default
+    toggle:
+      icon: material/toggle-switch-off-outline
+      name: Switch to dark mode
+  - scheme: slate
+    toggle:
+      icon: material/toggle-switch
+      name: Switch to light mode
