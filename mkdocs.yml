@@ -16,6 +16,7 @@ markdown_extensions:
     permalink: true
 nav:
 - Overview: index.md
+- Installation: installation.md
 - Providers: provider-status.md
 - Features: 
   - Advanced Deployments: features/advanced-deployments.md
