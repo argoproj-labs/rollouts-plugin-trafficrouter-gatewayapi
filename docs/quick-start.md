@@ -1,9 +1,7 @@
 # Quick start for using Kubernetes API Gateway with Argo Rollouts
 
 Let's look at a quick example of how you can use Argo Rollouts
-to control your Http Routes.
-
-In this guide we will see how to use [the Rollouts demo](https://github.com/argoproj/rollouts-demo) with [Envoy Gateway](https://gateway.envoyproxy.io/) as the traffic provider.
+to control your Http Routes. In this guide we will see how to use [the Rollouts demo](https://github.com/argoproj/rollouts-demo) with [Envoy Gateway](https://gateway.envoyproxy.io/) as the traffic provider.
 
 You can find more examples at the [provider status page](provider-status.md).
 
