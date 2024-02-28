@@ -9,7 +9,7 @@ First get the core Argo Rollouts controller in your cluster.
 
 Follow the [official instructions](https://argo-rollouts.readthedocs.io/en/stable/installation/) to install Argo Rollouts.
 
-Optionally instal the [Argo Rollouts CLI](https://argoproj.github.io/argo-rollouts/features/kubectl-plugin/) in order to control Rollouts from your terminal.
+Optionally install the [Argo Rollouts CLI](https://argoproj.github.io/argo-rollouts/features/kubectl-plugin/) in order to control Rollouts from your terminal.
 
 ## Installing the plugin
 

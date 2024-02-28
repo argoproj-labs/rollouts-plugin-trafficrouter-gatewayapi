@@ -11,7 +11,7 @@
 [Argo Rollouts](https://argoproj.github.io/rollouts/) is a progressive delivery controller for Kubernetes. It supports several advanced deployment methods such as blue/green and canaries.
 For canary deployments Argo Rollouts can optionally use [a traffic provider](https://argoproj.github.io/argo-rollouts/features/traffic-management/) to split traffic between pods with full control and in a gradual way.
 
-![Gateway API with traffic providers](public/images/gateway-api.png)
+![Gateway API with traffic providers](docs/images/gateway-api.png)
 
 Until recently adding a new traffic provider to Argo Rollouts needed ad-hoc support code. With the adoption of the [Gateway API](https://gateway-api.sigs.k8s.io/), the integration becomes much easier as any traffic provider that implements the API will automatically be supported by Argo Rollouts.
 

@@ -18,7 +18,8 @@ For convenience we are including here a list of those actually tested with the p
 | [NGINX Gateway](https://github.com/nginxinc/nginx-gateway-fabric)     | yes      | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/nginx)    |
 | [Traefik](https://doc.traefik.io/traefik/providers/kubernetes-gateway/)     | yes      | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/traefik)    |
 
-
+Note that these examples are included just for completeness. You should be able
+to use any solution that implements the Gateway API. 
 
 !!! note
     We are always looking for more tested implementations. If you have tried the plugin with a provider not listed above please [open a Pull Request](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pulls) to add it to the list.
