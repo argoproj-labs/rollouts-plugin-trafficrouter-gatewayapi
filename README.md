@@ -8,9 +8,9 @@
 
 # Argo Rollouts Gateway API plugin
 
-This repository is a [plugin](https://argoproj.github.io/argo-rollouts/features/traffic-management/plugins/) of [Argo Rollouts](https://argoproj.github.io/rollouts/) plugin for enabling the use of the Kubernetes Gateway API in Progressive Delivery scenarios.
+This repository is a [plugin](https://argoproj.github.io/argo-rollouts/features/traffic-management/plugins/) of [Argo Rollouts](https://argoproj.github.io/rollouts/) for enabling the use of the Kubernetes Gateway API in Progressive Delivery scenarios.
 
-See [https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/) for all the details.
+See [the main documentation site](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/) for all the details.
 
 ## Feedback needed
 
