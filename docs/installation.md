@@ -62,4 +62,4 @@ time="XXX" level=info msg="Downloading plugin argoproj-labs/gatewayAPI from: htt
 time="YYY" level=info msg="Download complete, it took 7.792426599s" 
 ```
 
-You are now ready to use the Gateway API in your [Rollout definitions](https://argoproj.github.io/argo-rollouts/features/specification/). 
+You are now ready to use the Gateway API in your [Rollout definitions](https://argoproj.github.io/argo-rollouts/features/specification/). See also our [Quick Start Guide](quick-start.md).

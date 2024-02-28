@@ -18,6 +18,7 @@ nav:
 - Overview: index.md
 - Installation: installation.md
 - Providers: provider-status.md
+- Quick start: quick-start.md
 - Features: 
   - Advanced Deployments: features/advanced-deployments.md
   - Multiple Routes: features/multiple-routes.md

@@ -41,7 +41,7 @@ This is the installation process.
 The first 3 steps are specific to your provider/implementation of the Gateway API inside the Kubernetes cluster. The rest of the steps are the same regardless of the specific implementation you chose.
 
 See end-to-end examples for several other implementations
-at the [provider status page](provider-status.md).
+at the [provider status page](provider-status.md) or try our [quick start guide](quick-start.md).
 
 
 
