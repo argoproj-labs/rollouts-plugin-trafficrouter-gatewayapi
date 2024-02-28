@@ -1,5 +1,8 @@
 # Contributing
 
+!!! warning
+    Page under construction.
+
 ## Before You Start
 The Gateway Plugin for Argo Rollouts is written in Golang. If you do not have a good grounding in Go, try out [the tutorial](https://tour.golang.org/).
 
