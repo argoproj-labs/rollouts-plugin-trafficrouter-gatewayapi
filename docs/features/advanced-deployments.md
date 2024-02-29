@@ -94,3 +94,108 @@ This defines the following routes
 When a canary is not in progress then all clients see the same/active version without any further changes.
 
 ## Making applications "canary-aware"
+
+Under normal circumstances an application doesn't know if it is part of canary or not. This is normally not a problem when all your applications are stateless and communicate via HTTP calls.
+
+However several times your applications interact with stateful stores such as databases or queues. In that case if you launch a canary with default settings it will instantly interact with your production database/queue which is something that you might now want.
+
+A classic example is when you want to launch a canary version of a queue worker. The moment you launch it will start picking tasks from your production queue. So simply "redirecting" 10% traffic to it does not actually mean that it will pick 10% of tasks.
+
+![Initial problem](../images/advanced-deployments/initial-problem.png)
+
+Ideally you would like to have full control and "tell" the application
+that it is running under canary mode. This will make adjust its behavior.
+For example you could instruct the application to pick task from a different queue while it is part of a canary.
+
+![Ideal scenario](../images/advanced-deployments/ideal-scenario.png)
+
+This can be achieved with 3 different components
+
+1. The [Kubernetes downward api](https://kubernetes.io/docs/concepts/workloads/pods/downward-api/)
+1. [Argo Rollouts ephemeral labels](https://argo-rollouts.readthedocs.io/en/stable/features/ephemeral-metadata/)
+1. Application code that reads configuration from files.
+
+The Kubernetes downward API allows you to mount resource labels as files in your application. Argo Rollouts ephemeral labels allow you to put special labels in a pod resource only for the duration of the canary.
+
+![Downward API](../images/advanced-deployments/downward-api.png)
+
+This means that while the canary is running the application can have different settings from the stable version. It is possible to read data from different data store or serve different results to the canary users.
+
+The last piece of the puzzle is for the application code to reload its configuration when the canary is fully promoted. This means that once the canary becomes the new stable version, all settings should be changed to "production" ones.
+
+There are different libraries for each programming language to achieve this.
+
+* [Viper Conf](https://github.com/spf13/viper) (Golang)
+* [RefreshScope](https://cloud.spring.io/spring-cloud-static/spring-cloud.html#_refresh_scope) (Spring/Java)
+* [chokidar](https://github.com/paulmillr/chokidar)/config (Node.js)
+* [configparser](https://pypi.org/project/configparser/)/[watchdog](https://pypi.org/project/watchdog/) (Python)
+* yaml/[listen](https://github.com/guard/listen) (Ruby)
+* config/[watchservice](https://developer.android.com/reference/kotlin/java/nio/file/WatchService) (Kotlin)
+* config/[config-watch](https://docs.rs/config/latest/config/) (Rust)
+
+Here is an example of a Rollout that uses this feature
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollouts-demo
+  namespace: default
+spec:
+  replicas: 5
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service 
+      stableService: argo-rollouts-stable-service 
+      activeMetadata:
+        labels:
+          rabbitHost: rabbitmq
+          rabbitPort: "5672"
+          role: active
+          rabbitQueue: myProductionQueue
+      previewMetadata:
+        labels:
+          rabbitHost: rabbitmq
+          rabbitPort: "5672"
+          role: preview
+          rabbitQueue: myPreviewQueue       
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: argo-rollouts-http-route 
+            namespace: default
+      steps:
+      - setWeight: 10
+      - pause: {}
+      - setWeight: 100
+      - pause: {}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: <my-image:my-tag>
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: podinfo
+              mountPath: /etc/podinfo                 
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels              
+```
+This Rollout passes different RabbitMQ settings to the canary application.
+The settings will be available to the pod in a file at `/etc/podinfo/labels` where the source code will need to read them.
+
