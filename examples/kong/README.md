@@ -2,8 +2,11 @@
 
 Kong Ingress has [native support](https://docs.konghq.com/kubernetes-ingress-controller/latest/concepts/gateway-api/) for the Gateway API making the integration with Argo Rollouts a straightforward process.
 
+## Step 0 - Install Argo Rollouts and the API Gateway Plugin
 
-## Step 0 - Install the Gateway APIs
+See [instructions](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/installation/).
+
+## Step 1 - Install the Gateway APIs
 
 Kong does not install the Gateway APIs by default. You need to install them manually
 as described in the [instructions](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api).
@@ -14,7 +17,7 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/downloa
 
 It is imperative you install the APIs **before** installing Kong, as the Helm chart detects the APIs and also installs the correct roles for Kong itself to manage Gateway resources.
 
-## Step 1 - Deploy Kong Ingress to the cluster
+## Step 2 - Deploy Kong Ingress to the cluster
 
 Follow [the official instructions](https://docs.konghq.com/kubernetes-ingress-controller/2.9.x/deployment/k4k8s/#helm)
 
@@ -36,7 +39,7 @@ kubectl set env -n kong deployment/ingress-kong CONTROLLER_FEATURE_GATES="Gatewa
 kubectl rollout restart -n NAMESPACE deployment DEPLOYMENT_NAME
 ```
 
-## Step 2 - Create Gateway and Gateway class
+## Step 3 - Create Gateway and Gateway class
 
 Now create the GatewayClass object (it needs to be created only once). 
 
@@ -78,7 +81,7 @@ kubectl get gateways.gateway.networking.k8s.io kong -o=jsonpath="{.status.addres
 
 Note down the IP address for testing the application later.
 
-## Step 3 - Give access to Argo Rollouts for the Gateway/Http Route
+## Step 4 - Give access to Argo Rollouts for the Gateway/Http Route
 
 
 Create Cluster Role resource with needed permissions for Gateway API provider.
@@ -119,7 +122,7 @@ subjects:
 
 Apply both files with `kubectl`.
 
-## Step 4 - Create HTTPRoute that defines a traffic split between two services
+## Step 5 - Create HTTPRoute that defines a traffic split between two services
 
 Create HTTPRoute and connect to the created Gateway resource
 
@@ -187,7 +190,7 @@ spec:
 
 Apply all the above manifests with `kubectl`.
 
-## Step 5 - Create an example Rollout
+## Step 6 - Create an example Rollout
 
 Deploy a rollout to get the initial version
 
