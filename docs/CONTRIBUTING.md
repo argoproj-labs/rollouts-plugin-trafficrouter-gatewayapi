@@ -79,7 +79,7 @@ To run unit tests:
 make test
 ```
 
-## Running E2E tests
+<!-- ## Running E2E tests -->
 
 <!-- The end-to-end tests need to run against a kubernetes cluster with the Argo Rollouts controller
 running. The rollout controller can be started with the command:
