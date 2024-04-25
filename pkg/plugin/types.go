@@ -8,9 +8,10 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
-	gatewayApiv1alpha2 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1alpha2"
-	gatewayApiv1beta1 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1beta1"
+	gatewayApiClientv1alpha2 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1alpha2"
+	gatewayApiClientv1 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1"
 )
 
 type RpcPlugin struct {
@@ -19,10 +20,10 @@ type RpcPlugin struct {
 	GatewayAPIClientset  *gatewayAPIClientset.Clientset
 	Clientset            *kubernetes.Clientset
 	TestClientset        v1.ConfigMapInterface
-	UpdatedHTTPRouteMock *v1beta1.HTTPRoute
+	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
 	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
-	HTTPRouteClient      gatewayApiv1beta1.HTTPRouteInterface
-	TCPRouteClient       gatewayApiv1alpha2.TCPRouteInterface
+	HTTPRouteClient      gatewayApiClientv1.HTTPRouteInterface
+	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
 }
 
 type GatewayAPITrafficRouting struct {

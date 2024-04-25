@@ -20,8 +20,8 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
-		gatewayV1beta1 := r.GatewayAPIClientset.GatewayV1beta1()
-		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
@@ -73,8 +73,8 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	httpRouteName := gatewayAPIConfig.HTTPRoute
 	clientset := r.TestClientset
 	if !r.IsTest {
-		gatewayV1beta1 := r.GatewayAPIClientset.GatewayV1beta1()
-		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
@@ -253,8 +253,8 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 	httpRouteName := gatewayAPIConfig.HTTPRoute
 	managedRouteMap := make(ManagedRouteMap)
 	if !r.IsTest {
-		gatewayV1beta1 := r.GatewayAPIClientset.GatewayV1beta1()
-		httpRouteClient = gatewayV1beta1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
