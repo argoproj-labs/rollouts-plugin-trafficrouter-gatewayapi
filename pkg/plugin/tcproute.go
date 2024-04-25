@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	tcpRouteClient := r.TCPRouteClient
 	if !r.IsTest {
@@ -26,14 +26,14 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
-	canaryBackendRef, err := getBackendRef[*TCPBackendRef, *TCPRouteRule](canaryServiceName, routeRuleList)
+	canaryBackendRef, err := getBackendRef(canaryServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	canaryBackendRef.Weight = &desiredWeight
-	stableBackendRef, err := getBackendRef[*TCPBackendRef, *TCPRouteRule](stableServiceName, routeRuleList)
+	stableBackendRef, err := getBackendRef(stableServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

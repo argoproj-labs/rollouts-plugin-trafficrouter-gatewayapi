@@ -6,7 +6,7 @@ import (
 
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -22,35 +22,35 @@ const (
 )
 
 var (
-	port                     = v1beta1.PortNumber(80)
+	port                     = gatewayv1.PortNumber(80)
 	weight             int32 = 0
-	httpPathMatchType        = v1beta1.PathMatchPathPrefix
+	httpPathMatchType        = gatewayv1.PathMatchPathPrefix
 	httpPathMatchValue       = "/"
-	httpPathMatch            = v1beta1.HTTPPathMatch{
+	httpPathMatch            = gatewayv1.HTTPPathMatch{
 		Type:  &httpPathMatchType,
 		Value: &httpPathMatchValue,
 	}
 )
 
-var HTTPRouteObj = v1beta1.HTTPRoute{
+var HTTPRouteObj = gatewayv1.HTTPRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      HTTPRouteName,
 		Namespace: RolloutNamespace,
 	},
-	Spec: v1beta1.HTTPRouteSpec{
-		CommonRouteSpec: v1beta1.CommonRouteSpec{
-			ParentRefs: []v1beta1.ParentReference{
+	Spec: gatewayv1.HTTPRouteSpec{
+		CommonRouteSpec: gatewayv1.CommonRouteSpec{
+			ParentRefs: []gatewayv1.ParentReference{
 				{
 					Name: "argo-rollouts-gateway",
 				},
 			},
 		},
-		Rules: []v1beta1.HTTPRouteRule{
+		Rules: []gatewayv1.HTTPRouteRule{
 			{
-				BackendRefs: []v1beta1.HTTPBackendRef{
+				BackendRefs: []gatewayv1.HTTPBackendRef{
 					{
-						BackendRef: v1beta1.BackendRef{
-							BackendObjectReference: v1beta1.BackendObjectReference{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: StableServiceName,
 								Port: &port,
 							},
@@ -58,8 +58,8 @@ var HTTPRouteObj = v1beta1.HTTPRoute{
 						},
 					},
 					{
-						BackendRef: v1beta1.BackendRef{
-							BackendObjectReference: v1beta1.BackendObjectReference{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: CanaryServiceName,
 								Port: &port,
 							},
@@ -67,7 +67,7 @@ var HTTPRouteObj = v1beta1.HTTPRoute{
 						},
 					},
 				},
-				Matches: []v1beta1.HTTPRouteMatch{
+				Matches: []gatewayv1.HTTPRouteMatch{
 					{
 						Path: &httpPathMatch,
 					},
@@ -84,7 +84,7 @@ var TCPPRouteObj = v1alpha2.TCPRoute{
 	},
 	Spec: v1alpha2.TCPRouteSpec{
 		CommonRouteSpec: v1alpha2.CommonRouteSpec{
-			ParentRefs: []v1beta1.ParentReference{
+			ParentRefs: []gatewayv1.ParentReference{
 				{
 					Name: "argo-rollouts-gateway",
 				},

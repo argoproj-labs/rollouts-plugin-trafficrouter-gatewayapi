@@ -21,8 +21,8 @@ local-build:
 lint:
 	golangci-lint run --fix
 
-
-
+.PHONY: test
+	go test -v ./...
 
 # convenience target to run `mkdocs serve` using a docker container
 .PHONY: serve-docs

@@ -74,11 +74,10 @@ git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
 
 ## Running Unit Tests
 
-<!-- To run unit tests:
-
+To run unit tests:
 ```bash
 make test
-``` -->
+```
 
 ## Running E2E tests
 
