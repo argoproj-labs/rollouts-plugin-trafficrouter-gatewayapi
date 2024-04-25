@@ -26,7 +26,7 @@ cd rollouts-plugin-trafficrouter-gatewayapi
 
 ## Argo Rollouts plugin system architecture
 
-When Argo rollouts controller starts it requests the ConfigMap **argo-rollouts-config** from api server of k8s cluster and if it gets it, it validates its content before putting this ConfigMap in RAM. It is important to understand it happens only at the beginning and only one time, so if you will change **argo-rollouts-config** or you will add it after Argo Rollouts controller you will need to restart Argo Rollouts. Controller uses this config map to understand where specified in argo manifest plugins are. When Argo Rollouts learns their locations it downloads and executes them as seperate RPC servers in the same pod. When controller gets specific events, for example events corresponding to the SetWeight action, it makes specific remote procedure call to the needing RPC server and waits its response. Diagram illustrating the main aspects of architecture is below.
+When Argo rollouts controller starts it requests the ConfigMap **argo-rollouts-config** from api server of k8s cluster and if it gets it, it validates its content before putting this ConfigMap in RAM. It is important to understand it happens only at the beginning and only one time, so if you will change **argo-rollouts-config** or you will add it after Argo Rollouts controller you will need to restart Argo Rollouts. Controller uses this config map to understand where specified in argo manifest plugins are. When Argo Rollouts learns their locations it downloads and executes them as seperate RPC servers in the same pod. When controller gets specific events, for example events corresponding to the SetWeight action, it makes specific remote procedure call to the needing RPC server and waits its response. Diagram illustrating the main aspects of architecture is below
 
 ![Argo rollouts plugin system architecture](./images/contributing/argo-rollouts-plugin-system-architecture.png)
 
@@ -38,8 +38,8 @@ When Argo rollouts controller starts it requests the ConfigMap **argo-rollouts-c
 ## Building
 
 We have 2 targets in /Makefile:
-1. **local-build** It is recommended to use this target "*make local-build*" to make not optimized build for local testing as debugger can't link optimized binary code with its go code to debug it correctly
 
+1. **local-build** It is recommended to use this target "*make local-build*" to make not optimized build for local testing as debugger can't link optimized binary code with its go code to debug it correctly
 2. **gateway-api-plugin-build** It is recommended to use this target "*make gateway-api-plugin-build*" to make optimized build for production when you are sure it is ready for it. We use it to create releases
 
 
