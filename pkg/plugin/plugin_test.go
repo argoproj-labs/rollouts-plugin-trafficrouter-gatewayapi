@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
@@ -38,7 +38,7 @@ func TestRunSuccessfully(t *testing.T) {
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          logCtx,
 		IsTest:          true,
-		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1beta1().HTTPRoutes(mocks.RolloutNamespace),
+		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
 		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
 		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
@@ -159,7 +159,7 @@ func TestRunSuccessfully(t *testing.T) {
 	t.Run("SetHTTPHeaderRoute", func(t *testing.T) {
 		headerName := "X-Test"
 		headerValue := "test"
-		headerValueType := v1beta1.HeaderMatchRegularExpression
+		headerValueType := gatewayv1.HeaderMatchRegularExpression
 		prefixedHeaderValue := headerValue + ".*"
 		headerMatch := v1alpha1.StringMatch{
 			Prefix: headerValue,

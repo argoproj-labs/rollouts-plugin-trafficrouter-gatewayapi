@@ -64,7 +64,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 	rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 		gatewayAPIConfig.HTTPRoute = route.Name
-		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
+		return r.setHTTPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
 	})
 	if rpcError.HasError() {
 		return rpcError
@@ -72,7 +72,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
 	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
 		gatewayAPIConfig.TCPRoute = route.Name
-		return r.setTCPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
+		return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
 	})
 	return rpcError
 }
