@@ -9,7 +9,7 @@ An alternative method is to use HTTP headers that distinguish which clients conn
 Here is an example of a rollout that uses headers 
 for the canary:
 
-```yml
+```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -101,7 +101,8 @@ spec:
           - name: header-route2
         plugins:
           argoproj-labs/gatewayAPI:
-            namespace: default                                                       httpRoutes:
+            namespace: default                                  
+            httpRoutes:
               - name: http-route
                 useHeaderRoutes: true
               - name: http-route2
