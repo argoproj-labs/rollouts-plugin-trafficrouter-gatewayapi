@@ -24,6 +24,7 @@ type RpcPlugin struct {
 	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
 	HTTPRouteClient      gatewayApiClientv1.HTTPRouteInterface
 	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
+	HTTPRouteAPIVersion  string
 }
 
 type GatewayAPITrafficRouting struct {
