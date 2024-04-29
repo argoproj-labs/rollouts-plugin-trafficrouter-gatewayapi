@@ -10,20 +10,97 @@ import (
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
 	HTTPConfigMapKey = "httpManagedRoutes"
 )
 
+func httpRouteV1Alpha2ToV1(obj *gatewayv1alpha2.HTTPRoute) *gatewayv1.HTTPRoute {
+	return &gatewayv1.HTTPRoute{
+		TypeMeta:   obj.TypeMeta,
+		ObjectMeta: obj.ObjectMeta,
+		Spec:       obj.Spec,
+		Status:     obj.Status,
+	}
+}
+
+func httpRouteV1ToV1Alpha2(obj *gatewayv1.HTTPRoute) *gatewayv1alpha2.HTTPRoute {
+	return &gatewayv1alpha2.HTTPRoute{
+		TypeMeta:   obj.TypeMeta,
+		ObjectMeta: obj.ObjectMeta,
+		Spec:       obj.Spec,
+		Status:     obj.Status,
+	}
+}
+
+func httpRouteV1Beta1ToV1(obj *gatewayv1beta1.HTTPRoute) *gatewayv1.HTTPRoute {
+	return &gatewayv1.HTTPRoute{
+		TypeMeta:   obj.TypeMeta,
+		ObjectMeta: obj.ObjectMeta,
+		Spec:       obj.Spec,
+		Status:     obj.Status,
+	}
+}
+
+func httpRouteV1ToV1Beta1(obj *gatewayv1.HTTPRoute) *gatewayv1beta1.HTTPRoute {
+	return &gatewayv1beta1.HTTPRoute{
+		TypeMeta:   obj.TypeMeta,
+		ObjectMeta: obj.ObjectMeta,
+		Spec:       obj.Spec,
+		Status:     obj.Status,
+	}
+}
+
+func (r *RpcPlugin) getHTTPRoute(ctx context.Context, namespace, name string) (*gatewayv1.HTTPRoute, error) {
+	if r.IsTest {
+		return r.HTTPRouteClient.Get(ctx, name, metav1.GetOptions{})
+	}
+	switch r.HTTPRouteAPIVersion {
+	case "v1alpha2":
+		route, err := r.GatewayAPIClientset.GatewayV1alpha2().HTTPRoutes(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return httpRouteV1Alpha2ToV1(route), nil
+	case "v1beta1":
+		route, err := r.GatewayAPIClientset.GatewayV1beta1().HTTPRoutes(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return httpRouteV1Beta1ToV1(route), nil
+	default:
+		return r.GatewayAPIClientset.GatewayV1().HTTPRoutes(namespace).Get(ctx, name, metav1.GetOptions{})
+	}
+}
+
+func (r *RpcPlugin) updateHTTPRoute(ctx context.Context, input *gatewayv1.HTTPRoute) (*gatewayv1.HTTPRoute, error) {
+	if r.IsTest {
+		return r.HTTPRouteClient.Update(ctx, input, metav1.UpdateOptions{})
+	}
+	switch r.HTTPRouteAPIVersion {
+	case "v1alpha2":
+		output, err := r.GatewayAPIClientset.GatewayV1alpha2().HTTPRoutes(input.Namespace).Update(ctx, httpRouteV1ToV1Alpha2(input), metav1.UpdateOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return httpRouteV1Alpha2ToV1(output), nil
+	case "v1beta1":
+		output, err := r.GatewayAPIClientset.GatewayV1beta1().HTTPRoutes(input.Namespace).Update(ctx, httpRouteV1ToV1Beta1(input), metav1.UpdateOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return httpRouteV1Beta1ToV1(output), nil
+	default:
+		return r.GatewayAPIClientset.GatewayV1().HTTPRoutes(input.Namespace).Update(ctx, input, metav1.UpdateOptions{})
+	}
+}
+
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	httpRouteClient := r.HTTPRouteClient
-	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
-	}
-	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+	httpRoute, err := r.getHTTPRoute(ctx, gatewayAPIConfig.Namespace, gatewayAPIConfig.HTTPRoute)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -47,7 +124,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	}
 	restWeight := 100 - desiredWeight
 	stableBackendRef.Weight = &restWeight
-	updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+	updatedHTTPRoute, err := r.updateHTTPRoute(ctx, httpRoute)
 	if r.IsTest {
 		r.UpdatedHTTPRouteMock = updatedHTTPRoute
 	}
@@ -68,13 +145,10 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		return r.removeHTTPManagedRoutes(managedRouteList, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
-	httpRouteClient := r.HTTPRouteClient
 	managedRouteMap := make(ManagedRouteMap)
 	httpRouteName := gatewayAPIConfig.HTTPRoute
 	clientset := r.TestClientset
 	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
@@ -92,7 +166,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			ErrorString: err.Error(),
 		}
 	}
-	httpRoute, err := httpRouteClient.Get(ctx, httpRouteName, metav1.GetOptions{})
+	httpRoute, err := r.getHTTPRoute(ctx, gatewayAPIConfig.Namespace, httpRouteName)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -158,7 +232,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	taskList := []utils.Task{
 		{
 			Action: func() error {
-				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				updatedHTTPRoute, err := r.updateHTTPRoute(ctx, httpRoute)
 				if r.IsTest {
 					r.UpdatedHTTPRouteMock = updatedHTTPRoute
 				}
@@ -169,7 +243,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			},
 			ReverseAction: func() error {
 				httpRoute.Spec.Rules = oldHTTPRuleList
-				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				updatedHTTPRoute, err := r.updateHTTPRoute(ctx, httpRoute)
 				if r.IsTest {
 					r.UpdatedHTTPRouteMock = updatedHTTPRoute
 				}
@@ -248,13 +322,10 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 
 func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	httpRouteClient := r.HTTPRouteClient
 	clientset := r.TestClientset
 	httpRouteName := gatewayAPIConfig.HTTPRoute
 	managedRouteMap := make(ManagedRouteMap)
 	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
@@ -272,7 +343,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			ErrorString: err.Error(),
 		}
 	}
-	httpRoute, err := httpRouteClient.Get(ctx, httpRouteName, metav1.GetOptions{})
+	httpRoute, err := r.getHTTPRoute(ctx, gatewayAPIConfig.Namespace, httpRouteName)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -310,7 +381,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 	taskList := []utils.Task{
 		{
 			Action: func() error {
-				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				updatedHTTPRoute, err := r.updateHTTPRoute(ctx, httpRoute)
 				if r.IsTest {
 					r.UpdatedHTTPRouteMock = updatedHTTPRoute
 				}
@@ -321,7 +392,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			},
 			ReverseAction: func() error {
 				httpRoute.Spec.Rules = oldHTTPRuleList
-				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				updatedHTTPRoute, err := r.updateHTTPRoute(ctx, httpRoute)
 				if r.IsTest {
 					r.UpdatedHTTPRouteMock = updatedHTTPRoute
 				}

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin"
 
@@ -19,12 +21,16 @@ var handshakeConfig = goPlugin.HandshakeConfig{
 	MagicCookieValue: "trafficrouter",
 }
 
+var httpRouteAPIVersion = flag.String("http-route-api-version", "v1", "HTTPRoute version")
+
 func main() {
+	flag.Parse()
 	logCtx := log.WithFields(log.Fields{"plugin": "trafficrouter"})
 	utils.SetLogLevel("debug")
 	log.SetFormatter(utils.CreateFormatter("text"))
 	rpcPluginImp := &plugin.RpcPlugin{
-		LogCtx: logCtx,
+		LogCtx:              logCtx,
+		HTTPRouteAPIVersion: *httpRouteAPIVersion,
 	}
 	//  pluginMap is the map of plugins we can dispense.
 	var pluginMap = map[string]goPlugin.Plugin{
