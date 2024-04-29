@@ -3,7 +3,6 @@ package plugin
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
@@ -46,8 +45,6 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		r.UpdatedTCPRouteMock = updatedTCPRoute
 	}
 	if err != nil {
-		msg := fmt.Sprintf(GatewayAPIUpdateError, tcpRoute.GetName(), err)
-		r.LogCtx.Error(msg)
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
