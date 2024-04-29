@@ -48,6 +48,9 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	if err != nil {
 		msg := fmt.Sprintf(GatewayAPIUpdateError, tcpRoute.GetName(), err)
 		r.LogCtx.Error(msg)
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
 	}
 	return pluginTypes.RpcError{}
 }
