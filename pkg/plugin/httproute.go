@@ -56,8 +56,9 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		r.UpdatedHTTPRouteMock = updatedHTTPRoute
 	}
 	if err != nil {
-		msg := fmt.Sprintf(GatewayAPIUpdateError, httpRoute.GetName(), err)
-		r.LogCtx.Error(msg)
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
 	}
 	return pluginTypes.RpcError{}
 }
