@@ -131,7 +131,9 @@ To run a subset of e2e tests, you need to specify the suite with `-run`, and the
 
 ```
 E2E_TEST_OPTIONS="-run 'TestCanarySuite' -testify.m 'TestCanaryScaleDownOnAbortNoTrafficRouting'" make test-e2e 
-``` -->
+``` 
+
+-->
 
 ## Creating a Pull Request
 
