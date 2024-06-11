@@ -31,7 +31,7 @@ When the Argo Rollouts controller starts, it reads the ConfigMap named `argo-rol
 
 If this configmap is present, the Argol Rollouts controller validates its content and then loads the plugin that is defined there. It is important to understand that this process happens only at the beginning and **only once** during the controller startup. ,
 
-This means that if you change the `argo-rollouts-config` configmap or you will create it after the Argo Rollouts controller is already up you will need to restart the controller for the changes to take effect. 
+This means that if you change the `argo-rollouts-config` configmap or if you create it after the Argo Rollouts controller is already up you will need to restart the controller for the changes to take effect. 
 
 The Argo Rollouts Controller uses this config map to understand where to load its plugins from. When Argo Rollouts learns their locations it downloads and executes them as separate RPC servers in the same pod. When the controller detects [specific Rollout events](https://argo-rollouts.readthedocs.io/en/stable/features/specification/), for example events corresponding to the `SetWeight` action, it makes specific remote procedure calls to the respective RPC server and waits for a response. 
 
@@ -52,7 +52,7 @@ See all dependencies in the `go.mod` file. The usual `go build/test` commands wi
 
 ## Building the plugin
 
-We have 2 targets in /Makefile:
+We have 2 targets in the [Makefile](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/Makefile):
 
 1. `local-build` - This is the main makefile target you will use during development. This creates raw/unoptimized binaries that keep the link symbols so that you can use a Go debugger while you change your code.
 2. `gateway-api-plugin-build` - This makefile target creates an optimized build binary for a production release. This target is currently run by Continuous integration to create releases. You should normally not need this target during development
@@ -94,7 +94,7 @@ If you prefer to make pre-release run
 git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
 ```
 3. Push the tag to the remote repository
-4. The pushed tag will trigger a GitHub actions workflow that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore after pushing the tag to the remote repository you also need to delete it locally. When the workflow has finished its work you can run **git pull** and you will see new tag.
+4. The pushed tag will trigger [a GitHub actions workflow](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/.github/workflows/release.yaml) that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore after pushing the tag to the remote repository you also need to delete it locally. When the workflow has finished its work you can run **git pull** and you will see new tag.
 
 ## Running Unit Tests
 
@@ -132,6 +132,16 @@ To run a subset of e2e tests, you need to specify the suite with `-run`, and the
 ```
 E2E_TEST_OPTIONS="-run 'TestCanarySuite' -testify.m 'TestCanaryScaleDownOnAbortNoTrafficRouting'" make test-e2e 
 ``` -->
+
+## Creating a Pull Request
+
+When you have finished implementing your feature, you need to create a Pull Request in GitHub.
+
+You need to sign-off your commit using DCO (Developer Certificate of Origin). Read [the guide](https://github.com/src-d/guide/blob/master/developer-community/fix-DCO.md) if you don't know how to do that.
+
+Please use [meaningful PR names](https://www.conventionalcommits.org/en/v1.0.0/) for the Pull request title.
+
+When you submit a PR, a couple of CI checks will be run automatically to ensure your changes will build fine and meet certain quality standards. Your contribution needs to pass those checks in order to be merged into the repository.
 
 
 ## Documentation Changes
