@@ -1,20 +1,19 @@
 # Contributing
 
-!!! warning
-    Page under construction.
+This guide shall help you in setting up your build & test environment, so that you can start developing and testing bug fixes and feature enhancements without having to make too much effort in setting up a local toolchain.
 
 ## Before You Start
 The Gateway Plugin for Argo Rollouts is written in Golang. If you do not have a good grounding in Go, try out [the tutorial](https://tour.golang.org/).
 
 ## Pre-requisites
 
-Install:
+Install on your local workstation:
 
 * [docker](https://docs.docker.com/install/#supported-platforms)
 * [golang](https://golang.org/)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 * [kustomize](https://github.com/kubernetes-sigs/kustomize/releases) >= 4.5.5
-* [k3d](https://k3d.io/) recommended
+* A local Kubernetes cluster. We recommend [k3d](https://k3d.io/) 
 
 
 Checkout the code:
@@ -26,56 +25,76 @@ cd rollouts-plugin-trafficrouter-gatewayapi
 
 ## Argo Rollouts plugin system architecture
 
-When Argo Rollouts controller starts, it requests the ConfigMap **argo-rollouts-config** (from the namespace in which controller is located) from api server of k8s cluster and if it gets it, it validates its content before putting this ConfigMap in RAM. It is important to understand it happens only at the beginning and only one time, so if you will change **argo-rollouts-config** or you will add it after Argo Rollouts controller you will need to restart Argo Rollouts. Controller uses this config map to understand where specified in argo manifest plugins are. When Argo Rollouts learns their locations it downloads and executes them as seperate RPC servers in the same pod. When controller gets specific events, for example events corresponding to the SetWeight action, it makes specific remote procedure call to the needing RPC server and waits its response. Diagram illustrating the main aspects of architecture is below
+The Argo Rollouts Gateway API plugin needs the main Argo Rollouts controller to work. 
+
+When the Argo Rollouts controller starts, it reads the ConfigMap named `argo-rollouts-config` (from the namespace in which controller is located) from the API server of the k8s cluster it is running on.
+
+If this configmap is present, the Argol Rollouts controller validates its content and then loads the plugin that is defined there. It is important to understand that this process happens only at the beginning and **only once** during the controller startup. ,
+
+This means that if you change the `argo-rollouts-config` configmap or you will create it after the Argo Rollouts controller is already up you will need to restart the controller for the changes to take effect. 
+
+The Argo Rollouts Controller uses this config map to understand where to load its plugins from. When Argo Rollouts learns their locations it downloads and executes them as separate RPC servers in the same pod. When the controller detects [specific Rollout events](https://argo-rollouts.readthedocs.io/en/stable/features/specification/), for example events corresponding to the `SetWeight` action, it makes specific remote procedure calls to the respective RPC server and waits for a response. 
+
+Here is a diagram illustrating the main aspects of architecture:
 
 ![Argo rollouts plugin system architecture](./images/contributing/argo-rollouts-plugin-system-architecture.png)
 
+For more information about Argo Rollouts plugins please read
 
-## Project dependecies
+* [https://argo-rollouts.readthedocs.io/en/latest/plugins/](https://argo-rollouts.readthedocs.io/en/latest/plugins/)
+* [https://argo-rollouts.readthedocs.io/en/latest/features/traffic-management/plugins/](https://argo-rollouts.readthedocs.io/en/latest/features/traffic-management/plugins/)
 
-`go.mod` is used, so the `go build/test` commands automatically install the needed dependencies
 
-## Building
+## Project dependencies
+
+The project is using Go modules. 
+See all dependencies in the `go.mod` file. The usual `go build/test` commands will automatically install the needed dependencies in your local workspace.
+
+## Building the plugin
 
 We have 2 targets in /Makefile:
 
-1. **local-build** It is recommended to use this target "*make local-build*" to make not optimized build for local testing as debugger can't link optimized binary code with its go code to debug it correctly
-2. **gateway-api-plugin-build** It is recommended to use this target "*make gateway-api-plugin-build*" to make optimized build for production when you are sure it is ready for it. We use it to create releases
+1. `local-build` - This is the main makefile target you will use during development. This creates raw/unoptimized binaries that keep the link symbols so that you can use a Go debugger while you change your code.
+2. `gateway-api-plugin-build` - This makefile target creates an optimized build binary for a production release. This target is currently run by Continuous integration to create releases. You should normally not need this target during development
 
 
 ## Running the plugin Locally
 
-1. Create ConfigMap **argo-rollouts-config** in namespace of Argo Rollouts controller. We will run it locally so its namespace will be default
-2. Run **make local-build** to make not optimized local build of plugin. Specify the path to this local build in the ConfigMap that we created before
+To start developing the plugin do the following
+
+
+1. Start your local Kubernetes cluster
+1. Create a ConfigMap named `argo-rollouts-config` in the namespace of Argo Rollouts controller. We will run it locally so its namespace will be `default`
+2. Run `make local-build` to create a local build of the plugin binary. In the `argo-rollouts-config` manifest specify the path to this local build by using a file directive
 ```
 file://<path to the local build>
 ```
-3. Install needing CRDs for Argo Rollouts and apply its needing manifest. For that you can run
+3. Install required CRDs for Argo Rollouts deploy the controller. For that you can run
 ```bash
 kubectl create namespace argo-rollouts
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 ```
-After delete in cluster Argo Rollouts controller deployment as we will run controller locally
-4. Run locally Argo Rollouts controller
+After that delete the in cluster Argo Rollouts controller deployment as we will run controller locally (We only needed the CRDs).
+4. Run locally the Argo Rollouts controller
 ```bash
 cd ~/go/src/github.com/argoproj/argo-rollouts
 go run ./cmd/rollouts-controller/main.go
 ```
-5. If you did all right, Argo Rollouts controller will find your local build of plugin and will run it as RPC server locally. You have ability to debug plugin. Debugger of go has ability to attach to the local process and as we built our plugin without optimizations it also can map binary code with text code of plugin correctly so you can use breakpoints and it will work
+5. If you followed all instructions correctly, the Argo Rollouts controller will find your local build of your plugin and will run it as an RPC server locally. You have the ability to debug the plugin like any other Golang application. Any Goland Debugger that has the ability to attach to a local process can be used to place breakpoints on your code.
 
 ## Making releases
 
 1. Write in **/RELEASE_NOTES.md** the description of the future release
-2. On needing commit in **main** branch create locally tag
+2. Create a tag in the `main` branch 
 ```bash
 git tag release-v[0-9]+.[0-9]+.[0-9]+
 ```
-If you would like to make pre-release run
+If you prefer to make pre-release run
 ```bash
 git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
 ```
-3. Push tag to the remote repository
-4. Pushed tag will trigger needing workflow that will create corresponding tag **v[0-9]+.[0-9]+.[0-9]+** or **v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+** and will delete your tag so after pushing tag to the remote repository you need to delete it locally. When workflow will finish its work you can run **git pull** and you will see new tag
+3. Push the tag to the remote repository
+4. The pushed tag will trigger a GitHub actions workflow that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore after pushing the tag to the remote repository you also need to delete it locally. When the workflow has finished its work you can run **git pull** and you will see new tag.
 
 ## Running Unit Tests
 
@@ -118,9 +137,9 @@ E2E_TEST_OPTIONS="-run 'TestCanarySuite' -testify.m 'TestCanaryScaleDownOnAbortN
 ## Documentation Changes
 
 Install Docker locally.
-Modify contents in `docs/` directory.
+Modify documentation contents in the `docs/` directory.
 
-Preview changes in your browser by visiting http://localhost:8000 after running:
+You can preview changes in your browser by visiting http://localhost:8000 after running:
 
 ```shell
 make serve-docs
