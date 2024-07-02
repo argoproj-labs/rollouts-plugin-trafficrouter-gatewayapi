@@ -43,7 +43,7 @@ data:
       location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.2.0/gateway-api-plugin-linux-amd64"
 ```
 
-Deploy this file with `kubectl -f gateway-plugin.yml -n argo-rollouts`. You can also use [Argo CD](https://argoproj.github.io/cd/) or any other Kubernetes deployment method that you prefer.
+Deploy this file with `kubectl apply -f gateway-plugin.yml -n argo-rollouts`. You can also use [Argo CD](https://argoproj.github.io/cd/) or any other Kubernetes deployment method that you prefer.
 
 For more installation options see the [Plugin documentation](https://argoproj.github.io/argo-rollouts/features/traffic-management/plugins/) at the main Argo Rollouts site.
 
