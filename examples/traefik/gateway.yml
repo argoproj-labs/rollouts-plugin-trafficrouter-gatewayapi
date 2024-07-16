@@ -1,9 +1,9 @@
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
-  name: argo-rollouts-gateway
+  name: traefik-gateway
 spec:
-  gatewayClassName: argo-rollouts-gateway-class
+  gatewayClassName: traefik
   listeners:
     - protocol: HTTP
       name: web

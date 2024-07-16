@@ -1,0 +1,21 @@
+experimental:
+  kubernetesGateway:
+    enabled: true
+
+providers:
+  kubernetesCRD:
+    enabled: false
+  kubernetesIngress:
+    enabled: false
+  kubernetesGateway:
+    enabled: true
+
+ingressClass:
+  enabled: false
+
+service:
+  enabled: false
+
+logs:
+  general:
+    level: DEBUG
