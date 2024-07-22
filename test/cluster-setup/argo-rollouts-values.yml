@@ -1,0 +1,34 @@
+controller:
+  nodeSelector:
+    argo-rollouts-controller: "true"
+
+  replicas: 1
+
+  logging:
+    level: debug
+
+  volumes:
+    - name: gatewayapi-plugin
+      hostPath:
+        path: /Volumes/
+        type: Directory
+
+  volumeMounts:
+    - mountPath: /argo-rollouts-gatewayapi-plugin/
+      name: gatewayapi-plugin
+
+  trafficRouterPlugins:
+    trafficRouterPlugins: |-
+      - name: "argoproj-labs/gatewayAPI"
+        location: "file:///argo-rollouts-gatewayapi-plugin/gatewayapi-plugin-linux-amd64"
+
+providerRBAC:
+  providers:
+    istio: false
+    smi: false
+    ambassador: false
+    awsLoadBalancerController: false
+    awsAppMesh: false
+    apisix: false
+    contour: false
+    glooPlatform: false
