@@ -11,8 +11,8 @@ define add_helm_repo
 endef
 
 define install_helm_charts
-	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml
-	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml
+	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version 2.37.2
+	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version 29.0.1
 endef
 
 define install_k8s_resources
