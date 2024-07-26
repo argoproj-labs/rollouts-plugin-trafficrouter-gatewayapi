@@ -7,7 +7,7 @@ CLUSTER_DELETE ?= true
 
 define add_helm_repo
 	helm repo add traefik https://traefik.github.io/charts
-    helm repo add argo https://argoproj.github.io/argo-helm
+	helm repo add argo https://argoproj.github.io/argo-helm
 endef
 
 define install_helm_charts

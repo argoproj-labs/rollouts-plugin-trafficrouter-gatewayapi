@@ -102,7 +102,7 @@ After we enabled the Gateway API provider in our controller we can create a Gate
 - GatewayClass
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: argo-rollouts-gateway-class
@@ -113,7 +113,7 @@ spec:
 - Gateway
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: argo-rollouts-gateway
