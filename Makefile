@@ -4,6 +4,7 @@ E2E_CLUSTER_NAME=gatewayapi-plugin-e2e
 IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
 
 CLUSTER_DELETE ?= true
+RUN ?= ''
 
 define add_helm_repo
 	helm repo add traefik https://traefik.github.io/charts
@@ -66,11 +67,7 @@ endif
 
 .PHONY: run-e2e-tests
 run-e2e-tests:
-ifeq (${RUN},)
-	go test -v -timeout 1m -count=1 ./test/e2e/...
-else
 	go test -v -timeout 1m -count=1 -run ${RUN} ./test/e2e/...
-endif
 
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:
