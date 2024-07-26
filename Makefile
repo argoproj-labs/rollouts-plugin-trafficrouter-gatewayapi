@@ -46,7 +46,7 @@ lint:
 
 .PHONY: unit-tests
 unit-tests:
-	go test -v ./pkg/...
+	go test -v -count=1 ./pkg/...
 
 .PHONY: setup-e2e-cluster
 setup-e2e-cluster:	
@@ -59,10 +59,17 @@ ifeq (${IS_E2E_CLUSTER},)
 endif
 
 .PHONY: e2e-tests
-e2e-tests: setup-e2e-cluster
-	go test -v ./test/e2e/...
+e2e-tests: setup-e2e-cluster run-e2e-tests
 ifeq (${CLUSTER_DELETE},true)
 	make clear-e2e-cluster
+endif
+
+.PHONY: run-e2e-tests
+run-e2e-tests:
+ifeq (${RUN},)
+	go test -v -timeout 1m -count=1 ./test/e2e/...
+else
+	go test -v -timeout 1m -count=1 -run ${RUN} ./test/e2e/...
 endif
 
 .PHONY: clear-e2e-cluster

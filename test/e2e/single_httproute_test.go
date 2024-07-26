@@ -25,6 +25,8 @@ import (
 
 func TestSingleHTTPRoute(t *testing.T) {
 	feature := features.New("Single HTTPRoute feature").Setup(
+		setupEnvironment,
+	).Setup(
 		setupSingleHTTPRouteEnv,
 	).Assess(
 		"Testing single HTTPRoute feature",
@@ -38,6 +40,7 @@ func TestSingleHTTPRoute(t *testing.T) {
 func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	var httpRoute gatewayv1.HTTPRoute
 	var rollout v1alpha1.Rollout
+	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
 	firstHTTPRouteFile, err := os.Open(FIRST_HTTP_ROUTE_PATH)
@@ -91,21 +94,21 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	resourcesMap[ROLLOUT_KEY] = &unstructured.Unstructured{
 		Object: rolloutObject,
 	}
-	err = config.Client().Resources().Create(ctx, resourcesMap[HTTP_ROUTE_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[HTTP_ROUTE_KEY])
 	if err != nil {
 		logrus.Errorf("httpRoute %q creation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("httpRoute %q was created", resourcesMap[HTTP_ROUTE_KEY].GetName())
-	err = config.Client().Resources().Create(ctx, resourcesMap[ROLLOUT_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("rollout %q creation was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
-	waitCondition := conditions.New(config.Client().Resources())
+	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -124,6 +127,7 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 }
 
 func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
 		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
@@ -170,14 +174,14 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 		PatchType: types.MergePatchType,
 		Data:      serializedRollout,
 	}
-	err = config.Client().Resources().Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPatch)
+	err = clusterResources.Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPatch)
 	if err != nil {
 		logrus.Errorf("rollout %q updating was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
-	waitCondition := conditions.New(config.Client().Resources())
+	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -196,6 +200,7 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 }
 
 func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
 		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
@@ -203,14 +208,14 @@ func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envco
 		return ctx
 	}
 	logrus.Infof("%q was type asserted", RESOURCES_MAP_KEY)
-	err := config.Client().Resources().Delete(ctx, resourcesMap[ROLLOUT_KEY])
+	err := clusterResources.Delete(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("deleting rollout %q was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was deleted", resourcesMap[ROLLOUT_KEY].GetName())
-	err = config.Client().Resources().Delete(ctx, resourcesMap[HTTP_ROUTE_KEY])
+	err = clusterResources.Delete(ctx, resourcesMap[HTTP_ROUTE_KEY])
 	if err != nil {
 		logrus.Errorf("deleting httpRoute %q was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
@@ -220,7 +225,7 @@ func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envco
 	return ctx
 }
 
-func getMatchHTTPRouteFetcher(t *testing.T, value int32) func(k8s.Object) bool {
+func getMatchHTTPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
 	return func(obj k8s.Object) bool {
 		var httpRoute gatewayv1.HTTPRoute
 		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
@@ -237,6 +242,6 @@ func getMatchHTTPRouteFetcher(t *testing.T, value int32) func(k8s.Object) bool {
 			return false
 		}
 		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
-		return *httpRoute.Spec.Rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == value
+		return *httpRoute.Spec.Rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

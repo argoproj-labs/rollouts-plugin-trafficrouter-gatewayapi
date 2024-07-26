@@ -23,6 +23,8 @@ import (
 
 func TestSingleTCPRoute(t *testing.T) {
 	feature := features.New("Single TCPRoute feature").Setup(
+		setupEnvironment,
+	).Setup(
 		setupSingleTCPRouteEnv,
 	).Assess(
 		"Testing single TCPRoute feature",
@@ -36,6 +38,7 @@ func TestSingleTCPRoute(t *testing.T) {
 func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	var tcpRoute v1alpha2.TCPRoute
 	var rollout v1alpha1.Rollout
+	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
 	firstTCPRouteFile, err := os.Open(FIRST_TCP_ROUTE_PATH)
@@ -89,21 +92,21 @@ func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.C
 	resourcesMap[ROLLOUT_KEY] = &unstructured.Unstructured{
 		Object: rolloutObject,
 	}
-	err = config.Client().Resources().Create(ctx, resourcesMap[TCP_ROUTE_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[TCP_ROUTE_KEY])
 	if err != nil {
 		logrus.Errorf("tcpRoute %q creation was failed: %s", resourcesMap[TCP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("tcpRoute %q was created", resourcesMap[TCP_ROUTE_KEY].GetName())
-	err = config.Client().Resources().Create(ctx, resourcesMap[ROLLOUT_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("rollout %q creation was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
-	waitCondition := conditions.New(config.Client().Resources())
+	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[TCP_ROUTE_KEY],
@@ -122,6 +125,7 @@ func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.C
 }
 
 func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
 		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
@@ -168,14 +172,14 @@ func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Confi
 		PatchType: types.MergePatchType,
 		Data:      serializedRollout,
 	}
-	err = config.Client().Resources().Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPatch)
+	err = clusterResources.Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPatch)
 	if err != nil {
 		logrus.Errorf("rollout %q updating was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
-	waitCondition := conditions.New(config.Client().Resources())
+	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[TCP_ROUTE_KEY],
@@ -194,6 +198,7 @@ func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Confi
 }
 
 func teardownSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
 		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
@@ -201,14 +206,14 @@ func teardownSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envcon
 		return ctx
 	}
 	logrus.Infof("%q was type asserted", RESOURCES_MAP_KEY)
-	err := config.Client().Resources().Delete(ctx, resourcesMap[ROLLOUT_KEY])
+	err := clusterResources.Delete(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("deleting rollout %q was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was deleted", resourcesMap[ROLLOUT_KEY].GetName())
-	err = config.Client().Resources().Delete(ctx, resourcesMap[TCP_ROUTE_KEY])
+	err = clusterResources.Delete(ctx, resourcesMap[TCP_ROUTE_KEY])
 	if err != nil {
 		logrus.Errorf("deleting tcpRoute %q was failed: %s", resourcesMap[TCP_ROUTE_KEY].GetName(), err)
 		t.Error()
@@ -218,7 +223,7 @@ func teardownSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envcon
 	return ctx
 }
 
-func getMatchTCPRouteFetcher(t *testing.T, value int32) func(k8s.Object) bool {
+func getMatchTCPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
 	return func(obj k8s.Object) bool {
 		var tcpRoute v1alpha2.TCPRoute
 		unstructuredTCPRoute, ok := obj.(*unstructured.Unstructured)
@@ -235,6 +240,6 @@ func getMatchTCPRouteFetcher(t *testing.T, value int32) func(k8s.Object) bool {
 			return false
 		}
 		logrus.Infof("unstructured tcpRoute %q was converted to the typed tcpRoute", tcpRoute.GetName())
-		return *tcpRoute.Spec.Rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == value
+		return *tcpRoute.Spec.Rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

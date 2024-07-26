@@ -1,3 +1,3 @@
 package e2e
 
-type ContextKey string
+type contextKey string

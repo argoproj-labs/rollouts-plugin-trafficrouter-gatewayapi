@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -24,6 +23,8 @@ import (
 
 func TestSingleHeaderBasedHTTPRoute(t *testing.T) {
 	feature := features.New("Single header based HTTPRoute feature").Setup(
+		setupEnvironment,
+	).Setup(
 		setupSingleHeaderBasedHTTPRouteEnv,
 	).Assess(
 		"Testing single header based HTTPRoute feature",
@@ -37,6 +38,7 @@ func TestSingleHeaderBasedHTTPRoute(t *testing.T) {
 func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	var httpRoute gatewayv1.HTTPRoute
 	var rollout v1alpha1.Rollout
+	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
 	firstHTTPRouteFile, err := os.Open(FIRST_HTTP_ROUTE_PATH)
@@ -90,21 +92,21 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 	resourcesMap[ROLLOUT_KEY] = &unstructured.Unstructured{
 		Object: rolloutObject,
 	}
-	err = config.Client().Resources().Create(ctx, resourcesMap[HTTP_ROUTE_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[HTTP_ROUTE_KEY])
 	if err != nil {
 		logrus.Errorf("httpRoute %q creation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("httpRoute %q was created", resourcesMap[HTTP_ROUTE_KEY].GetName())
-	err = config.Client().Resources().Create(ctx, resourcesMap[ROLLOUT_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("rollout %q creation was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
-	waitCondition := conditions.New(config.Client().Resources())
+	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -123,6 +125,7 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 }
 
 func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
 		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
@@ -169,21 +172,21 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		PatchType: types.MergePatchType,
 		Data:      serializedRollout,
 	}
-	err = config.Client().Resources().Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPatch)
+	err = clusterResources.Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPatch)
 	if err != nil {
 		logrus.Errorf("rollout %q updating was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
-	waitCondition := conditions.New(config.Client().Resources())
+	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
 			getMatchHeaderBasedHTTPRouteFetcher(
 				t,
 				LAST_CANARY_ROUTE_WEIGHT,
-				LAST_REFLECTED_HEADER_BASED_ROUTE_VALUE,
+				LAST_HEADER_BASED_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
@@ -201,7 +204,7 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 			getMatchHeaderBasedHTTPRouteFetcher(
 				t,
 				FIRST_CANARY_ROUTE_WEIGHT,
-				FIRST_REFLECTED_HEADER_BASED_ROUTE_VALUE,
+				FIRST_HEADER_BASED_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
@@ -217,6 +220,7 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 }
 
 func teardownSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
 		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
@@ -224,14 +228,14 @@ func teardownSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, co
 		return ctx
 	}
 	logrus.Infof("%q was type asserted", RESOURCES_MAP_KEY)
-	err := config.Client().Resources().Delete(ctx, resourcesMap[ROLLOUT_KEY])
+	err := clusterResources.Delete(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("deleting rollout %q was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("rollout %q was deleted", resourcesMap[ROLLOUT_KEY].GetName())
-	err = config.Client().Resources().Delete(ctx, resourcesMap[HTTP_ROUTE_KEY])
+	err = clusterResources.Delete(ctx, resourcesMap[HTTP_ROUTE_KEY])
 	if err != nil {
 		logrus.Errorf("deleting httpRoute %q was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
@@ -241,12 +245,9 @@ func teardownSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, co
 	return ctx
 }
 
-func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, weight int32, reflectedBasedRouteValue reflect.Value) func(k8s.Object) bool {
+func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, targetWeight int32, targetHeaderBasedRouteValue gatewayv1.HTTPHeaderMatch) func(k8s.Object) bool {
 	return func(obj k8s.Object) bool {
 		var httpRoute gatewayv1.HTTPRoute
-		httpRouteRuleIndex := HEADER_BASED_RULE_INDEX
-		backendRefIndex := HEADER_BASED_BACKEND_REF_INDEX
-		isReflectedBasedRouteValueValid := reflectedBasedRouteValue.IsValid()
 		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			logrus.Error("k8s object type assertion was failed")
@@ -262,36 +263,19 @@ func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, weight int32, reflectedBa
 		}
 		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
 		rules := httpRoute.Spec.Rules
-		if !isReflectedBasedRouteValueValid {
-			httpRouteRuleIndex = ROLLOUT_HTTP_ROUTE_RULE_INDEX
-			backendRefIndex = CANARY_BACKEND_REF_INDEX
-		} else if len(rules) != FIRST_HEADER_BASED_RULES_LENGTH {
+		if targetHeaderBasedRouteValue.Type == nil {
+			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&
+				*rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
+		}
+		if len(rules) != FIRST_HEADER_BASED_RULES_LENGTH {
 			return false
 		}
-		if *rules[httpRouteRuleIndex].BackendRefs[backendRefIndex].Weight != weight {
-			return false
-		}
-		logrus.Infof("httpRoute %q header based backend ref weight passed check", httpRoute.GetName())
-		if !isReflectedBasedRouteValueValid {
-			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH
-		}
-		header := rules[HEADER_BASED_RULE_INDEX].Matches[HEADER_BASED_MATCH_INDEX].Headers[HEADER_BASED_HEADER_INDEX]
-		reflectedHeaderValue := reflect.ValueOf(header)
-		reflectedHeaderType := reflect.TypeOf(header)
-		for i := 0; i < reflectedHeaderType.NumField(); i++ {
-			headerField := reflectedHeaderValue.Field(i)
-			targetHeaderField := reflectedBasedRouteValue.Field(i)
-			if headerField.Kind() != targetHeaderField.Kind() {
-				return false
-			}
-			if headerField.Kind() == reflect.Pointer {
-				headerField = headerField.Elem()
-				targetHeaderField = targetHeaderField.Elem()
-			}
-			if !targetHeaderField.Equal(headerField) {
-				return false
-			}
-		}
-		return true
+		headerBasedRouteValue := rules[HEADER_BASED_RULE_INDEX].Matches[HEADER_BASED_MATCH_INDEX].Headers[HEADER_BASED_HEADER_INDEX]
+		weight := *rules[HEADER_BASED_RULE_INDEX].BackendRefs[HEADER_BASED_BACKEND_REF_INDEX].Weight
+		return weight == targetWeight && isHeaderBasedRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue)
 	}
+}
+
+func isHeaderBasedRouteValuesEqual(first, second gatewayv1.HTTPHeaderMatch) bool {
+	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
 }

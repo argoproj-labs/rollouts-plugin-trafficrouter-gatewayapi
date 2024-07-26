@@ -112,16 +112,36 @@ make e2e-tests
 ```
 
 This command will
+
 1. Create local cluster **gatewayapi-plugin-e2e** using tools [kind](https://kind.sigs.k8s.io/) and [docker](https://www.docker.com/). You need to install them.
 2. Setup cluster using instruments [helm](https://helm.sh/) and [kubectl](https://kubernetes.io/docs/reference/kubectl/). You need to install them.
 3. Runs tests in **/test/e2e** folder. 
 4. Delete all resources from created cluster.
 5. Delete created cluster.
 
+**Note:** It is used Traefik in e2e tests.
+
 If you want to leave working cluster with needing setup at the end you should run the following command
 ```
 make CLUSTER_DELETE=false e2e-tests
 ```
+
+After this command you can want to run again all tests. Although you can run again **make CLUSTER_DELETE=false e2e-tests** command, it is recommended to use this command
+```
+make run-e2e-tests
+```
+as you have already had cluster setup.
+
+If you want to run specific e2e tests then you can these commands
+```
+make RUN=<reg-exp> e2e-tests
+```
+or
+```
+make RUN=<reg-exp> run-e2e-tests
+```
+reg-exp - the value you would set for the **-run** flag of **go test** command 
+
 
 ## Creating a Pull Request
 

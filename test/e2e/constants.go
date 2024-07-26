@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"reflect"
 	"time"
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -32,7 +31,7 @@ const (
 	FIRST_CANARY_ROUTE_WEIGHT = 0
 	LAST_CANARY_ROUTE_WEIGHT  = 30
 
-	RESOURCES_MAP_KEY ContextKey = "resourcesMap"
+	RESOURCES_MAP_KEY contextKey = "resourcesMap"
 
 	HTTP_ROUTE_KEY = "httpRoute"
 	TCP_ROUTE_KEY  = "tcpRoute"
@@ -41,17 +40,16 @@ const (
 
 const (
 	SHORT_PERIOD  = time.Second
-	MEDIUM_PERIOD = 3 * time.Second
-	LONG_PERIOD   = 5 * time.Second
+	MEDIUM_PERIOD = 5 * time.Second
+	LONG_PERIOD   = 8 * time.Second
 )
 
 var (
-	FIRST_REFLECTED_HEADER_BASED_ROUTE_VALUE = reflect.ValueOf(nil)
-	headerBasedRouteValueType                = gatewayv1.HeaderMatchExact
-	LAST_HEADER_BASED_ROUTE_VALUE            = gatewayv1.HTTPHeaderMatch{
+	FIRST_HEADER_BASED_ROUTE_VALUE gatewayv1.HTTPHeaderMatch
+	headerBasedRouteValueType      = gatewayv1.HeaderMatchExact
+	LAST_HEADER_BASED_ROUTE_VALUE  = gatewayv1.HTTPHeaderMatch{
 		Name:  "X-Test",
 		Type:  &headerBasedRouteValueType,
 		Value: "test",
 	}
-	LAST_REFLECTED_HEADER_BASED_ROUTE_VALUE = reflect.ValueOf(LAST_HEADER_BASED_ROUTE_VALUE)
 )
