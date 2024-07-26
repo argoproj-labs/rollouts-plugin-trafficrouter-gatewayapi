@@ -1,11 +1,14 @@
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
 metadata:
-  name: argo-rollouts-http-route
+  name: first-tcproute
+  namespace: default
 spec:
   parentRefs:
     - name: traefik-gateway
+      sectionName: tcp
       namespace: default
+      kind: Gateway
   rules:
     - backendRefs:
         - name: argo-rollouts-stable-service

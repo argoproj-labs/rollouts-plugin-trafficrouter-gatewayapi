@@ -1,6 +1,6 @@
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
-  name: argo-rollouts-gateway-class
+  name: traefik
 spec:
   controllerName: traefik.io/gateway-controller

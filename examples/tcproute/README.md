@@ -102,7 +102,7 @@ After we enabled the Gateway API provider in our controller we can create a Gate
 - GatewayClass
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: argo-rollouts-gateway-class
@@ -113,7 +113,7 @@ spec:
 - Gateway
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: argo-rollouts-gateway
@@ -152,7 +152,7 @@ This concludes the setup that is specific to Traefik Proxy. The rest of the step
 Create TCPRoute and connect to the created Gateway resource
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TCPRoute
 metadata:
   name: argo-rollouts-tcp-route

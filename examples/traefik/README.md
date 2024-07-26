@@ -105,7 +105,7 @@ After we enabled the Gateway API provider in our controller we can create a Gate
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
-  name: argo-rollouts-gateway-class
+  name: traefik
 spec:
   controllerName: traefik.io/gateway-controller
 ```
@@ -116,9 +116,9 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
-  name: argo-rollouts-gateway
+  name: traefik-gateway
 spec:
-  gatewayClassName: argo-rollouts-gateway-class
+  gatewayClassName: traefik
   listeners:
     - protocol: HTTP
       name: web

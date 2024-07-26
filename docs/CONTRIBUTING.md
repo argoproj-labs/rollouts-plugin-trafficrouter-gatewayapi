@@ -103,37 +103,45 @@ To run unit tests:
 make test
 ```
 
-<!-- ## Running E2E tests -->
+## Running E2E tests
 
-<!-- The end-to-end tests need to run against a kubernetes cluster with the Argo Rollouts controller
-running. The rollout controller can be started with the command:
-
-```
-make start-e2e
-```
-
-Start and prepare your cluster for e2e tests:
+The e2e tests need to run against a kubernetes cluster with the Argo Rollouts controller. To run e2e tests run in the repository root
 
 ```
-k3d cluster create
-kubectl create ns argo-rollouts
-kubectl apply -k manifests/crds
-kubectl apply -f test/e2e/crds
+make e2e-tests
 ```
 
-Then run the e2e tests:
+This command will
 
+1. Create local cluster **gatewayapi-plugin-e2e** using tools [kind](https://kind.sigs.k8s.io/) and [docker](https://www.docker.com/). You need to install them.
+2. Setup cluster using instruments [helm](https://helm.sh/) and [kubectl](https://kubernetes.io/docs/reference/kubectl/). You need to install them.
+3. Runs tests in **/test/e2e** folder. 
+4. Delete all resources from created cluster.
+5. Delete created cluster.
+
+**Note:** It is used Traefik in e2e tests.
+
+If you want to leave working cluster with needing setup at the end you should run the following command
 ```
-make test-e2e
+make CLUSTER_DELETE=false e2e-tests
 ```
 
-To run a subset of e2e tests, you need to specify the suite with `-run`, and the specific test regex with `-testify.m`.
-
+After this command you can want to run again all tests. Although you can run again **make CLUSTER_DELETE=false e2e-tests** command, it is recommended to use this command
 ```
-E2E_TEST_OPTIONS="-run 'TestCanarySuite' -testify.m 'TestCanaryScaleDownOnAbortNoTrafficRouting'" make test-e2e 
-``` 
+make run-e2e-tests
+```
+as you have already had cluster setup.
 
--->
+If you want to run specific e2e tests then you can these commands
+```
+make RUN=<reg-exp> e2e-tests
+```
+or
+```
+make RUN=<reg-exp> run-e2e-tests
+```
+reg-exp - the value you would set for the **-run** flag of **go test** command 
+
 
 ## Creating a Pull Request
 
@@ -144,7 +152,6 @@ You need to sign-off your commit using DCO (Developer Certificate of Origin). Re
 Please use [meaningful PR names](https://www.conventionalcommits.org/en/v1.0.0/) for the Pull request title.
 
 When you submit a PR, a couple of CI checks will be run automatically to ensure your changes will build fine and meet certain quality standards. Your contribution needs to pass those checks in order to be merged into the repository.
-
 
 ## Documentation Changes
 
