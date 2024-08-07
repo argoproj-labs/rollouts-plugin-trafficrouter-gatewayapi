@@ -6,7 +6,6 @@ import (
 
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	goPlugin "github.com/hashicorp/go-plugin"
-	log "github.com/sirupsen/logrus"
 )
 
 // handshakeConfigs are used to just do a basic handshake between
@@ -20,14 +19,10 @@ var handshakeConfig = goPlugin.HandshakeConfig{
 }
 
 func main() {
-	logCtx := log.WithFields(log.Fields{"plugin": "trafficrouter"})
-	utils.SetLogLevel("debug")
-	log.SetFormatter(utils.CreateFormatter("text"))
 	rpcPluginImp := &plugin.RpcPlugin{
-		LogCtx: logCtx,
+		LogCtx: utils.SetupLog(),
 	}
-	//  pluginMap is the map of plugins we can dispense.
-	var pluginMap = map[string]goPlugin.Plugin{
+	pluginMap := map[string]goPlugin.Plugin{
 		"RpcTrafficRouterPlugin": &rolloutsPlugin.RpcTrafficRouterPlugin{Impl: rpcPluginImp},
 	}
 	goPlugin.Serve(&goPlugin.ServeConfig{

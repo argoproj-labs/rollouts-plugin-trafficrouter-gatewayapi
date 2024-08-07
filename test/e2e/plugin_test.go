@@ -22,8 +22,9 @@ func TestMain(m *testing.M) {
 func setupEnvironment(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	logrus.SetLevel(logrus.InfoLevel)
 	logrus.SetFormatter(&logrus.TextFormatter{
-		ForceColors:  true,
-		PadLevelText: true,
+		ForceColors:   true,
+		PadLevelText:  true,
+		FullTimestamp: true,
 	})
 	return ctx
 }

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"strings"
 
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	log "github.com/sirupsen/logrus"
@@ -26,30 +25,14 @@ func GetKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-func SetLogLevel(logLevel string) {
-	level, err := log.ParseLevel(logLevel)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.SetLevel(level)
-}
-
-func CreateFormatter(logFormat string) log.Formatter {
-	var formatType log.Formatter
-	switch strings.ToLower(logFormat) {
-	case "json":
-		formatType = &log.JSONFormatter{}
-	case "text":
-		formatType = &log.TextFormatter{
+func SetupLog() *log.Entry {
+	log.SetLevel(log.InfoLevel)
+	log.SetFormatter(
+		&log.TextFormatter{
 			FullTimestamp: true,
-		}
-	default:
-		log.Infof("Unknown format: %s. Using text logformat", logFormat)
-		formatType = &log.TextFormatter{
-			FullTimestamp: true,
-		}
-	}
-	return formatType
+		},
+	)
+	return log.WithFields(log.Fields{"plugin": "trafficrouter"})
 }
 
 func GetOrCreateConfigMap(name string, options CreateConfigMapOptions) (*v1.ConfigMap, error) {
@@ -94,11 +77,6 @@ func UpdateConfigMapData(configMap *v1.ConfigMap, configMapData any, options Upd
 	return err
 }
 
-func RemoveIndex[T any](original []T, index int) []T {
-	result := original[:index]
-	return append(result, original[index+1:]...)
-}
-
 func DoTransaction(logCtx *log.Entry, taskList ...Task) error {
 	var err, reverseErr error
 	for index, task := range taskList {
@@ -109,7 +87,7 @@ func DoTransaction(logCtx *log.Entry, taskList ...Task) error {
 		logCtx.Error(err.Error())
 		for i := index - 1; i > -1; i-- {
 			reverseErr = taskList[i].ReverseAction()
-			if err != nil {
+			if reverseErr != nil {
 				return reverseErr
 			}
 		}

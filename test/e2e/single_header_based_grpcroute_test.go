@@ -18,68 +18,68 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
-func TestSingleHeaderBasedHTTPRoute(t *testing.T) {
-	feature := features.New("Single header based HTTPRoute feature").Setup(
+func TestSingleHeaderBasedGRPCRoute(t *testing.T) {
+	feature := features.New("Single header based GRPCRoute feature").Setup(
 		setupEnvironment,
 	).Setup(
-		setupSingleHeaderBasedHTTPRouteEnv,
+		setupSingleHeaderBasedGRPCRouteEnv,
 	).Assess(
-		"Testing single header based HTTPRoute feature",
-		testSingleHeaderBasedHTTPRoute,
+		"Testing single header based GRPCRoute feature",
+		testSingleHeaderBasedGRPCRoute,
 	).Teardown(
-		teardownSingleHeaderBasedHTTPRouteEnv,
+		teardownSingleHeaderBasedGRPCRouteEnv,
 	).Feature()
 	_ = global.Test(t, feature)
 }
 
-func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
-	var httpRoute gatewayv1.HTTPRoute
+func setupSingleHeaderBasedGRPCRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	var grpcRoute v1alpha2.GRPCRoute
 	var rollout v1alpha1.Rollout
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstHTTPRouteFile, err := os.Open(FIRST_HTTP_ROUTE_PATH)
+	firstGRPCRouteFile, err := os.Open(FIRST_GRPC_ROUTE_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", FIRST_GRPC_ROUTE_PATH, err)
 		t.Error()
 		return ctx
 	}
-	defer firstHTTPRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_HTTP_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH)
+	defer firstGRPCRouteFile.Close()
+	logrus.Infof("file %q was opened", FIRST_GRPC_ROUTE_PATH)
+	rolloutFile, err := os.Open(SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH)
-	err = decoder.Decode(firstHTTPRouteFile, &httpRoute)
+	logrus.Infof("file %q was opened", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH)
+	err = decoder.Decode(firstGRPCRouteFile, &grpcRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", FIRST_GRPC_ROUTE_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_HTTP_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", FIRST_GRPC_ROUTE_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH)
-	httpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&httpRoute)
+	logrus.Infof("file %q was decoded", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH)
+	grpcRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&grpcRoute)
 	if err != nil {
-		logrus.Errorf("httpRoute %q converting to unstructured was failed: %s", httpRoute.GetName(), err)
+		logrus.Errorf("grpcRoute %q converting to unstructured was failed: %s", grpcRoute.GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was converted to unstructured", httpRoute.GetName())
-	resourcesMap[HTTP_ROUTE_KEY] = &unstructured.Unstructured{
-		Object: httpRouteObject,
+	logrus.Infof("grpcRoute %q was converted to unstructured", grpcRoute.GetName())
+	resourcesMap[GRPC_ROUTE_KEY] = &unstructured.Unstructured{
+		Object: grpcRouteObject,
 	}
 	rolloutObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&rollout)
 	if err != nil {
@@ -92,13 +92,13 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 	resourcesMap[ROLLOUT_KEY] = &unstructured.Unstructured{
 		Object: rolloutObject,
 	}
-	err = clusterResources.Create(ctx, resourcesMap[HTTP_ROUTE_KEY])
+	err = clusterResources.Create(ctx, resourcesMap[GRPC_ROUTE_KEY])
 	if err != nil {
-		logrus.Errorf("httpRoute %q creation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("grpcRoute %q creation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was created", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("grpcRoute %q was created", resourcesMap[GRPC_ROUTE_KEY].GetName())
 	err = clusterResources.Create(ctx, resourcesMap[ROLLOUT_KEY])
 	if err != nil {
 		logrus.Errorf("rollout %q creation was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
@@ -109,22 +109,22 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
-			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHTTPRouteFetcher(t, FIRST_CANARY_ROUTE_WEIGHT),
+			resourcesMap[GRPC_ROUTE_KEY],
+			getMatchGRPCRouteFetcher(t, FIRST_CANARY_ROUTE_WEIGHT),
 		),
 		wait.WithTimeout(MEDIUM_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("checking httpRoute %q connection with rollout %q was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), err)
+		logrus.Errorf("checking grpcRoute %q connection with rollout %q was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q connected with rollout %q", resourcesMap[HTTP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName())
+	logrus.Infof("grpcRoute %q connected with rollout %q", resourcesMap[GRPC_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName())
 	return ctx
 }
 
-func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
@@ -182,44 +182,44 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 	waitCondition := conditions.New(clusterResources)
 	err = wait.For(
 		waitCondition.ResourceMatch(
-			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHeaderBasedHTTPRouteFetcher(
+			resourcesMap[GRPC_ROUTE_KEY],
+			getMatchHeaderBasedGRPCRouteFetcher(
 				t,
 				LAST_CANARY_ROUTE_WEIGHT,
-				LAST_HEADER_BASED_HTTP_ROUTE_VALUE,
+				LAST_HEADER_BASED_GRPC_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("grpcRoute %q updation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was updated", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("grpcRoute %q was updated", resourcesMap[GRPC_ROUTE_KEY].GetName())
 	err = wait.For(
 		waitCondition.ResourceMatch(
-			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHeaderBasedHTTPRouteFetcher(
+			resourcesMap[GRPC_ROUTE_KEY],
+			getMatchHeaderBasedGRPCRouteFetcher(
 				t,
 				FIRST_CANARY_ROUTE_WEIGHT,
-				FIRST_HEADER_BASED_HTTP_ROUTE_VALUE,
+				FIRST_HEADER_BASED_GRPC_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("last httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("last grpcRoute %q updation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was updated lastly", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("grpcRoute %q was updated lastly", resourcesMap[GRPC_ROUTE_KEY].GetName())
 	return ctx
 }
 
-func teardownSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+func teardownSingleHeaderBasedGRPCRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
@@ -235,47 +235,48 @@ func teardownSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, co
 		return ctx
 	}
 	logrus.Infof("rollout %q was deleted", resourcesMap[ROLLOUT_KEY].GetName())
-	err = clusterResources.Delete(ctx, resourcesMap[HTTP_ROUTE_KEY])
+	err = clusterResources.Delete(ctx, resourcesMap[GRPC_ROUTE_KEY])
 	if err != nil {
-		logrus.Errorf("deleting httpRoute %q was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("deleting grpcRoute %q was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was deleted", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("grpcRoute %q was deleted", resourcesMap[GRPC_ROUTE_KEY].GetName())
 	return ctx
 }
 
-func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, targetWeight int32, targetHeaderBasedRouteValue gatewayv1.HTTPHeaderMatch) func(k8s.Object) bool {
+func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targetHeaderBasedRouteValue v1alpha2.GRPCHeaderMatch) func(k8s.Object) bool {
 	return func(obj k8s.Object) bool {
-		var httpRoute gatewayv1.HTTPRoute
-		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
+		var grpcRoute v1alpha2.GRPCRoute
+		unstructuredGRPCRoute, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			logrus.Error("k8s object type assertion was failed")
 			t.Error()
 			return false
 		}
 		logrus.Info("k8s object was type asserted")
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredGRPCRoute.Object, &grpcRoute)
 		if err != nil {
-			logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
+			logrus.Errorf("conversation from unstructured grpcRoute %q to the typed grpcRoute was failed", unstructuredGRPCRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
-		rules := httpRoute.Spec.Rules
+		logrus.Infof("unstructured grpcRoute %q was converted to the typed grpcRoute", grpcRoute.GetName())
+		rules := grpcRoute.Spec.Rules
 		if targetHeaderBasedRouteValue.Type == nil {
 			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&
 				*rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 		}
+		// TODO: It needs more checks
 		if len(rules) != FIRST_HEADER_BASED_RULES_LENGTH {
 			return false
 		}
 		headerBasedRouteValue := rules[HEADER_BASED_RULE_INDEX].Matches[HEADER_BASED_MATCH_INDEX].Headers[HEADER_BASED_HEADER_INDEX]
 		weight := *rules[HEADER_BASED_RULE_INDEX].BackendRefs[HEADER_BASED_BACKEND_REF_INDEX].Weight
-		return weight == targetWeight && isHeaderBasedHTTPRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue)
+		return weight == targetWeight && isHeaderBasedGRPCRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue)
 	}
 }
 
-func isHeaderBasedHTTPRouteValuesEqual(first, second gatewayv1.HTTPHeaderMatch) bool {
+func isHeaderBasedGRPCRouteValuesEqual(first, second v1alpha2.GRPCHeaderMatch) bool {
 	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
 }

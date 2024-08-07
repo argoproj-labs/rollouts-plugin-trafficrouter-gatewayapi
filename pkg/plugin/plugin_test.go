@@ -28,17 +28,13 @@ var testHandshake = goPlugin.HandshakeConfig{
 }
 
 func TestRunSuccessfully(t *testing.T) {
-	logCtx := log.WithFields(log.Fields{"plugin": "trafficrouter"})
-
-	utils.SetLogLevel("debug")
-	log.SetFormatter(utils.CreateFormatter("text"))
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:          logCtx,
+		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		GRPCRouteClient: gwFake.NewSimpleClientset(&mocks.GRPCRouteObj).GatewayV1alpha2().GRPCRoutes(mocks.RolloutNamespace),
 		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
 		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
@@ -117,6 +113,18 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
+	t.Run("SetGRPCRouteWeight", func(t *testing.T) {
+		var desiredWeight int32 = 30
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+		})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
 	t.Run("SetTCPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
@@ -165,7 +173,7 @@ func TestRunSuccessfully(t *testing.T) {
 			Prefix: headerValue,
 		}
 		headerRouting := v1alpha1.SetHeaderRoute{
-			Name: mocks.HTTPManagedRouteName,
+			Name: mocks.ManagedRouteName,
 			Match: []v1alpha1.HeaderRoutingMatch{
 				{
 					HeaderName:  headerName,
@@ -185,6 +193,35 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
 		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
 	})
+	t.Run("SetGRPCHeaderRoute", func(t *testing.T) {
+		headerName := "X-Test"
+		headerValue := "test"
+		headerValueType := gatewayv1.HeaderMatchRegularExpression
+		prefixedHeaderValue := headerValue + ".*"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
+		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
+		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
+	})
 	t.Run("RemoveHTTPManagedRoutes", func(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
@@ -195,6 +232,17 @@ func TestRunSuccessfully(t *testing.T) {
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 1, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
+	})
+	t.Run("RemoveGRPCManagedRoutes", func(t *testing.T) {
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.RemoveManagedRoutes(rollout)
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 1, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
 	})
 
 	// Canceling should cause an exit
@@ -220,7 +268,7 @@ func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *
 					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
 						ManagedRoutes: []v1alpha1.MangedRoutes{
 							{
-								Name: mocks.HTTPManagedRouteName,
+								Name: mocks.ManagedRouteName,
 							},
 						},
 						Plugins: map[string]json.RawMessage{

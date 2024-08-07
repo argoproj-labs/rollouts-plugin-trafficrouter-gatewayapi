@@ -240,6 +240,6 @@ func getMatchTCPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) 
 			return false
 		}
 		logrus.Infof("unstructured tcpRoute %q was converted to the typed tcpRoute", tcpRoute.GetName())
-		return *tcpRoute.Spec.Rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
+		return *tcpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

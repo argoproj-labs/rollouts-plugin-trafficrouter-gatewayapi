@@ -69,6 +69,14 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	if rpcError.HasError() {
 		return rpcError
 	}
+	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
+		gatewayAPIConfig.GRPCRoute = route.Name
+		return r.setGRPCRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+	})
+	if rpcError.HasError() {
+		return rpcError
+	}
 	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
 	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
 		gatewayAPIConfig.TCPRoute = route.Name
@@ -93,6 +101,22 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 			}
 			gatewayAPIConfig.HTTPRoute = route.Name
 			return r.setHTTPHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+			return rpcError
+		}
+		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+	}
+	if gatewayAPIConfig.GRPCRoutes != nil {
+		gatewayAPIConfig.ConfigMapRWMutex.Lock()
+		r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
+			if !route.UseHeaderRoutes {
+				return pluginTypes.RpcError{}
+			}
+			gatewayAPIConfig.GRPCRoute = route.Name
+			return r.setGRPCHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
 			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
@@ -134,6 +158,22 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 		}
 		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
+	if gatewayAPIConfig.GRPCRoutes != nil {
+		gatewayAPIConfig.ConfigMapRWMutex.Lock()
+		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
+			if !route.UseHeaderRoutes {
+				return pluginTypes.RpcError{}
+			}
+			gatewayAPIConfig.GRPCRoute = route.Name
+			return r.removeGRPCManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+			return rpcError
+		}
+		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+	}
 	return pluginTypes.RpcError{}
 }
 
@@ -162,6 +202,12 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 	if gatewayAPIConfig.HTTPRoute != "" {
 		gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, HTTPRoute{
 			Name:            gatewayAPIConfig.HTTPRoute,
+			UseHeaderRoutes: true,
+		})
+	}
+	if gatewayAPIConfig.GRPCRoute != "" {
+		gatewayAPIConfig.GRPCRoutes = append(gatewayAPIConfig.GRPCRoutes, GRPCRoute{
+			Name:            gatewayAPIConfig.GRPCRoute,
 			UseHeaderRoutes: true,
 		})
 	}
@@ -220,32 +266,8 @@ func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gate
 	return nil, routeRuleList.Error()
 }
 
-func removeManagedRouteEntry(managedRouteMap ManagedRouteMap, routeRuleList HTTPRouteRuleList, managedRouteName string, httpRouteName string) (HTTPRouteRuleList, error) {
-	routeManagedRouteMap, isOk := managedRouteMap[managedRouteName]
-	if !isOk {
-		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteName, managedRouteName)
-	}
-	managedRouteIndex, isOk := routeManagedRouteMap[httpRouteName]
-	if !isOk {
-		managedRouteMapKey := managedRouteName + "." + httpRouteName
-		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteMapKey, managedRouteMapKey)
-	}
-	delete(routeManagedRouteMap, httpRouteName)
-	if len(managedRouteMap[managedRouteName]) == 0 {
-		delete(managedRouteMap, managedRouteName)
-	}
-	for _, currentRouteManagedRouteMap := range managedRouteMap {
-		value := currentRouteManagedRouteMap[httpRouteName]
-		if value > managedRouteIndex {
-			currentRouteManagedRouteMap[httpRouteName]--
-		}
-	}
-	routeRuleList = utils.RemoveIndex(routeRuleList, managedRouteIndex)
-	return routeRuleList, nil
-}
-
 func isConfigHasRoutes(config *GatewayAPITrafficRouting) bool {
-	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0
+	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0 || len(config.GRPCRoutes) > 0
 }
 
 func forEachGatewayAPIRoute[T1 GatewayAPIRoute](routeList []T1, fn func(route T1) pluginTypes.RpcError) pluginTypes.RpcError {

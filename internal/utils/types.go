@@ -13,8 +13,8 @@ type CreateConfigMapOptions struct {
 
 type UpdateConfigMapOptions struct {
 	Clientset    v1.ConfigMapInterface
-	ConfigMapKey string
 	Ctx          context.Context
+	ConfigMapKey string
 }
 
 type Task struct {
