@@ -1,0 +1,14 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: GRPCRoute
+metadata:
+  name: first-grpcroute
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  rules:
+    - backendRefs:
+        - name: argo-rollouts-stable-service
+          port: 80
+        - name: argo-rollouts-canary-service
+          port: 80

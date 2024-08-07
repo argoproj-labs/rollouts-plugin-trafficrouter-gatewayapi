@@ -242,6 +242,6 @@ func getMatchHTTPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object)
 			return false
 		}
 		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
-		return *httpRoute.Spec.Rules[ROLLOUT_HTTP_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
+		return *httpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

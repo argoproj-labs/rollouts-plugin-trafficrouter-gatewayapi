@@ -15,34 +15,42 @@ import (
 )
 
 type RpcPlugin struct {
-	IsTest               bool
-	LogCtx               *logrus.Entry
-	GatewayAPIClientset  *gatewayAPIClientset.Clientset
-	Clientset            *kubernetes.Clientset
-	TestClientset        v1.ConfigMapInterface
-	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
-	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
 	HTTPRouteClient      gatewayApiClientv1.HTTPRouteInterface
 	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
+	GRPCRouteClient      gatewayApiClientv1alpha2.GRPCRouteInterface
+	TestClientset        v1.ConfigMapInterface
+	GatewayAPIClientset  *gatewayAPIClientset.Clientset
+	Clientset            *kubernetes.Clientset
+	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
+	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
+	UpdatedGRPCRouteMock *v1alpha2.GRPCRoute
+	LogCtx               *logrus.Entry
+	IsTest               bool
 }
 
 type GatewayAPITrafficRouting struct {
 	// HTTPRoute refers to the name of the HTTPRoute used to route traffic to the
 	// service
 	HTTPRoute string `json:"httpRoute,omitempty"`
+	// GRPCRoute refers to the name of the GRPCRoute used to route traffic to the
+	// service
+	GRPCRoute string `json:"grpcRoute,omitempty"`
 	// TCPRoute refers to the name of the TCPRoute used to route traffic to the
 	// service
 	TCPRoute string `json:"tcpRoute,omitempty"`
+	// Namespace refers to the namespace of the specified resource
+	Namespace string `json:"namespace,omitempty"`
+	// ConfigMap refers to the config map where plugin stores data about managed routes
+	ConfigMap string `json:"configMap,omitempty"`
 	// HTTPRoutes refer to names of HTTPRoute resources used to route traffic to the
 	// service
 	HTTPRoutes []HTTPRoute `json:"httpRoutes,omitempty"`
 	// TCPRoutes refer to names of TCPRoute resources used to route traffic to the
 	// service
 	TCPRoutes []TCPRoute `json:"tcpRoutes,omitempty"`
-	// Namespace refers to the namespace of the specified resource
-	Namespace string `json:"namespace,omitempty"`
-	// ConfigMap refers to the config map where plugin stores data about managed routes
-	ConfigMap string `json:"configMap,omitempty"`
+	// GRPCRoutes refer to names of GRPCRoute resources used to route traffic to the
+	// service
+	GRPCRoutes []GRPCRoute `json:"grpcRoutes,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
 	// critical section is config map
 	ConfigMapRWMutex sync.RWMutex
@@ -64,38 +72,52 @@ type TCPRoute struct {
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
 }
 
+type GRPCRoute struct {
+	// Name refers to the GRPCRoute name
+	Name string `json:"name" validate:"required"`
+	// UseHeaderRoutes indicates header routes will be added to this route or not
+	// during setHeaderRoute step
+	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+}
+
 type ManagedRouteMap map[string]map[string]int
 
 type HTTPRouteRule v1beta1.HTTPRouteRule
+
+type GRPCRouteRule v1alpha2.GRPCRouteRule
 
 type TCPRouteRule v1alpha2.TCPRouteRule
 
 type HTTPRouteRuleList []v1beta1.HTTPRouteRule
 
+type GRPCRouteRuleList []v1alpha2.GRPCRouteRule
+
 type TCPRouteRuleList []v1alpha2.TCPRouteRule
 
 type HTTPBackendRef v1beta1.HTTPBackendRef
 
+type GRPCBackendRef v1alpha2.GRPCBackendRef
+
 type TCPBackendRef v1beta1.BackendRef
 
 type GatewayAPIRoute interface {
-	HTTPRoute | TCPRoute
+	HTTPRoute | GRPCRoute | TCPRoute
 	GetName() string
 }
 
 type GatewayAPIRouteRule[T1 GatewayAPIBackendRef] interface {
-	*HTTPRouteRule | *TCPRouteRule
+	*HTTPRouteRule | *GRPCRouteRule | *TCPRouteRule
 	Iterator() (GatewayAPIRouteRuleIterator[T1], bool)
 }
 
 type GatewayAPIRouteRuleList[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]] interface {
-	HTTPRouteRuleList | TCPRouteRuleList
+	HTTPRouteRuleList | GRPCRouteRuleList | TCPRouteRuleList
 	Iterator() (GatewayAPIRouteRuleListIterator[T1, T2], bool)
 	Error() error
 }
 
 type GatewayAPIBackendRef interface {
-	*HTTPBackendRef | *TCPBackendRef
+	*HTTPBackendRef | *GRPCBackendRef | *TCPBackendRef
 	GetName() string
 }
 
