@@ -43,8 +43,8 @@ spec:
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
-            grpcRoute: first-tcproute # grpcroute you have created on the 6th step
-            namespace: default # namespace where your grpcroute is
+            grpcRoute: first-tcproute # tcproute you have created on the 6th step
+            namespace: default # namespace where your tcproute is
       steps:
         - setWeight: 30
         - pause: { duration: 2 }
