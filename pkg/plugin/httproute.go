@@ -129,7 +129,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 	}
 	httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
-		Matches:     []gatewayv1.HTTPRouteMatch{},
+		Matches: []gatewayv1.HTTPRouteMatch{},
 		BackendRefs: []gatewayv1.HTTPBackendRef{
 			{
 				BackendRef: gatewayv1.BackendRef{

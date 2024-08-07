@@ -130,7 +130,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 	}
 	grpcHeaderRouteRule := v1alpha2.GRPCRouteRule{
-		Matches:     []v1alpha2.GRPCRouteMatch{},
+		Matches: []v1alpha2.GRPCRouteMatch{},
 		BackendRefs: []v1alpha2.GRPCBackendRef{
 			{
 				BackendRef: v1alpha2.BackendRef{
@@ -154,7 +154,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	} else {
 		for i := 0; i < matchLength; i++ {
 			grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, v1alpha2.GRPCRouteMatch{
-				Method: grpcRouteRule.Matches[i].Method,
+				Method:  grpcRouteRule.Matches[i].Method,
 				Headers: grpcHeaderRouteRuleList,
 			})
 		}

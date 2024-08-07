@@ -10,16 +10,16 @@ import (
 )
 
 const (
-	HTTPRoute            = "HTTPRoute"
-	TCPRoute             = "TCPRoute"
-	StableServiceName    = "argo-rollouts-stable-service"
-	CanaryServiceName    = "argo-rollouts-canary-service"
-	HTTPRouteName        = "argo-rollouts-http-route"
-	GRPCRouteName        = "argo-rollouts-grpc-route"
-	TCPRouteName         = "argo-rollouts-tcp-route"
-	RolloutNamespace     = "default"
-	ConfigMapName        = "test-config"
-	ManagedRouteName = "test-header-route"
+	HTTPRoute         = "HTTPRoute"
+	TCPRoute          = "TCPRoute"
+	StableServiceName = "argo-rollouts-stable-service"
+	CanaryServiceName = "argo-rollouts-canary-service"
+	HTTPRouteName     = "argo-rollouts-http-route"
+	GRPCRouteName     = "argo-rollouts-grpc-route"
+	TCPRouteName      = "argo-rollouts-tcp-route"
+	RolloutNamespace  = "default"
+	ConfigMapName     = "test-config"
+	ManagedRouteName  = "test-header-route"
 )
 
 var (
@@ -73,7 +73,7 @@ var HTTPRouteObj = gatewayv1.HTTPRoute{
 
 var GRPCRouteObj = v1alpha2.GRPCRoute{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: GRPCRouteName,
+		Name:      GRPCRouteName,
 		Namespace: RolloutNamespace,
 	},
 	Spec: v1alpha2.GRPCRouteSpec{
