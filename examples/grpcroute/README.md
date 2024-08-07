@@ -1,5 +1,8 @@
 # Using Traefik Gateway API with Argo Rollouts
 
+!!! warning
+  We tested grpc support by looking at resources state but it would be great if you contribute a real example
+
 This guide will describe how to use Traefik proxy an an implementation
 for the Gateway API in order to do split traffic with Argo Rollouts.
 

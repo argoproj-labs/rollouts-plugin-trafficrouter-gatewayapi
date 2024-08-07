@@ -23,7 +23,8 @@ nav:
   - Advanced Deployments: features/advanced-deployments.md
   - Multiple Routes: features/multiple-routes.md
   - Header Based Routing: features/header-based-routing.md    
-  - TCP Routing: features/tcp.md  
+  - TCP Routing: features/tcp.md
+  - GRPC Routing: features/grpc.md  
 
 - Contributing: CONTRIBUTING.md
 repo_url: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi

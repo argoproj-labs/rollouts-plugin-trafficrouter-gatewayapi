@@ -1,25 +1,25 @@
-# TCP Routes
+# GRPC routes
 
-To use TCPRoute:
+!!! warning
+    We tested grpc support only by looking at resources state as traffic providers didn't support grpc well at the moment of development but it would be great if you contribute a real example
+
+To use GRPCRoute:
 
 1. Install your traffic provider
 2. Install [GatewayAPI CRD](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api) if your traffic provider doesn't do it by default
 3. Install [Argo Rollouts](https://argoproj.github.io/argo-rollouts/installation/)
 4. Install [Argo Rollouts GatewayAPI plugin](installation.md)
 5. Create stable and canary services
-6. Create TCPRoute resource according to the GatewayAPI and your traffic provider documentation
+6. Create GRPCRoute resource according to the GatewayAPI and your traffic provider documentation
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
-kind: TCPRoute
+kind: GRPCRoute
 metadata:
-  name: first-tcproute
+  name: first-grpcroute
   namespace: default
 spec:
   parentRefs:
     - name: traefik-gateway # read documentation of your traffic provider to understand what you need to specify here
-      sectionName: tcp
-      namespace: default
-      kind: Gateway
   rules:
     - backendRefs:
         - name: argo-rollouts-stable-service # stable service you have created on the 5th step
@@ -43,7 +43,7 @@ spec:
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
-            grpcRoute: first-tcproute # grpcroute you have created on the 6th step
+            grpcRoute: first-grpcroute # grpcroute you have created on the 6th step
             namespace: default # namespace where your grpcroute is
       steps:
         - setWeight: 30
