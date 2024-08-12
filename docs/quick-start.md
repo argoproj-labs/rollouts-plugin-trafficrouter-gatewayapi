@@ -89,11 +89,13 @@ metadata:
   namespace: argo-rollouts
 rules:
   - apiGroups:
-      - "*"
+      - gateway.networking.k8s.io
     resources:
-      - "*"
+      - httproutes
     verbs:
-      - "*"
+      - get
+      - patch
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
