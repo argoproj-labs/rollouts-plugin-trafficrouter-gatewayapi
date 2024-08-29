@@ -2,7 +2,7 @@ package plugin
 
 const (
 	GatewayAPIUpdateError                    = "error updating Gateway API %q: %s"
-	GatewayAPIManifestError                  = "No routes configured. One of 'tcpRoutes', 'httpRoutes', 'tcpRoute' or 'httpRoute' should be set"
+	GatewayAPIManifestError                  = "No routes configured. At least one of 'httpRoutes', 'grpcRoutes', 'tcpRoutes', 'httpRoute', 'grpcRoute' or 'tcpRoute' must be set"
 	HTTPRouteFieldIsEmptyError               = "httpRoute field is empty. It has to be set to remove managed routes"
 	InvalidHeaderMatchTypeError              = "invalid header match type"
 	BackendRefWasNotFoundInHTTPRouteError    = "backendRef was not found in httpRoute"
