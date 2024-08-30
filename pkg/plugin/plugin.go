@@ -50,7 +50,7 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 }
 
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
-	gatewayAPIConfig, err := getGatewayAPITracfficRoutingConfig(rollout)
+	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -86,7 +86,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
-	gatewayAPIConfig, err := getGatewayAPITracfficRoutingConfig(rollout)
+	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -136,7 +136,7 @@ func (r *RpcPlugin) VerifyWeight(rollout *v1alpha1.Rollout, desiredWeight int32,
 }
 
 func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.RpcError {
-	gatewayAPIConfig, err := getGatewayAPITracfficRoutingConfig(rollout)
+	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -181,7 +181,7 @@ func (r *RpcPlugin) Type() string {
 	return Type
 }
 
-func getGatewayAPITracfficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
+func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	gatewayAPIConfig := &GatewayAPITrafficRouting{
 		ConfigMap: defaults.ConfigMap,
