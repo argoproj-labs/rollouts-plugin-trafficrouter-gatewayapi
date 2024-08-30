@@ -27,9 +27,9 @@ install-dependencies:
 
 .PHONY: release
 release:
-	make BIN_NAME=gatewayapi-plugin-darwin-amd64 GOOS=darwin gatewayapi-plugin-build
+	make BIN_NAME=gatewayapi-plugin-darwin-amd64 GOOS=darwin GOARCH=amd64 gatewayapi-plugin-build
 	make BIN_NAME=gatewayapi-plugin-darwin-arm64 GOOS=darwin GOARCH=arm64 gatewayapi-plugin-build
-	make BIN_NAME=gatewayapi-plugin-linux-amd64 GOOS=linux gatewayapi-plugin-build
+	make BIN_NAME=gatewayapi-plugin-linux-amd64 GOOS=linux GOARCH=amd64 gatewayapi-plugin-build
 	make BIN_NAME=gatewayapi-plugin-linux-arm64 GOOS=linux GOARCH=arm64 gatewayapi-plugin-build
 	make BIN_NAME=gatewayapi-plugin-windows-amd64.exe GOOS=windows gatewayapi-plugin-build
 
