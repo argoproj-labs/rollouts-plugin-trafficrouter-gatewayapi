@@ -1,7 +1,7 @@
 # GRPC routes
 
 !!! warning
-    We tested grpc support only by looking at resources state as traffic providers didn't support grpc well at the moment of development but it would be great if you contribute a real example
+    We tested grpc support only by looking at resources state as traffic providers didn't support grpc well at the moment of development, but it would be great if you contribute a real example. Due to this, gRPC support is not included in the released builds, but can be tested by building the plugin from the source code.
 
 To use GRPCRoute:
 
