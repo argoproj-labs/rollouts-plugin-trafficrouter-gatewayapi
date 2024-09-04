@@ -71,15 +71,15 @@ var HTTPRouteObj = gatewayv1.HTTPRoute{
 	},
 }
 
-var GRPCRouteObj = v1alpha2.GRPCRoute{
+var GRPCRouteObj = gatewayv1.GRPCRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      GRPCRouteName,
 		Namespace: RolloutNamespace,
 	},
-	Spec: v1alpha2.GRPCRouteSpec{
-		Rules: []v1alpha2.GRPCRouteRule{
+	Spec: gatewayv1.GRPCRouteSpec{
+		Rules: []gatewayv1.GRPCRouteRule{
 			{
-				BackendRefs: []v1alpha2.GRPCBackendRef{
+				BackendRefs: []gatewayv1.GRPCBackendRef{
 					{
 						BackendRef: gatewayv1.BackendRef{
 							BackendObjectReference: gatewayv1.BackendObjectReference{

@@ -21,8 +21,8 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
+		httpRouteClient = gatewayClientV1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {

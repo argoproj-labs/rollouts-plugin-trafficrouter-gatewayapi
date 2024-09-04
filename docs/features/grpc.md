@@ -1,8 +1,5 @@
 # GRPC routes
 
-!!! warning
-    We tested grpc support only by looking at resources state as traffic providers didn't support grpc well at the moment of development, but it would be great if you contribute a real example. Due to this, gRPC support is not included in the released builds, but can be tested by building the plugin from the source code.
-
 To use GRPCRoute:
 
 1. Install your traffic provider
@@ -27,7 +24,7 @@ spec:
         - name: argo-rollouts-canary-service # canary service you have created on the 5th step
           port: 80
 ```
-7. Create Rollout resource
+1. Create Rollout resource
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout

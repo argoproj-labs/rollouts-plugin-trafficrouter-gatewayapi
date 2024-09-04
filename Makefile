@@ -11,9 +11,10 @@ define add_helm_repo
 	helm repo add argo https://argoproj.github.io/argo-helm
 endef
 
-define install_helm_charts
+define setup_cluster
+	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/experimental-install.yaml
 	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version 2.37.2
-	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version 29.0.1
+	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version 31.0.0
 endef
 
 define install_k8s_resources
@@ -55,7 +56,7 @@ setup-e2e-cluster:
 ifeq (${IS_E2E_CLUSTER},)
 	kind create cluster --name ${E2E_CLUSTER_NAME} --config ./test/cluster-setup/cluster-config.yml
 	$(call add_helm_repo)
-	$(call install_helm_charts)
+	$(call setup_cluster)
 	$(call install_k8s_resources)
 endif
 
