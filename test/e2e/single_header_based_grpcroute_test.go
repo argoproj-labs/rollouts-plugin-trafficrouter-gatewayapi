@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestSingleHeaderBasedGRPCRoute(t *testing.T) {
@@ -36,7 +36,7 @@ func TestSingleHeaderBasedGRPCRoute(t *testing.T) {
 }
 
 func setupSingleHeaderBasedGRPCRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
-	var grpcRoute v1alpha2.GRPCRoute
+	var grpcRoute gatewayv1.GRPCRoute
 	var rollout v1alpha1.Rollout
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
@@ -245,9 +245,9 @@ func teardownSingleHeaderBasedGRPCRouteEnv(ctx context.Context, t *testing.T, co
 	return ctx
 }
 
-func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targetHeaderBasedRouteValue v1alpha2.GRPCHeaderMatch) func(k8s.Object) bool {
+func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targetHeaderBasedRouteValue gatewayv1.GRPCHeaderMatch) func(k8s.Object) bool {
 	return func(obj k8s.Object) bool {
-		var grpcRoute v1alpha2.GRPCRoute
+		var grpcRoute gatewayv1.GRPCRoute
 		unstructuredGRPCRoute, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			logrus.Error("k8s object type assertion was failed")
@@ -267,7 +267,6 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&
 				*rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 		}
-		// TODO: It needs more checks
 		if len(rules) != FIRST_HEADER_BASED_RULES_LENGTH {
 			return false
 		}
@@ -277,6 +276,6 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 	}
 }
 
-func isHeaderBasedGRPCRouteValuesEqual(first, second v1alpha2.GRPCHeaderMatch) bool {
+func isHeaderBasedGRPCRouteValuesEqual(first, second gatewayv1.GRPCHeaderMatch) bool {
 	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
 }

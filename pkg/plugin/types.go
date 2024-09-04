@@ -8,7 +8,6 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
-	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 	gatewayApiClientv1 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1"
 	gatewayApiClientv1alpha2 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1alpha2"
@@ -17,13 +16,13 @@ import (
 type RpcPlugin struct {
 	HTTPRouteClient      gatewayApiClientv1.HTTPRouteInterface
 	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
-	GRPCRouteClient      gatewayApiClientv1alpha2.GRPCRouteInterface
+	GRPCRouteClient      gatewayApiClientv1.GRPCRouteInterface
 	TestClientset        v1.ConfigMapInterface
 	GatewayAPIClientset  *gatewayAPIClientset.Clientset
 	Clientset            *kubernetes.Clientset
 	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
 	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
-	UpdatedGRPCRouteMock *v1alpha2.GRPCRoute
+	UpdatedGRPCRouteMock *gatewayv1.GRPCRoute
 	LogCtx               *logrus.Entry
 	IsTest               bool
 }
@@ -82,23 +81,23 @@ type GRPCRoute struct {
 
 type ManagedRouteMap map[string]map[string]int
 
-type HTTPRouteRule v1beta1.HTTPRouteRule
+type HTTPRouteRule gatewayv1.HTTPRouteRule
 
-type GRPCRouteRule v1alpha2.GRPCRouteRule
+type GRPCRouteRule gatewayv1.GRPCRouteRule
 
 type TCPRouteRule v1alpha2.TCPRouteRule
 
-type HTTPRouteRuleList []v1beta1.HTTPRouteRule
+type HTTPRouteRuleList []gatewayv1.HTTPRouteRule
 
-type GRPCRouteRuleList []v1alpha2.GRPCRouteRule
+type GRPCRouteRuleList []gatewayv1.GRPCRouteRule
 
 type TCPRouteRuleList []v1alpha2.TCPRouteRule
 
-type HTTPBackendRef v1beta1.HTTPBackendRef
+type HTTPBackendRef gatewayv1.HTTPBackendRef
 
-type GRPCBackendRef v1alpha2.GRPCBackendRef
+type GRPCBackendRef gatewayv1.GRPCBackendRef
 
-type TCPBackendRef v1beta1.BackendRef
+type TCPBackendRef gatewayv1.BackendRef
 
 type GatewayAPIRoute interface {
 	HTTPRoute | GRPCRoute | TCPRoute

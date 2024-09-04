@@ -11,7 +11,6 @@ import (
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 const (
@@ -22,8 +21,8 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	ctx := context.TODO()
 	grpcRouteClient := r.GRPCRouteClient
 	if !r.IsTest {
-		gatewayV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
-		grpcRouteClient = gatewayV1alpha2.GRPCRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
 	}
 	grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
 	if err != nil {
@@ -80,8 +79,8 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	grpcRouteName := gatewayAPIConfig.GRPCRoute
 	clientset := r.TestClientset
 	if !r.IsTest {
-		gatewayV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
-		grpcRouteClient = gatewayV1alpha2.GRPCRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
@@ -129,12 +128,12 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			break
 		}
 	}
-	grpcHeaderRouteRule := v1alpha2.GRPCRouteRule{
-		Matches: []v1alpha2.GRPCRouteMatch{},
-		BackendRefs: []v1alpha2.GRPCBackendRef{
+	grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
+		Matches: []gatewayv1.GRPCRouteMatch{},
+		BackendRefs: []gatewayv1.GRPCBackendRef{
 			{
-				BackendRef: v1alpha2.BackendRef{
-					BackendObjectReference: v1alpha2.BackendObjectReference{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
 						Group: &canaryServiceGroup,
 						Kind:  &canaryServiceKind,
 						Name:  canaryServiceName,
@@ -146,14 +145,14 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	}
 	matchLength := len(grpcRouteRule.Matches)
 	if matchLength == 0 {
-		grpcHeaderRouteRule.Matches = []v1alpha2.GRPCRouteMatch{
+		grpcHeaderRouteRule.Matches = []gatewayv1.GRPCRouteMatch{
 			{
 				Headers: grpcHeaderRouteRuleList,
 			},
 		}
 	} else {
 		for i := 0; i < matchLength; i++ {
-			grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, v1alpha2.GRPCRouteMatch{
+			grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, gatewayv1.GRPCRouteMatch{
 				Method:  grpcRouteRule.Matches[i].Method,
 				Headers: grpcHeaderRouteRuleList,
 			})
@@ -231,11 +230,11 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	return pluginTypes.RpcError{}
 }
 
-func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]v1alpha2.GRPCHeaderMatch, pluginTypes.RpcError) {
-	grpcHeaderRouteRuleList := []v1alpha2.GRPCHeaderMatch{}
+func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatewayv1.GRPCHeaderMatch, pluginTypes.RpcError) {
+	grpcHeaderRouteRuleList := []gatewayv1.GRPCHeaderMatch{}
 	for _, headerRule := range headerRouting.Match {
-		grpcHeaderRouteRule := v1alpha2.GRPCHeaderMatch{
-			Name: v1alpha2.GRPCHeaderName(headerRule.HeaderName),
+		grpcHeaderRouteRule := gatewayv1.GRPCHeaderMatch{
+			Name: gatewayv1.GRPCHeaderName(headerRule.HeaderName),
 		}
 		switch {
 		case headerRule.HeaderValue.Exact != "":
@@ -267,8 +266,8 @@ func (r *RpcPlugin) removeGRPCManagedRoutes(managedRouteNameList []v1alpha1.Mang
 	grpcRouteName := gatewayAPIConfig.GRPCRoute
 	managedRouteMap := make(ManagedRouteMap)
 	if !r.IsTest {
-		gatewayV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
-		grpcRouteClient = gatewayV1alpha2.GRPCRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{

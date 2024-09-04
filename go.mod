@@ -11,7 +11,8 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	k8s.io/client-go v0.30.1
-	sigs.k8s.io/gateway-api v1.0.0
+	sigs.k8s.io/e2e-framework v0.4.0
+	sigs.k8s.io/gateway-api v1.1.0
 )
 
 require (
@@ -27,7 +28,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
@@ -55,7 +56,6 @@ require (
 	google.golang.org/grpc v1.63.2 // indirect
 	k8s.io/component-base v0.30.1 // indirect
 	sigs.k8s.io/controller-runtime v0.18.2 // indirect
-	sigs.k8s.io/e2e-framework v0.4.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
