@@ -79,8 +79,8 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	grpcRouteName := gatewayAPIConfig.GRPCRoute
 	clientset := r.TestClientset
 	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
+		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
+		grpcRouteClient = gatewayClientV1.GRPCRoutes(gatewayAPIConfig.Namespace)
 		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
