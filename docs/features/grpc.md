@@ -9,7 +9,7 @@ To use GRPCRoute:
 5. Create stable and canary services
 6. Create GRPCRoute resource according to the GatewayAPI and your traffic provider documentation
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
 metadata:
   name: first-grpcroute
