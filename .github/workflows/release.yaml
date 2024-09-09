@@ -99,57 +99,57 @@ jobs:
           prerelease: ${{ env.IS_PRE_RELEASE }}
           body_path: RELEASE_NOTES.md
 
-      - name: Gateway-api-plugin-linux-amd64 binary uploading to release assets
+      - name: Gatewayapi-plugin-linux-amd64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/gateway-api-plugin-linux-amd64
-          asset_name: gateway-api-plugin-linux-amd64
+          asset_path: ./dist/gatewayapi-plugin-linux-amd64
+          asset_name: gatewayapi-plugin-linux-amd64
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Gateway-api-plugin-linux-arm64 binary uploading to release assets
+      - name: Gatewayapi-plugin-linux-arm64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/gateway-api-plugin-linux-arm64
-          asset_name: gateway-api-plugin-linux-arm64
+          asset_path: ./dist/gatewayapi-plugin-linux-arm64
+          asset_name: gatewayapi-plugin-linux-arm64
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Gateway-api-plugin-darwin-amd64 binary uploading to release assets
+      - name: Gatewayapi-plugin-darwin-amd64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/gateway-api-plugin-darwin-amd64
-          asset_name: gateway-api-plugin-darwin-amd64
+          asset_path: ./dist/gatewayapi-plugin-darwin-amd64
+          asset_name: gatewayapi-plugin-darwin-amd64
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Gateway-api-plugin-darwin-arm64 binary uploading to release assets
+      - name: Gatewayapi-plugin-darwin-arm64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/gateway-api-plugin-darwin-arm64
-          asset_name: gateway-api-plugin-darwin-arm64
+          asset_path: ./dist/gatewayapi-plugin-darwin-arm64
+          asset_name: gatewayapi-plugin-darwin-arm64
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
 
-      - name: Gateway-api-plugin-windows-amd64 binary uploading to release assets
+      - name: Gatewayapi-plugin-windows-amd64 binary uploading to release assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/gateway-api-plugin-windows-amd64.exe
-          asset_name: gateway-api-plugin-windows-amd64.exe
+          asset_path: ./dist/gatewayapi-plugin-windows-amd64.exe
+          asset_name: gatewayapi-plugin-windows-amd64.exe
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
