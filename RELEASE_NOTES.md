@@ -1,6 +1,6 @@
-This is the first release of the pluging compiled against version 1.0 of the Kubernetes Gateway API
+This is the first release of the plugin that has GRPC support
 
 Also
 
-- Support multiple backend references
-- New documentation site similar with all the other Argo projects
+- Added E2E integration tests
+- Fixed multi-arch images
