@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    service: server
+  ports:
+    - port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server-canary
+  namespace: default
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+  selector:
+    service: server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server-stable
+  namespace: default
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+  selector:
+    service: server

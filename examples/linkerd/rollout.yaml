@@ -1,0 +1,56 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: server-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: server-canary
+      stableService: server-stable
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: server-route # our created httproute
+            namespace: default
+      steps:
+        - setWeight: 100
+        - analysis:
+            templates:
+              - templateName: black-box
+            args:
+              - name: service-name
+                value: progressive-delivery-test
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      service: server
+  template:
+    metadata:
+      labels:
+        service: server
+    spec:
+      containers:
+        - name: server
+          image: local/test-progressive-delivery:20633c3
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: APP_VERSION
+              value: "1.0.14"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
