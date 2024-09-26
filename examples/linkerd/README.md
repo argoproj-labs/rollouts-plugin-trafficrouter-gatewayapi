@@ -64,14 +64,22 @@ Create three Services required for canary based rollout stratedy
 kubectl apply -f service.yaml
 ```
 
-## Step 7 - Create an example Rollout
+## Step 7 - Create the services required for traffic split 
+
+Add Linkerd annotaions to the namespace where the services are deployed
+
+```shell
+kubectl apply -f namespace.yaml
+```
+
+## Step 8 - Create an example Rollout
 
 Deploy a rollout to get the initial version.
-``shell
+```shell
 kubectl apply -f rollout.yaml
 ```
 
-## Step 8 - Watch the rollout
+## Step 9 - Watch the rollout
 ```shell
-kubectl -n default get httproute.gateway.networking.k8s.io/argo-rollouts-http-route -o custom-columns=NAME:.metadata.name,PRIMARY_SERVICE:.spec.rules[0].backendRefs[0].name,PRIMARY_WEIGHT:.spec.rules[0].backendRefs[0].weight,CANARY_SERVICE:.spec.rules[0].backendRefs[1].name,CANARY_WEIGHT:.spec.rules[0].backendRefs[1].weight
+watch "kubectl -n default get httproute.gateway.networking.k8s.io/argo-rollouts-http-route -o custom-columns=NAME:.metadata.name,PRIMARY_SERVICE:.spec.rules[0].backendRefs[0].name,PRIMARY_WEIGHT:.spec.rules[0].backendRefs[0].weight,CANARY_SERVICE:.spec.rules[0].backendRefs[1].name,CANARY_WEIGHT:.spec.rules[0].backendRefs[1].weight"
 ```
