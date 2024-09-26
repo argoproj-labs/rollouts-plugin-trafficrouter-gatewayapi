@@ -12,11 +12,11 @@ spec:
       port: 80
   rules:
     - backendRefs:
-        - name: server-stable
+        - name: argo-rollouts-stable-service
           group: "core"
           port: 80
           kind: Service
-        - name: server-canary
+        - name: argo-rollouts-canary-service
           group: "core"
           port: 80
           kind: Service

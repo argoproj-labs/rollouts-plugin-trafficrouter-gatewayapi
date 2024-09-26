@@ -16,7 +16,7 @@ spec:
             namespace: default # namespace where this rollout resides
       steps:
         - setWeight: 30
-        - pause: {}
+        - pause: { duration: 10 }
         - setWeight: 40
         - pause: { duration: 10 }
         - setWeight: 60
@@ -39,6 +39,9 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+          env:
+            - name: APP_VERSION
+              value: "1.0.0"
           resources:
             requests:
               memory: 32Mi

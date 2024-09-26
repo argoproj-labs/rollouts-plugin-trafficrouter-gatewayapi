@@ -1,4 +1,4 @@
-# Using Linkerd and with Argo Rollouts
+# Using Linkerd with Argo Rollouts
 
 [Linkerd](https://linkerd.io/) is a service mesh for Kubernetes. It makes running services easier and safer by giving you runtime debugging, observability, reliability, and security—all without requiring any changes to your code.
 
@@ -35,16 +35,16 @@ kubectl create namespace argo-rollouts
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 kubectl apply -k https://github.com/argoproj/argo-rollouts/manifests/crds\?ref\=stable
 kubectl apply -f argo-rollouts-plugin.yaml
+kubectl rollout restart deploy -n argo-rollouts
 ```
 
-## Step 4 - Give access to Argo Rollouts for the Gateway/Http Route
-
+## Step 4 - Grant Argo Rollouts SA access to the Gateway/Http Route
 ```shell
 kubectl apply -f cluster-role.yaml
 ```
 __Note:__ These permission are very permissive. You should lock them down according to your needs.
 
-With the following role we allow Argo Rollouts to have write access to HTTPRoutes and Gateways.
+With the following role we allow Argo Rollouts to have Admin access to HTTPRoutes and Gateways.
 
 ```shell
 kubectl apply -f cluster-role-binding.yaml
@@ -83,3 +83,10 @@ kubectl apply -f rollout.yaml
 ```shell
 watch "kubectl -n default get httproute.gateway.networking.k8s.io/argo-rollouts-http-route -o custom-columns=NAME:.metadata.name,PRIMARY_SERVICE:.spec.rules[0].backendRefs[0].name,PRIMARY_WEIGHT:.spec.rules[0].backendRefs[0].weight,CANARY_SERVICE:.spec.rules[0].backendRefs[1].name,CANARY_WEIGHT:.spec.rules[0].backendRefs[1].weight"
 ```
+
+## Step 10 - Patch the rollout to see the canary deployment
+```shell
+kubectl patch rollout rollouts-demo --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env/0/value", "value": "1.1.0"}]'
+```
+
+
