@@ -1,168 +1,77 @@
-# Using NGINX Kubernetes Gateway with Argo Rollouts
+# Using Linkerd and with Argo Rollouts
 
-This guide will describe how to use NGINX Kubernetes Gateway as an implementation
-for the Gateway API in order to do split traffic with Argo Rollouts.
+[Linkerd](https://linkerd.io/) is a service mesh for Kubernetes. It makes running services easier and safer by giving you runtime debugging, observability, reliability, and security—all without requiring any changes to your code.
 
-Note that Argo Rollouts also [supports NGINX natively](https://argoproj.github.io/argo-rollouts/features/traffic-management/nginx/).
+## Prerequisites
 
-## Step 1 - Enable Gateway Provider and create Gateway entrypoint
+A Kubernetes cluster. If you do not have one, you can create one using [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/), or any other Kubernetes cluster. This guide will use Kind.
 
-Before enabling a Gateway Provider you also need to install NGINX Kubernetes Gateway. Follow the official [installation instructions](https://docs.nginx.com/nginx-gateway-fabric/installation/installing-ngf/helm/).
-
-This installation will create an `nginx` gateway class that we can use later on.
+Linkerd installed in your Kubernetes cluster.
 
 
-1. If not already done through the previous installation instructions, register the [Gateway API CRDs](https://gateway-api.sigs.k8s.io/guides/#install-standard-channel)
+## Step 1 - Create a Kind cluster by running the following command:
 
-```
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.8.0/standard-install.yaml
+```shell
+kind delete cluster &>/dev/null
+kind create cluster --config ./kind-cluster.yaml
 ```
 
-## Step 2 - Create a Gateway resource and HTTPRoute that defines a traffic split
+## Step 2 - Install Linkerd and Linkerd Viz by running the following commands:
 
+I will use the Linkerd CLI to install Linkerd in the cluster. You can also install Linkerd using Helm or kubectl.
+I tested this guide with Linkerd version 2.13.0
 
-After we deployed the Gateway API provider and Gateway class, we can create a Gateway resource:
-
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: Gateway
-metadata:
-  name: argo-rollouts-gateway
-spec:
-  gatewayClassName: nginx
-  listeners:
-    - protocol: HTTP
-      name: web
-      port: 80 # one of Gateway entrypoint that was created following the official installation instructions
+```shell
+linkerd install --crds | kubectl apply -f -
+linkerd install | kubectl apply -f - && linkerd check
+linkerd viz install | kubectl apply -f - && linkerd check
 ```
 
-Create HTTPRoute and connect to the created Gateway resource:
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: HTTPRoute
-metadata:
-  name: argo-rollouts-http-route
-spec:
-  parentRefs:
-    - name: argo-rollouts-gateway
-  rules:
-    - backendRefs:
-        - name: argo-rollouts-stable-service
-          port: 80
-        - name: argo-rollouts-canary-service
-          port: 80
+## Step 3 - Install Argo Rollouts and Argo Rollouts plugin to allow Linkerd to manage the traffic:
+
+```shell
+kubectl create namespace argo-rollouts
+kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+kubectl apply -k https://github.com/argoproj/argo-rollouts/manifests/crds\?ref\=stable
+kubectl apply -f argo-rollouts-plugin.yaml
 ```
 
-## Step 3 - Create canary and stable services for your application
+## Step 4 - Give access to Argo Rollouts for the Gateway/Http Route
 
-- Canary service
+```shell
+kubectl apply -f cluster-role.yaml
+```
+__Note:__ These permission are very permissive. You should lock them down according to your needs.
 
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: argo-rollouts-canary-service
-spec:
-  ports:
-    - port: 80
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    app: rollouts-demo
+With the following role we allow Argo Rollouts to have write access to HTTPRoutes and Gateways.
+
+```shell
+kubectl apply -f cluster-role-binding.yaml
+```
+## Step 5 - Create HTTPRoute that defines a traffic split between two services
+
+Create HTTPRoute and connect to the created Gateway resource
+
+```shell
+kubectl apply -f httproute.yaml
+```
+## Step 6 - Create the services required for traffic split 
+
+Create three Services required for canary based rollout stratedy
+
+```shell
+kubectl apply -f service.yaml
 ```
 
-- Stable service
+## Step 7 - Create an example Rollout
 
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: argo-rollouts-stable-service
-spec:
-  ports:
-    - port: 80
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    app: rollouts-demo
-```
-## Step 4 - Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources
-
-The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions:
-
-```yaml
-rules:
-- apiGroups:
-  - gateway.networking.k8s.io
-  resources:
-  - httproutes
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-  - patch
+Deploy a rollout to get the initial version.
+``shell
+kubectl apply -f rollout.yaml
 ```
 
-## Step 5 - Create argo-rollouts resources
-
-We can finally create the definition of the application.
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-metadata:
-  name: rollouts-demo
-spec:
-  replicas: 5
-  strategy:
-    canary:
-      canaryService: argo-rollouts-canary-service # our created canary service
-      stableService: argo-rollouts-stable-service # our created stable service
-      trafficRouting:
-        plugins:
-          argoproj-labs/gatewayAPI:
-            httpRoute: argo-rollouts-http-route # our created httproute
-            namespace: default # namespace where this rollout resides.
-      steps:
-        - setWeight: 30
-        - pause: {}
-        - setWeight: 40
-        - pause: { duration: 10 }
-        - setWeight: 60
-        - pause: { duration: 10 }
-        - setWeight: 80
-        - pause: { duration: 10 }
-  revisionHistoryLimit: 2
-  selector:
-    matchLabels:
-      app: rollouts-demo
-  template:
-    metadata:
-      labels:
-        app: rollouts-demo
-    spec:
-      containers:
-        - name: rollouts-demo
-          image: argoproj/rollouts-demo:red
-          ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
-          resources:
-            requests:
-              memory: 32Mi
-              cpu: 5m
+## Step 8 - Watch the rollout
+```shell
+kubectl -n default get httproute.gateway.networking.k8s.io/argo-rollouts-http-route -o custom-columns=NAME:.metadata.name,PRIMARY_SERVICE:.spec.rules[0].backendRefs[0].name,PRIMARY_WEIGHT:.spec.rules[0].backendRefs[0].weight,CANARY_SERVICE:.spec.rules[0].backendRefs[1].name,CANARY_WEIGHT:.spec.rules[0].backendRefs[1].weight
 ```
-
-Apply all the yaml files to your cluster
-
-## Step 6 - Test the canary
-
-Perform a deployment like any other Rollout and the Gateway plugin will split the traffic to your canary by instructing NGINX Gateway to proxy via the Gateway API
-
-

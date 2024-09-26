@@ -16,6 +16,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: server
+                name: argo-rollouts-service
                 port:
                   number: 80
