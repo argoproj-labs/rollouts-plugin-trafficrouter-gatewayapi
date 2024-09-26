@@ -17,6 +17,7 @@ For convenience we are including here a list of those actually tested with the p
 | [Kong](https://docs.konghq.com/kubernetes-ingress-controller/latest/concepts/gateway-api/)     | yes      | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kong)    |
 | [NGINX Gateway](https://github.com/nginxinc/nginx-gateway-fabric)     | yes      | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/nginx)    |
 | [Traefik](https://doc.traefik.io/traefik/providers/kubernetes-gateway/)     | yes      | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/traefik)    |
+| [Linkerd](https://linkerd.io/)     | yes      | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/traefik)    |
 
 Note that these examples are included just for completeness. You should be able
 to use any solution that implements the Gateway API. 
