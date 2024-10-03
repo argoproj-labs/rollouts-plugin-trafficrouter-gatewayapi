@@ -1,7 +1,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: traefik-controller-role
+  name: gateway-controller-role
+  namespace: argo-rollouts
 rules:
   - apiGroups:
       - "*"
