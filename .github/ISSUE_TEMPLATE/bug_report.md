@@ -14,6 +14,7 @@ Checklist:
 * [ ] I've included steps to reproduce the bug.
 * [ ] I've included the version of argo rollouts.
 * [ ] I've included the version of the gateway API plugin
+* [ ] I've included the name and version of the gateway API provider I am using
 * [ ] I've included my Rollout Spec (anonymized if needed)
 
 **Describe the bug**
