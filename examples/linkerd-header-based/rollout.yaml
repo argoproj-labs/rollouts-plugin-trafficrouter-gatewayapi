@@ -1,0 +1,54 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollouts-demo
+spec:
+  replicas: 5
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service # our created canary service
+      stableService: argo-rollouts-stable-service # our created stable service
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: argo-rollouts-http-route # our created httproute
+            namespace: default # namespace where this rollout resides
+            useHeaderRoutes: true
+      steps:
+        - pause: {}
+        - setCanaryScale:
+            replicas: 1
+        - setHeaderRoute:
+            name: header-route
+            match:
+              - headerName: X-Test
+                headerValue:
+                  exact: test
+        - pause: {}
+        - setHeaderRoute: # remove header route
+            name: header-route
+
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: APP_VERSION
+              value: "1.0.0"
+          resources:
+            requests:
+              memory: 32Mi
+              cpu: 5m
