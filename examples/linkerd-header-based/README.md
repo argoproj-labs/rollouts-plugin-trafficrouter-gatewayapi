@@ -66,7 +66,7 @@ kubectl apply -f service.yaml
 
 ## Step 7 - Create the services required for traffic split 
 
-Add Linkerd annotaions to the namespace where the services are deployed
+Add Linkerd annotation to the namespace where the services are deployed
 
 ```shell
 kubectl apply -f namespace.yaml
