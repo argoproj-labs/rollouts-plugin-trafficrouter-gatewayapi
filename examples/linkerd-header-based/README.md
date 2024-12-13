@@ -96,13 +96,10 @@ You can test the header-based routing by sending requests with and without the s
 
 # Without header (goes to stable)
 ```shell
-curl -H "Host: rollout.example.com" http://localhost:80
+curl http://localhost:80
 ```
 
 # With header (goes to canary)
 ```shell
-curl -H "Host: rollout.example.com" -H "X-test: canary" http://localhost:80
+curl -H "X-test: test" http://localhost:80
 ```
-
-You should see different responses from the stable and canary versions based on the presence of the `X-test: canary` header.
-
