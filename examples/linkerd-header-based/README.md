@@ -1,4 +1,4 @@
-# Using Linkerd with Argo Rollouts
+# Using Linkerd with Argo Rollouts for header based traffic split
 
 [Linkerd](https://linkerd.io/) is a service mesh for Kubernetes. It makes running services easier and safer by giving you runtime debugging, observability, reliability, and security—all without requiring any changes to your code.
 
@@ -19,7 +19,7 @@ kind create cluster --config ./kind-cluster.yaml
 ## Step 2 - Install Linkerd and Linkerd Viz by running the following commands:
 
 I will use the Linkerd CLI to install Linkerd in the cluster. You can also install Linkerd using Helm or kubectl.
-I tested this guide with Linkerd version 2.13.0
+I tested this guide with Linkerd version 2.14.10
 
 ```shell
 linkerd install --crds | kubectl apply -f -
@@ -80,8 +80,9 @@ kubectl apply -f rollout.yaml
 ```
 
 ## Step 9 - Watch the rollout
+Monitor the HTTPRoute configuration to see how traffic is split and header-based routing is configured:
 ```shell
-watch "kubectl -n default get httproute.gateway.networking.k8s.io/argo-rollouts-http-route -o custom-columns=NAME:.metadata.name,PRIMARY_SERVICE:.spec.rules[0].backendRefs[0].name,PRIMARY_WEIGHT:.spec.rules[0].backendRefs[0].weight,CANARY_SERVICE:.spec.rules[0].backendRefs[1].name,CANARY_WEIGHT:.spec.rules[0].backendRefs[1].weight"
+watch "kubectl get httproute.gateway.networking.k8s.io/argo-rollouts-http-route -o jsonpath='{\" HEADERS: \"}{.spec.rules[*].matches[*]}'"
 ```
 
 ## Step 10 - Patch the rollout to see the canary deployment
@@ -89,4 +90,19 @@ watch "kubectl -n default get httproute.gateway.networking.k8s.io/argo-rollouts-
 kubectl patch rollout rollouts-demo --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env/0/value", "value": "1.1.0"}]'
 ```
 
+## Step 11 - Test the header-based routing with curl
+
+You can test the header-based routing by sending requests with and without the specified header:
+
+# Without header (goes to stable)
+```shell
+curl -H "Host: rollout.example.com" http://localhost:80
+```
+
+# With header (goes to canary)
+```shell
+curl -H "Host: rollout.example.com" -H "X-test: canary" http://localhost:80
+```
+
+You should see different responses from the stable and canary versions based on the presence of the `X-test: canary` header.
 

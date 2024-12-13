@@ -15,19 +15,21 @@ spec:
             httpRoute: argo-rollouts-http-route # our created httproute
             namespace: default # namespace where this rollout resides
             useHeaderRoutes: true
+        managedRoutes:
+          - name: argo-rollouts
       steps:
         - pause: {}
         - setCanaryScale:
             replicas: 1
         - setHeaderRoute:
-            name: header-route
+            name: argo-rollouts
             match:
               - headerName: X-Test
                 headerValue:
                   exact: test
         - pause: {}
         - setHeaderRoute: # remove header route
-            name: header-route
+            name: argo-rollouts
 
   revisionHistoryLimit: 2
   selector:
@@ -52,3 +54,7 @@ spec:
             requests:
               memory: 32Mi
               cpu: 5m
+
+
+
+
