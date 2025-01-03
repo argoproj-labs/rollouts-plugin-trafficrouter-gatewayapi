@@ -1,9 +1,9 @@
 # Advanced Deployment methods
 
 Once you have the basic canary deployment in place, you can explore
-several other deployment scenarios with more flexible routing options
+several other deployment scenarios with more flexible routing options. 
 
-## Pinning clients to a specific version
+## Scenario - pinning clients to a specific version
 
 Sometimes you have some special clients (either humans or other services) which you consider critical and want to stay in the stable version as long as possible even if a canary is in progress.
 
@@ -91,9 +91,53 @@ This defines the following routes
 1. `always-old-version` at host `old.example.com` sees always old/stable version (1 backing service)
 1. `always-new-version` at new `app.example.com` sees always new/unstable version (1 backing service)
 
+Then in your Rollout manifest you only mention the "canary-route" HTTPRoute. This is the only route that Argo Rollouts will manage. The other 2 routes will always stay the same (always old or always new version) regardless of what the canary is doing.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: static-rollouts-demo
+spec:
+  replicas: 5
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service 
+      stableService: argo-rollouts-stable-service 
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            # only the canary route is managed by Argo rollouts
+            httpRoute: canary-route 
+            namespace: default # namespace where this rollout resides
+      steps:
+        - setWeight: 10
+        - pause: {}
+        - setWeight: 50
+        - pause: { duration: 10 }
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: static-rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: static-rollouts-demo
+    spec:
+      containers:
+        - name: static-rollouts-demo
+          image: kostiscodefresh/summer-of-k8s-app:v1       
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+```
 When a canary is not in progress then all clients see the same/active version without any further changes.
 
-## Making applications "canary-aware"
+## Scenario - making applications "canary-aware"
+
+Another advanced use case is when you want smarter applications that act differently depending on the current state of the rollout process.
 
 Under normal circumstances an application doesn't know if it is part of canary or not. This is normally not a problem when all your applications are stateless and communicate via HTTP calls.
 
@@ -196,6 +240,17 @@ spec:
                 fieldRef:
                   fieldPath: metadata.labels              
 ```
+
 This Rollout passes different RabbitMQ settings to the canary application.
 The settings will be available to the pod in a file at `/etc/podinfo/labels` where the source code will need to read them.
 
+The file will contain the labels in the following format
+
+```
+role="preview"
+rabbitHost=localhost
+rabbitPort=5672
+rabbitQueue=myProductionQueue
+```
+
+You can easily read this file with your favorite programming language into a settings object.
