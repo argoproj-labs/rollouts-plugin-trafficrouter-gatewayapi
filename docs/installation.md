@@ -58,7 +58,7 @@ kubectl rollout restart deployment -n argo-rollouts argo-rollouts
 Then check the controller logs. You should see a line for loading the plugin:
 
 ```
-time="XXX" level=info msg="Downloading plugin argoproj-labs/gatewayAPI from: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.2.0/gateway-api-plugin-linux-amd64"
+time="XXX" level=info msg="Downloading plugin argoproj-labs/gatewayAPI from: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.4.0/gatewayapi-plugin-linux-amd64"
 time="YYY" level=info msg="Download complete, it took 7.792426599s" 
 ```
 
