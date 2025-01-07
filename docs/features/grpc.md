@@ -5,7 +5,7 @@ To use GRPCRoute:
 1. Install your traffic provider
 2. Install [GatewayAPI CRD](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api) if your traffic provider doesn't do it by default
 3. Install [Argo Rollouts](https://argoproj.github.io/argo-rollouts/installation/)
-4. Install [Argo Rollouts GatewayAPI plugin](installation.md)
+4. Install [Argo Rollouts GatewayAPI plugin](../installation.md)
 5. Create stable and canary services
 6. Create GRPCRoute resource according to the GatewayAPI and your traffic provider documentation
 ```yaml
