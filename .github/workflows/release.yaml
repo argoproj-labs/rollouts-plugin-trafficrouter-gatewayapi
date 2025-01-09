@@ -153,3 +153,10 @@ jobs:
           asset_name: gatewayapi-plugin-windows-amd64.exe
           asset_content_type: application/octet-stream
         if: ${{ env.IS_DRY_RUN != 'true' }}
+
+      - name: Create Container image
+        run: |
+          echo "Building containers for ${RELEASE_TAG}"
+          gh workflow run docker-publish.yaml --ref ${RELEASE_TAG}  
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}      
