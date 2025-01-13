@@ -38,7 +38,7 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 		kubeConfig.QPS = r.CommandLineOpts.KubeClientQPS
 	}
 	if r.CommandLineOpts.KubeClientBurst != 0 {
-		log.Infof("KubeClientBurst set to: %f", r.CommandLineOpts.KubeClientBurst)
+		log.Infof("KubeClientBurst set to: %d", r.CommandLineOpts.KubeClientBurst)
 		kubeConfig.Burst = r.CommandLineOpts.KubeClientBurst
 	}
 
