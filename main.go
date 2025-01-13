@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin"
 
@@ -19,12 +21,24 @@ var handshakeConfig = goPlugin.HandshakeConfig{
 }
 
 func main() {
+	// Define and parse flags for your command line options:
+	kubeClientQPS := flag.Int("kubeClientQPS", 5, "The QPS to use for the Kubernetes client.")
+	kubeClientBurst := flag.Int("kubeClientBurst", 10, "The Burst to use for the Kubernetes client.")
+	flag.Parse()
+
+	// Create the plugin implementation, injecting command line options:
 	rpcPluginImp := &plugin.RpcPlugin{
+		CommandLineOpts: plugin.CommandLineOpts{
+			KubeClientQPS:   float32(*kubeClientQPS),
+			KubeClientBurst: *kubeClientBurst,
+		},
 		LogCtx: utils.SetupLog(),
 	}
+
 	pluginMap := map[string]goPlugin.Plugin{
 		"RpcTrafficRouterPlugin": &rolloutsPlugin.RpcTrafficRouterPlugin{Impl: rpcPluginImp},
 	}
+
 	goPlugin.Serve(&goPlugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,

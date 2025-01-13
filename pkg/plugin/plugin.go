@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/go-playground/validator/v10"
 	"k8s.io/client-go/kubernetes"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
+
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 )
 
 const (
@@ -19,6 +20,8 @@ const (
 )
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
+	log := utils.SetupLog()
+
 	if r.IsTest {
 		return pluginTypes.RpcError{}
 	}
@@ -28,6 +31,17 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 			ErrorString: err.Error(),
 		}
 	}
+
+	// Configure command-line overrides for the Kubernetes client:
+	if r.CommandLineOpts.KubeClientQPS != 0 {
+		log.Infof("KubeClientQPS set to: %f", r.CommandLineOpts.KubeClientQPS)
+		kubeConfig.QPS = r.CommandLineOpts.KubeClientQPS
+	}
+	if r.CommandLineOpts.KubeClientBurst != 0 {
+		log.Infof("KubeClientBurst set to: %d", r.CommandLineOpts.KubeClientBurst)
+		kubeConfig.Burst = r.CommandLineOpts.KubeClientBurst
+	}
+
 	gatewayAPIClientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return pluginTypes.RpcError{
