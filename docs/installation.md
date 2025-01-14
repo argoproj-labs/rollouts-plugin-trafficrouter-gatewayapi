@@ -63,3 +63,21 @@ time="YYY" level=info msg="Download complete, it took 7.792426599s"
 ```
 
 You are now ready to use the Gateway API in your [Rollout definitions](https://argoproj.github.io/argo-rollouts/features/specification/). See also our [Quick Start Guide](quick-start.md).
+
+## Configuration 
+
+The `kubeClientQPS` and `kubeClientBurst` options configure the behavior of the Kubernetes client. These
+values may need to be increased if you operate Argo Rollouts in a large cluster.  These values can be specified
+using the `args` block of the plugin configuration:
+
+```yaml
+  trafficRouterPlugins:
+    trafficRouterPlugins: |-
+      - name: "argoproj-labs/gatewayAPI"
+        location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/vX.X.X/gatewayapi-plugin-linux-amd64"
+        args:
+        - "-kubeClientQPS=40"
+        - "-kubeClientBurst=80"
+```
+
+Notice that this setting applies **only** to the plugin process. The main Argo Rollouts controller is not affected (or any other additional plugins you might have already).

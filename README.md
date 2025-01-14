@@ -19,5 +19,9 @@ please [tell us about it](https://github.com/argoproj-labs/rollouts-plugin-traff
 
 If you also want to add an example with your favorite [gateway API provider](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/provider-status/) please open a [Pull Request](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pulls).
 
+## Contact
+
+You can find us at the `#argo-rollouts` channel [at the CNCF slack](https://argoproj.github.io/community/join-slack).
+
 
 
