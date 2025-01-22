@@ -44,8 +44,8 @@ const (
 
 const (
 	SHORT_PERIOD  = time.Second
-	MEDIUM_PERIOD = 5 * time.Second
-	LONG_PERIOD   = 10 * time.Second
+	MEDIUM_PERIOD = 30 * time.Second
+	LONG_PERIOD   = 60 * time.Second
 )
 
 var (
