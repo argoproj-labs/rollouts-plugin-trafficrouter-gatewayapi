@@ -129,3 +129,8 @@ type GatewayAPIBackendRef interface {
 type GatewayAPIRouteRuleListIterator[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]] func() (T2, bool)
 
 type GatewayAPIRouteRuleIterator[T1 GatewayAPIBackendRef] func() (T1, bool)
+
+type IndexedBackendRefs[T GatewayAPIBackendRef] struct {
+	RuleIndex int
+	Refs      []T
+}

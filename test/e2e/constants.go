@@ -33,6 +33,7 @@ const (
 
 	FIRST_CANARY_ROUTE_WEIGHT = 0
 	LAST_CANARY_ROUTE_WEIGHT  = 30
+	DEFAULT_ROUTE_WEIGHT      = 1 // HTTPRoute rules that are managed by the rollout should never update their weight to the setWeight value. It should stay as the default 1
 
 	RESOURCES_MAP_KEY contextKey = "resourcesMap"
 
