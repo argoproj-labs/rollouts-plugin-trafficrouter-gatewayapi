@@ -23,16 +23,16 @@ jobs:
       # Whether a draft release should be created, instead of public one
       IS_DRAFT_RELEASE: false
       # Name of the GitHub user for Git config
-      GIT_USERNAME: Philipp-Plotnikov
+      GIT_USERNAME: schlags
       # E-Mail of the GitHub user for Git config
-      GIT_EMAIL: philipp.plotnikov@icloud.com
+      GIT_EMAIL: mail@dylanschlager.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Setup Golang
         uses: actions/setup-go@v4
         with:
@@ -157,6 +157,6 @@ jobs:
       - name: Create Container image
         run: |
           echo "Building containers for ${RELEASE_TAG}"
-          gh workflow run docker-publish.yaml --ref ${RELEASE_TAG}  
+          gh workflow run docker-publish.yaml --ref ${RELEASE_TAG}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}      
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
