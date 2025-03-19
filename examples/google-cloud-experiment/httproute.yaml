@@ -1,0 +1,24 @@
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: demo-app-route
+  namespace: demo
+  labels:
+    managed-by: external-dns
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: app-gateway
+    namespace: demo
+  hostnames:
+  - "demo.example.com"
+  rules:
+  - backendRefs:
+    - name: demo-app-stable
+      namespace: demo
+      port: 80
+      weight: 100
+    - name: demo-app-canary
+      namespace: demo
+      port: 80
+      weight: 0
