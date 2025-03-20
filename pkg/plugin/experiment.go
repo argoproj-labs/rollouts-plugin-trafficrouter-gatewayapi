@@ -12,7 +12,7 @@ import (
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
-func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient *gatewayApiClientset.Clientset, logger *logrus.Entry, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute) error {
+func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient *gatewayApiClientset.Clientset, logger *logrus.Entry, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute, additionalDestinations []v1alpha1.WeightDestination) error {
 	ruleIdx := -1
 	stableService := rollout.Spec.Strategy.Canary.StableService
 	canaryService := rollout.Spec.Strategy.Canary.CanaryService
@@ -47,8 +47,8 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 	if isExperimentActive {
 		logger.Info(fmt.Sprintf("Found active experiment %s", rollout.Status.Canary.CurrentExperiment))
 
-		if len(rollout.Status.Canary.Weights.Additional) == 0 {
-			logger.Info("No experiment services found in rollout status, skipping experiment service addition")
+		if len(additionalDestinations) == 0 {
+			logger.Info("No experiment services found in additionalDestinations, skipping experiment service addition")
 			return nil
 		}
 
@@ -60,9 +60,9 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 			}
 		}
 
-		for _, additionalDestination := range rollout.Status.Canary.Weights.Additional {
-			serviceName := additionalDestination.ServiceName
-			weight := additionalDestination.Weight
+		for _, additionalDest := range additionalDestinations {
+			serviceName := additionalDest.ServiceName
+			weight := additionalDest.Weight
 
 			exists := false
 			for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
