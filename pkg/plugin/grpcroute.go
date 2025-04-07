@@ -71,7 +71,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				Name: headerRouting.Name,
 			},
 		}
-		return r.removeHTTPManagedRoutes(managedRouteList, gatewayAPIConfig)
+		return r.removeGRPCManagedRoutes(managedRouteList, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
 	grpcRouteClient := r.GRPCRouteClient
