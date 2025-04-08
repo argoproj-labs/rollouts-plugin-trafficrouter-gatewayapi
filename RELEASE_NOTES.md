@@ -1,1 +1,1 @@
-Added ability to define rate limits for the kubeclient configuration used by the Plugin process.
+Added support for Argo Rollout Experiments
