@@ -17,7 +17,7 @@ const (
 	HTTPConfigMapKey = "httpManagedRoutes"
 )
 
-func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
@@ -51,6 +51,10 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	restWeight := 100 - desiredWeight
 	for _, ref := range stableBackendRefs {
 		ref.Weight = &restWeight
+	}
+	err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
+	if err != nil {
+		r.LogCtx.Error(err, "Failed to handle experiment services")
 	}
 	updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 	if r.IsTest {

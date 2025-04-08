@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: demo-app
+  namespace: demo
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      canaryService: demo-app-canary
+      stableService: demo-app-stable
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: demo-app-route
+            namespace: demo
+      steps:
+      - experiment:
+          duration: 5m
+          templates:
+          - name: experiment-baseline
+            specRef: stable
+            service:
+              name: demo-app-exp-baseline
+            weight: 10
+            metadata:
+              labels:
+                app: demo-app
+          - name: experiment-canary
+            specRef: canary
+            service:
+              name: demo-app-exp-canary
+            weight: 15
+            metadata:
+              labels:
+                app: demo-app
+      - pause: {} # Empty pause means indefinite - will require manual promotion     
+      - setWeight: 30
+      - pause: { duration: 5m }
+      - setWeight: 60
+      - pause: { duration: 5m }
+      - setWeight: 100
+      - pause: { duration: 5m }
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      containers:
+      - name: demo-app
+        image: argoproj/rollouts-demo:blue # change to green for next version
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 10m

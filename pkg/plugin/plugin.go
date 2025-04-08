@@ -78,7 +78,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 	rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 		gatewayAPIConfig.HTTPRoute = route.Name
-		return r.setHTTPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
 	})
 	if rpcError.HasError() {
 		return rpcError
