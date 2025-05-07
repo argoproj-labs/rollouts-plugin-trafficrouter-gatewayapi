@@ -59,11 +59,10 @@ controller:
           - cp /bin/rollouts-plugin-trafficrouter-gatewayapi /plugins
         volumeMounts:                                 
           - name: gwapi-plugin
-            mountPath: /plugins
-    trafficRouterPlugins:                             
-      trafficRouterPlugins: |-
-        - name: argoproj-labs/gatewayAPI
-          location: "file:///plugins/rollouts-plugin-trafficrouter-gatewayapi"  
+            mountPath: /plugins                           
+    trafficRouterPlugins:
+      - name: argoproj-labs/gatewayAPI
+        location: "file:///plugins/rollouts-plugin-trafficrouter-gatewayapi"  
     volumes:                                           
       - name: gwapi-plugin
         emptyDir: {}
