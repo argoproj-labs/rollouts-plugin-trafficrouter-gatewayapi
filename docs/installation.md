@@ -60,10 +60,9 @@ controller:
         volumeMounts:                                 
           - name: gwapi-plugin
             mountPath: /plugins
-    trafficRouterPlugins:                             
-      trafficRouterPlugins: |-
-        - name: argoproj-labs/gatewayAPI
-          location: "file:///plugins/rollouts-plugin-trafficrouter-gatewayapi"  
+    trafficRouterPlugins:
+      - name: argoproj-labs/gatewayAPI
+        location: "file:///plugins/rollouts-plugin-trafficrouter-gatewayapi"
     volumes:                                           
       - name: gwapi-plugin
         emptyDir: {}
@@ -100,13 +99,12 @@ values may need to be increased if you operate Argo Rollouts in a large cluster.
 using the `args` block of the plugin configuration:
 
 ```yaml
-  trafficRouterPlugins:
-    trafficRouterPlugins: |-
-      - name: "argoproj-labs/gatewayAPI"
-        location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/vX.X.X/gatewayapi-plugin-linux-amd64"
-        args:
-        - "-kubeClientQPS=40"
-        - "-kubeClientBurst=80"
+  trafficRouterPlugins: |-
+    - name: "argoproj-labs/gatewayAPI"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/vX.X.X/gatewayapi-plugin-linux-amd64"
+      args:
+      - "-kubeClientQPS=40"
+      - "-kubeClientBurst=80"
 ```
 
 Notice that this setting applies **only** to the plugin process. The main Argo Rollouts controller is not affected (or any other additional plugins you might have already).
