@@ -52,7 +52,20 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 			return nil
 		}
 
-		stableWeight := int32(45)
+		// Compute total experiment weight
+		var totalExperimentWeight int32
+		for _, dest := range additionalDestinations {
+			totalExperimentWeight += dest.Weight
+		}
+
+		// Sanity cap: don't allow overflow
+		if totalExperimentWeight > 100 {
+			logger.Warnf("Total experiment weight exceeds 100 (got %d), capping at 100", totalExperimentWeight)
+			totalExperimentWeight = 100
+		}
+
+		stableWeight := int32(100) - totalExperimentWeight
+
 		for i, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
 			if string(backendRef.Name) == stableService {
 				httpRoute.Spec.Rules[ruleIdx].BackendRefs[i].Weight = &stableWeight
