@@ -76,14 +76,34 @@ func TestHandleExperiment_ExperimentStatusChecking(t *testing.T) {
 	}
 	assert.False(t, hasExperimentServices, "HTTPRoute should not have experiment services initially")
 
-	stableWeight = int32(45)
+	// Test dynamic weight calculation
+	additionalDestinations := []v1alpha1.WeightDestination{
+		{
+			ServiceName: "exp-svc-1",
+			Weight:      25,
+		},
+		{
+			ServiceName: "exp-svc-2",
+			Weight:      30,
+		},
+	}
+
+	// Calculate total experiment weight
+	var totalExperimentWeight int32
+	for _, dest := range additionalDestinations {
+		totalExperimentWeight += dest.Weight
+	}
+	expectedStableWeight := int32(100) - totalExperimentWeight
+
+	// Update stable weight
 	for i, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
 		if string(backendRef.Name) == stableService {
-			httpRoute.Spec.Rules[ruleIdx].BackendRefs[i].Weight = &stableWeight
+			httpRoute.Spec.Rules[ruleIdx].BackendRefs[i].Weight = &expectedStableWeight
 			break
 		}
 	}
-	assert.Equal(t, int32(45), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight, "Should be able to modify the stable weight")
+
+	assert.Equal(t, int32(45), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight, "Stable weight should be 45% (100% - 55% experiment weight)")
 }
 
 func TestHandleExperiment_RemoveExperimentServices(t *testing.T) {
