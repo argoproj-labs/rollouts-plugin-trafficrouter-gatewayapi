@@ -134,6 +134,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	}
 	httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
 		Matches: []gatewayv1.HTTPRouteMatch{},
+		Filters: []gatewayv1.HTTPRouteFilter{},
 		BackendRefs: []gatewayv1.HTTPBackendRef{
 			{
 				BackendRef: gatewayv1.BackendRef{
@@ -147,6 +148,13 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			},
 		},
 	}
+
+	// Copy filters from original route
+	for i := 0; i < len(httpRouteRule.Filters); i++ {
+		httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
+	}
+
+	// Copy matches from original route
 	for i := 0; i < len(httpRouteRule.Matches); i++ {
 		httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
 			Path:        httpRouteRule.Matches[i].Path,
@@ -154,6 +162,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			QueryParams: httpRouteRule.Matches[i].QueryParams,
 		})
 	}
+
 	httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
 	oldHTTPRuleList := httpRoute.Spec.Rules
 	httpRoute.Spec.Rules = httpRouteRuleList
