@@ -150,8 +150,10 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	}
 
 	// Copy filters from original route
-	for i := 0; i < len(httpRouteRule.Filters); i++ {
-		httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
+	if httpRouteRule.Filters != nil {
+		for i := 0; i < len(httpRouteRule.Filters); i++ {
+			httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
+		}
 	}
 
 	// Copy matches from original route
