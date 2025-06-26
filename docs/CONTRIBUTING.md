@@ -100,7 +100,7 @@ git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
 
 To run unit tests:
 ```bash
-make test
+make unit-tests
 ```
 
 ## Running E2E tests
@@ -141,6 +141,18 @@ or
 make RUN=<reg-exp> run-e2e-tests
 ```
 reg-exp - the value you would set for the **-run** flag of **go test** command 
+
+
+## Cleaning up after failed E2E tests
+
+If your E2E tests fail, then the kind cluster will stay behind. 
+
+If you want to delete it (after debugging it) run:
+
+```
+make clear-e2e-cluster
+```
+
 
 
 ## Creating a Pull Request
