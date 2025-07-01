@@ -13,8 +13,8 @@ endef
 
 define setup_cluster
 	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/experimental-install.yaml
-	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version 2.37.2
-	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version 31.0.0
+	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version 2.37.2  --wait
+	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version 31.0.0  --wait
 endef
 
 define install_k8s_resources
