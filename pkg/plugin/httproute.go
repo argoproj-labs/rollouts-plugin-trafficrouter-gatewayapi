@@ -9,6 +9,7 @@ import (
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -19,10 +20,12 @@ const (
 
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
+	clientset := r.TestClientset
 	httpRouteClient := r.HTTPRouteClient
 	if !r.IsTest {
 		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
 		httpRouteClient = gatewayClientV1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
@@ -32,16 +35,63 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	}
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+
+	// Retrieve the managed routes from the configmap to determine which rules were added via setHTTPHeaderRoute
+	managedRouteMap := make(ManagedRouteMap)
+	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+		Clientset: clientset,
+		Ctx:       ctx,
+	})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
+	err = utils.GetConfigMapData(configMap, HTTPConfigMapKey, &managedRouteMap)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	managedRuleIndices := make(map[int]bool)
+	for _, managedRoute := range managedRouteMap {
+		if idx, ok := managedRoute[httpRoute.Name]; ok {
+			managedRuleIndices[idx] = true
+		}
+	}
+
+	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+	indexedCanaryBackendRefs, err := getIndexedBackendRefs(canaryServiceName, routeRuleList)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	canaryBackendRefs := make([]*HTTPBackendRef, 0)
+	for _, indexedCanaryBackendRef := range indexedCanaryBackendRefs {
+		// TODO - when setMirrorRoute is implemented, we would need to update the weight of the managed
+		// canary backendRefs for mirror routes.
+		// Ideally - these would be stored differently in the configmap from the managed header based routes
+		// but that would mean a breaking change to the configmap structure
+		if managedRuleIndices[indexedCanaryBackendRef.RuleIndex] {
+			r.LogCtx.WithFields(logrus.Fields{
+				"rule":            httpRoute.Spec.Rules[indexedCanaryBackendRef.RuleIndex],
+				"index":           indexedCanaryBackendRef.RuleIndex,
+				"managedRouteMap": managedRouteMap,
+			}).Info("Skipping matched canary backendRef for weight adjustment since it is a part of a rule marked as a managed route")
+			continue
+		}
+		canaryBackendRefs = append(canaryBackendRefs, indexedCanaryBackendRef.Refs...)
+	}
+
+	// Update the weight of the canary backendRefs not owned by a rule marked as a managed route
 	for _, ref := range canaryBackendRefs {
 		ref.Weight = &desiredWeight
 	}
+
+	// Noted above, but any managed routes that would have a stableBackendRef would be updated with weight here.
+	// Since this is not yet possible (all managed routes will only have a single canary backendRef),
+	// we can avoid checking for managed route rule indexes here.
 	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
 	if err != nil {
 		return pluginTypes.RpcError{

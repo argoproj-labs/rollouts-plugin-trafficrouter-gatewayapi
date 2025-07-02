@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollouts-demo
+spec:
+  replicas: 5
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service # our created canary service
+      stableService: argo-rollouts-stable-service # our created stable service
+      trafficRouting:
+        managedRoutes:
+          - name: rollouts-demo-canary-internal
+          - name: rollouts-demo-canary-beta-customers
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: argo-rollouts-http-route # our created httproute
+                useHeaderRoutes: true
+            namespace: default # namespace where this rollout resides
+      steps:
+        - setCanaryScale:
+            weight: 1 # Scale pods equivalent to 1% of the total number of pods
+        - setHeaderRoute:
+            match:
+              - headerName: X-Canary-Candidate
+                headerValue:
+                  exact: internal
+            name: rollouts-demo-canary-internal
+        - pause: {} # Run synthetics tests or manual validation from internal users
+        - setHeaderRoute:
+            match:
+              - headerName: X-Canary-Candidate
+                headerValue:
+                  exact: beta-customers
+            name: rollouts-demo-canary-beta-customers
+        - pause: {} # Run analysis or manual validation from beta customers
+        - setCanaryScale:
+            weight: 30 # Prepare for real customer traffic
+        - setWeight: 30
+        - setCanaryScale:
+            matchTrafficWeight: true # Allow pods to scale with setWeight steps
+        - pause: { duration: 10 }
+        - setWeight: 40
+        - pause: { duration: 10 }
+        - setWeight: 60
+        - pause: { duration: 10 }
+        - setWeight: 80
+        - pause: { duration: 10 }
+        - setWeight: 100
+        - setHeaderRoute:
+            name: rollouts-demo-canary-internal # Remove internal traffic route
+        - setHeaderRoute:
+            name: rollouts-demo-canary-beta-customers # Remove beta-customers traffic route
+        - pause: {} # Final sanity check on 100% traffic
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              memory: 32Mi
+              cpu: 5m
