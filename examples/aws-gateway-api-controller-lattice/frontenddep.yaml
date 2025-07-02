@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: workshop
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "9000"
+        prometheus.io/scrape: "true"
+    spec:
+      containers:
+      - name: frontend
+        image: nicksrj/frontend_node:1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9000
+          name: http
+        env:
+        - name: BASE_URL
+          value: http://prodcatalog.workshop:5000/products/
+        - name: AWS_XRAY_DAEMON_ADDRESS
+          value: xray-service.default:2000
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 3

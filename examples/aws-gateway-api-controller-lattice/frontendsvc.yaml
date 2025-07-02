@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: workshop
+  labels:
+    app: frontend
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  loadBalancerClass: eks.amazonaws.com/nlb
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 9000
+    protocol: TCP

@@ -1,0 +1,33 @@
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: TargetGroupPolicy
+metadata:
+  name: proddetail-policy
+  namespace: workshop
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: proddetail-stable-service
+  protocol: HTTP
+  protocolVersion: HTTP1
+  healthCheck:
+    enabled: true
+    path: "/catalogdetail"
+    statusMatch: "200"
+---
+apiVersion: application-networking.k8s.aws/v1alpha1
+kind: TargetGroupPolicy
+metadata:
+  name: proddetailv2-policy
+  namespace: workshop
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: proddetail-canary-service
+  protocol: HTTP
+  protocolVersion: HTTP1
+  healthCheck:
+    enabled: true
+    path: "/catalogdetail"
+    statusMatch: "200"
