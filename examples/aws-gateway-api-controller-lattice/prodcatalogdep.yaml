@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prodcatalog
+  namespace: workshop
+  labels:
+    app: prodcatalog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prodcatalog
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: prodcatalog
+    spec:
+      containers:
+      - name: prodcatalog
+        image: nicksrj/product_catalog:1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: AGG_APP_URL
+          value: http://latcan-app-default-xxxxxxxxxxxx.vpc-lattice-svcs.ap-southeast-1.on.aws/catalogDetail
+          #value: http://proddetail.workshop:3000/catalogDetail
+        - name: AWS_XRAY_DAEMON_ADDRESS
+          value: xray-service.default:2000
+        - name: DATABASE_SERVICE_URL
+          value: mysql.workshop
+        livenessProbe:
+          httpGet:
+            path: /products/ping
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /products/ping
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 3

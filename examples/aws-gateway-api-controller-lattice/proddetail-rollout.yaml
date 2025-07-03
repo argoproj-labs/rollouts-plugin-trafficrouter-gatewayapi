@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: proddetail
+  namespace: workshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proddetail
+  template:
+    metadata:
+      labels:
+        app: proddetail
+    spec:
+      containers:
+        - name: proddetail
+          image: nicksrj/product_detail:1.0
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 3000
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 3000 
+            successThreshold: 3
+          ports:
+            - containerPort: 3000
+          env:
+          - name: AWS_XRAY_DAEMON_ADDRESS
+            value: xray-service.default:2000
+  strategy:
+    canary:
+      canaryService: proddetail-canary-service
+      stableService: proddetail-stable-service
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: latcan-app
+            namespace: default
+      steps:
+      - setWeight: 20
+      - pause: {duration: 2m}
+      - setWeight: 40
+      - pause: {duration: 3m}
+      - setWeight: 60
+      - pause: {duration: 3m}
+      - setWeight: 80
+      - pause: {duration: 3m}
+      - setWeight: 100
