@@ -29,11 +29,11 @@ The Argo Rollouts Gateway API plugin needs the main Argo Rollouts controller to 
 
 When the Argo Rollouts controller starts, it reads the ConfigMap named `argo-rollouts-config` (from the namespace in which controller is located) from the API server of the k8s cluster it is running on.
 
-If this configmap is present, the Argol Rollouts controller validates its content and then loads the plugin that is defined there. It is important to understand that this process happens only at the beginning and **only once** during the controller startup. ,
+If this configmap is present, the Argo Rollouts controller validates its content and then loads the plugin that is defined there. It is important to understand that this process happens only at the beginning and **only once** during the controller startup.
 
-This means that if you change the `argo-rollouts-config` configmap or if you create it after the Argo Rollouts controller is already up you will need to restart the controller for the changes to take effect. 
+This means that if you change the `argo-rollouts-config` configmap or if you create it after the Argo Rollouts controller is already up, you will need to restart the controller for the changes to take effect. 
 
-The Argo Rollouts Controller uses this config map to understand where to load its plugins from. When Argo Rollouts learns their locations it downloads and executes them as separate RPC servers in the same pod. When the controller detects [specific Rollout events](https://argo-rollouts.readthedocs.io/en/stable/features/specification/), for example events corresponding to the `SetWeight` action, it makes specific remote procedure calls to the respective RPC server and waits for a response. 
+The Argo Rollouts Controller uses this config map to understand where to load its plugins from. When Argo Rollouts learns their locations, it downloads and executes them as separate RPC servers in the same pod. When the controller detects [specific Rollout events](https://argo-rollouts.readthedocs.io/en/stable/features/specification/), for example events corresponding to the `SetWeight` action, it makes specific remote procedure calls to the respective RPC server and waits for a response. 
 
 Here is a diagram illustrating the main aspects of architecture:
 
@@ -64,17 +64,17 @@ To start developing the plugin do the following
 
 
 1. Start your local Kubernetes cluster
-1. Create a ConfigMap named `argo-rollouts-config` in the namespace of Argo Rollouts controller. We will run it locally so its namespace will be `default`
+1. Create a ConfigMap named `argo-rollouts-config` in the namespace of the Argo Rollouts controller. We will run it locally so its namespace will be `default`
 2. Run `make local-build` to create a local build of the plugin binary. In the `argo-rollouts-config` manifest specify the path to this local build by using a file directive
 ```
 file://<path to the local build>
 ```
-3. Install required CRDs for Argo Rollouts deploy the controller. For that you can run
+3. Install required CRDs for Argo Rollouts and deploy the controller. For that you can run
 ```bash
 kubectl create namespace argo-rollouts
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 ```
-After that delete the in cluster Argo Rollouts controller deployment as we will run controller locally (We only needed the CRDs).
+After that, delete the in-cluster Argo Rollouts controller deployment as we will run controller locally (We only needed the CRDs).
 4. Run locally the Argo Rollouts controller
 ```bash
 cd ~/go/src/github.com/argoproj/argo-rollouts
@@ -84,7 +84,7 @@ go run ./cmd/rollouts-controller/main.go
 
 ## Making releases
 
-1. Write in **/RELEASE_NOTES.md** the description of the future release
+1. Write the description of the future release in **/RELEASE_NOTES.md**
 2. Create a tag in the `main` branch 
 ```bash
 git tag release-v[0-9]+.[0-9]+.[0-9]+
@@ -94,7 +94,7 @@ If you prefer to make pre-release run
 git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
 ```
 3. Push the tag to the remote repository
-4. The pushed tag will trigger [a GitHub actions workflow](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/.github/workflows/release.yaml) that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore after pushing the tag to the remote repository you also need to delete it locally. When the workflow has finished its work you can run **git pull** and you will see new tag.
+4. The pushed tag will trigger [a GitHub Actions workflow](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/.github/workflows/release.yaml) that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore, after pushing the tag to the remote repository, you also need to delete it locally. When the workflow has finished its work, you can run **git pull** and you will see the new tag.
 
 ## Running Unit Tests
 
@@ -113,26 +113,26 @@ make e2e-tests
 
 This command will
 
-1. Create local cluster **gatewayapi-plugin-e2e** using tools [kind](https://kind.sigs.k8s.io/) and [docker](https://www.docker.com/). You need to install them.
-2. Setup cluster using instruments [helm](https://helm.sh/) and [kubectl](https://kubernetes.io/docs/reference/kubectl/). You need to install them.
-3. Runs tests in **/test/e2e** folder. 
-4. Delete all resources from created cluster.
-5. Delete created cluster.
+1. Create a local cluster **gatewayapi-plugin-e2e** using tools [kind](https://kind.sigs.k8s.io/) and [docker](https://www.docker.com/). You need to install them.
+2. Set up the cluster using tools [helm](https://helm.sh/) and [kubectl](https://kubernetes.io/docs/reference/kubectl/). You need to install them.
+3. Run tests in the **/test/e2e** folder. 
+4. Delete all resources from the created cluster.
+5. Delete the created cluster.
 
-**Note:** It is used Traefik in e2e tests.
+**Note:** Traefik is used in e2e tests.
 
-If you want to leave working cluster with needing setup at the end you should run the following command
+If you want to leave the working cluster with the needed setup at the end, you should run the following command
 ```
 make CLUSTER_DELETE=false e2e-tests
 ```
 
-After this command you can want to run again all tests. Although you can run again **make CLUSTER_DELETE=false e2e-tests** command, it is recommended to use this command
+After this command, you may want to run all tests again. Although you can run the **make CLUSTER_DELETE=false e2e-tests** command again, it is recommended to use this command
 ```
 make run-e2e-tests
 ```
-as you have already had cluster setup.
+as you already have the cluster set up.
 
-If you want to run specific e2e tests then you can these commands
+If you want to run specific e2e tests, then you can use these commands
 ```
 make RUN=<reg-exp> e2e-tests
 ```
@@ -140,7 +140,7 @@ or
 ```
 make RUN=<reg-exp> run-e2e-tests
 ```
-reg-exp - the value you would set for the **-run** flag of **go test** command 
+reg-exp - the value you would set for the **-run** flag of the **go test** command 
 
 
 ## Cleaning up after failed E2E tests
