@@ -106,6 +106,7 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
 
@@ -155,6 +156,7 @@ func TestRunSuccessfully(t *testing.T) {
 						UseHeaderRoutes: true,
 					},
 				},
+				ConfigMap: mocks.ConfigMapName,
 			})
 		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
 
