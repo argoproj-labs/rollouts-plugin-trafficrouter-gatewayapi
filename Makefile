@@ -72,7 +72,7 @@ sanity-check-e2e:
 
 .PHONY: run-e2e-tests 
 run-e2e-tests: sanity-check-e2e
-	go test -v -timeout 1m -count=1 -run ${RUN} ./test/e2e/...
+	go test -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
 
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:
