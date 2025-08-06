@@ -66,9 +66,13 @@ ifeq (${CLUSTER_DELETE},true)
 	make clear-e2e-cluster
 endif
 
-.PHONY: run-e2e-tests
-run-e2e-tests:
-	go test -v -timeout 1m -count=1 -run ${RUN} ./test/e2e/...
+.PHONY: sanity-check-e2e
+sanity-check-e2e:
+	./test/cluster-setup/sanity-check.sh
+
+.PHONY: run-e2e-tests 
+run-e2e-tests: sanity-check-e2e
+	go test -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
 
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:
