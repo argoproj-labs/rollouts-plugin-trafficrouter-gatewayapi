@@ -3,6 +3,15 @@ DIST_DIR=${CURRENT_DIR}/dist
 E2E_CLUSTER_NAME=gatewayapi-plugin-e2e
 IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
 
+# Versions of components used in e2e tests
+GATEWAY_API_VERSION=v1.1.0
+# See more versions at https://artifacthub.io/packages/helm/argo/argo-rollouts
+ARGO_ROLLOUTS_HELM_VERSION=2.37.2 # Contains Argo Rollouts 1.7.1
+# See more versions at https://artifacthub.io/packages/helm/traefik/traefik
+TRAEFIK_HELM_VERSION=31.0.0 # Contains Traefik proxy v3.1.2
+
+
+
 CLUSTER_DELETE ?= true
 RUN ?= ''
 
@@ -12,9 +21,9 @@ define add_helm_repo
 endef
 
 define setup_cluster
-	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/experimental-install.yaml
-	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version 2.37.2  --wait
-	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version 31.0.0  --wait
+	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/experimental-install.yaml
+	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version ${ARGO_ROLLOUTS_HELM_VERSION} --wait
+	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version ${TRAEFIK_HELM_VERSION} --wait
 endef
 
 define install_k8s_resources
