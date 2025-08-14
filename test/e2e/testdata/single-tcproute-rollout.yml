@@ -16,7 +16,7 @@ spec:
             namespace: default
       steps:
         - setWeight: 30
-        - pause: {}
+        - pause: { 60 }
   revisionHistoryLimit: 1
   selector:
     matchLabels:
