@@ -82,19 +82,6 @@ go run ./cmd/rollouts-controller/main.go
 ```
 5. If you followed all instructions correctly, the Argo Rollouts controller will find your local build of your plugin and will run it as an RPC server locally. You have the ability to debug the plugin like any other Golang application. Any Goland Debugger that has the ability to attach to a local process can be used to place breakpoints on your code.
 
-## Making releases
-
-1. Write the description of the future release in **/RELEASE_NOTES.md**
-2. Create a tag in the `main` branch 
-```bash
-git tag release-v[0-9]+.[0-9]+.[0-9]+
-```
-If you prefer to make pre-release run
-```bash
-git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
-```
-3. Push the tag to the remote repository
-4. The pushed tag will trigger [a GitHub Actions workflow](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/.github/workflows/release.yaml) that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore, after pushing the tag to the remote repository, you also need to delete it locally. When the workflow has finished its work, you can run **git pull** and you will see the new tag.
 
 ## Running Unit Tests
 
@@ -153,6 +140,10 @@ If you want to delete it (after debugging it) run:
 make clear-e2e-cluster
 ```
 
+## Upgrading the versions for E2E components
+
+You can see which versions are used for Argo Rollouts, Traefik and Gateway
+API specification near the top of the [Makefile](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/Makefile).
 
 
 ## Creating a Pull Request
@@ -176,8 +167,17 @@ You can preview changes in your browser by visiting http://localhost:8000 after 
 make serve-docs
 ```
 
-<!-- To publish changes, run:
+## Making GitHub releases
 
-```shell
-make release-docs
-``` -->
+1. Write the description of the future release in **/RELEASE_NOTES.md**
+2. Create a tag in the `main` branch 
+```bash
+git tag release-v[0-9]+.[0-9]+.[0-9]+
+```
+If you prefer to make pre-release run
+```bash
+git tag release-v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+```
+3. Push the tag to the remote repository
+4. The pushed tag will trigger [a GitHub Actions workflow](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/blob/main/.github/workflows/release.yaml) that will create a corresponding tag `v[0-9]+.[0-9]+.[0-9]+` or `v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+` and will then delete your tag. Therefore, after pushing the tag to the remote repository, you also need to delete it locally. When the workflow has finished its work, you can run **git pull** and you will see the new tag.
+
