@@ -1,5 +1,7 @@
 name: Gateway API plugin CI
 on:
+  # Run the workflow manually without pushing a commit
+  workflow_dispatch:
   push:
     branches:
       - "main"
