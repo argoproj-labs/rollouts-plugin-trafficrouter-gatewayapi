@@ -200,6 +200,67 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 		return ctx
 	}
 	logrus.Infof("grpcRoute %q was updated", resourcesMap[GRPC_ROUTE_KEY].GetName())
+	// Manually promote the canary by removing the pause step to allow rollout to finish
+	unstructured.RemoveNestedField(resourcesMap[ROLLOUT_KEY].Object, "metadata", "resourceVersion")
+	// Remove the pause step from the canary strategy steps
+	steps, found, err := unstructured.NestedSlice(resourcesMap[ROLLOUT_KEY].Object, "spec", "strategy", "canary", "steps")
+	if !found || err != nil {
+		logrus.Errorf("rollout %q canary steps not found or error: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	// Filter out the pause step from the steps array
+	var filteredSteps []interface{}
+	for _, step := range steps {
+		stepMap, ok := step.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		// Skip any step that contains a "pause" key
+		if _, hasPause := stepMap["pause"]; !hasPause {
+			filteredSteps = append(filteredSteps, step)
+		}
+	}
+	err = unstructured.SetNestedSlice(resourcesMap[ROLLOUT_KEY].Object, filteredSteps, "spec", "strategy", "canary", "steps")
+	if err != nil {
+		logrus.Errorf("rollout %q steps update failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	serializedRolloutPromotion, err := json.Marshal(resourcesMap[ROLLOUT_KEY].Object)
+	if err != nil {
+		logrus.Errorf("rollout %q promotion serializing was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("rollout %q promotion was serialized", resourcesMap[ROLLOUT_KEY].GetName())
+	rolloutPromotionPatch := k8s.Patch{
+		PatchType: types.MergePatchType,
+		Data:      serializedRolloutPromotion,
+	}
+	err = clusterResources.Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPromotionPatch)
+	if err != nil {
+		logrus.Errorf("rollout %q promotion was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("rollout %q was promoted to finish canary deployment", resourcesMap[ROLLOUT_KEY].GetName())
+	// Wait for rollout to reach a healthy finished state
+	logrus.Infof("waiting for rollout %q to complete and reach healthy status", resourcesMap[ROLLOUT_KEY].GetName())
+	err = wait.For(
+		waitCondition.ResourceMatch(
+			resourcesMap[ROLLOUT_KEY],
+			getRolloutHealthyFetcher(t),
+		),
+		wait.WithTimeout(LONG_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("rollout %q completion was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("rollout %q completed successfully", resourcesMap[ROLLOUT_KEY].GetName())
 	logrus.Infof("waiting for grpcRoute %q to clean up header-based routing and reset canary weight to %d", resourcesMap[GRPC_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
@@ -281,4 +342,25 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 
 func isHeaderBasedGRPCRouteValuesEqual(first, second gatewayv1.GRPCHeaderMatch) bool {
 	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
+}
+
+func getRolloutHealthyFetcher(t *testing.T) func(k8s.Object) bool {
+	return func(obj k8s.Object) bool {
+		var rollout v1alpha1.Rollout
+		unstructuredRollout, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			logrus.Error("k8s rollout object type assertion was failed")
+			t.Error()
+			return false
+		}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredRollout.Object, &rollout)
+		if err != nil {
+			logrus.Errorf("conversation from unstructured rollout %q to the typed rollout was failed", unstructuredRollout.GetName())
+			t.Error()
+			return false
+		}
+		// Check if rollout is healthy (completed successfully)
+		// A rollout is considered finished when its phase is "Healthy"
+		return rollout.Status.Phase == "Healthy"
+	}
 }
