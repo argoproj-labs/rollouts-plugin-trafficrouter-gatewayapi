@@ -26,7 +26,7 @@ spec:
             - headerName: X-Test
               headerValue:
                 exact: test  
-      - pause: { 30 }
+      - pause: {  }
   revisionHistoryLimit: 2
   selector:
     matchLabels:

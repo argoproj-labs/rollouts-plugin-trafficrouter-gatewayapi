@@ -109,6 +109,7 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[HTTP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -182,6 +183,7 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to update canary weight to %d after rollout image change", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -234,14 +236,14 @@ func getMatchHTTPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object)
 			t.Error()
 			return false
 		}
-		logrus.Info("k8s object was type asserted")
+		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
+		// logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
 		return *httpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

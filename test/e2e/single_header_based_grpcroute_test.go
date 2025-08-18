@@ -107,6 +107,7 @@ func setupSingleHeaderBasedGRPCRouteEnv(ctx context.Context, t *testing.T, confi
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for grpcRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[GRPC_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[GRPC_ROUTE_KEY],
@@ -180,6 +181,7 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for grpcRoute %q to update with header-based routing and canary weight %d", resourcesMap[GRPC_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[GRPC_ROUTE_KEY],
@@ -198,6 +200,7 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 		return ctx
 	}
 	logrus.Infof("grpcRoute %q was updated", resourcesMap[GRPC_ROUTE_KEY].GetName())
+	logrus.Infof("waiting for grpcRoute %q to clean up header-based routing and reset canary weight to %d", resourcesMap[GRPC_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[GRPC_ROUTE_KEY],
@@ -254,14 +257,14 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 			t.Error()
 			return false
 		}
-		logrus.Info("k8s object was type asserted")
+		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredGRPCRoute.Object, &grpcRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured grpcRoute %q to the typed grpcRoute was failed", unstructuredGRPCRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured grpcRoute %q was converted to the typed grpcRoute", grpcRoute.GetName())
+		// logrus.Infof("unstructured grpcRoute %q was converted to the typed grpcRoute", grpcRoute.GetName())
 		rules := grpcRoute.Spec.Rules
 		if targetHeaderBasedRouteValue.Type == nil {
 			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&

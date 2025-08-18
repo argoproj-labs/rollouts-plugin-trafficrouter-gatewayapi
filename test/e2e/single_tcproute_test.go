@@ -107,6 +107,7 @@ func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.C
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for tcpRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[TCP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[TCP_ROUTE_KEY],
@@ -180,6 +181,7 @@ func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Confi
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for tcpRoute %q to update canary weight to %d after rollout image change", resourcesMap[TCP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[TCP_ROUTE_KEY],
@@ -232,14 +234,14 @@ func getMatchTCPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) 
 			t.Error()
 			return false
 		}
-		logrus.Info("k8s object was type asserted")
+		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTCPRoute.Object, &tcpRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured tcpRoute %q to the typed tcpRoute was failed", unstructuredTCPRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured tcpRoute %q was converted to the typed tcpRoute", tcpRoute.GetName())
+		// logrus.Infof("unstructured tcpRoute %q was converted to the typed tcpRoute", tcpRoute.GetName())
 		return *tcpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

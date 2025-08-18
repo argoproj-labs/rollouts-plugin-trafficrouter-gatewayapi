@@ -107,6 +107,7 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[HTTP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -180,6 +181,7 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to update with header-based routing and canary weight %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -198,6 +200,7 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		return ctx
 	}
 	logrus.Infof("httpRoute %q was updated", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("waiting for httpRoute %q to clean up header-based routing and reset canary weight to %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -254,14 +257,14 @@ func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, targetWeight int32, targe
 			t.Error()
 			return false
 		}
-		logrus.Info("k8s object was type asserted")
+		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
+		// logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
 		rules := httpRoute.Spec.Rules
 		if targetHeaderBasedRouteValue.Type == nil {
 			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&
