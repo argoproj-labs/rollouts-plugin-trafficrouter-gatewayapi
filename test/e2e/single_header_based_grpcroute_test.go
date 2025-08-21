@@ -41,36 +41,36 @@ func setupSingleHeaderBasedGRPCRouteEnv(ctx context.Context, t *testing.T, confi
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstGRPCRouteFile, err := os.Open(FIRST_GRPC_ROUTE_PATH)
+	firstGRPCRouteFile, err := os.Open(GRPC_ROUTE_HEADER_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_GRPC_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", GRPC_ROUTE_HEADER_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstGRPCRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_GRPC_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", GRPC_ROUTE_HEADER_PATH)
+	rolloutFile, err := os.Open(GRPC_ROUTE_HEADER_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", GRPC_ROUTE_HEADER_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", GRPC_ROUTE_HEADER_ROLLOUT_PATH)
 	err = decoder.Decode(firstGRPCRouteFile, &grpcRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_GRPC_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", GRPC_ROUTE_HEADER_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_GRPC_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", GRPC_ROUTE_HEADER_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", GRPC_ROUTE_HEADER_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", GRPC_ROUTE_HEADER_ROLLOUT_PATH)
 	grpcRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&grpcRoute)
 	if err != nil {
 		logrus.Errorf("grpcRoute %q converting to unstructured was failed: %s", grpcRoute.GetName(), err)

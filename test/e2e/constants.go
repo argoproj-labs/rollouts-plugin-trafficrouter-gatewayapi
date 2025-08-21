@@ -7,14 +7,21 @@ import (
 )
 
 const (
-	FIRST_HTTP_ROUTE_PATH                       = "./testdata/first-httproute.yml"
-	FIRST_GRPC_ROUTE_PATH                       = "./testdata/first-grpcroute.yml"
-	FIRST_TCP_ROUTE_PATH                        = "./testdata/first-tcproute.yml"
-	SINGLE_HTTP_ROUTE_ROLLOUT_PATH              = "./testdata/single-httproute-rollout.yml"
-	SINGLE_GRPC_ROUTE_ROLLOUT_PATH              = "./testdata/single-grpcroute-rollout.yml"
-	SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH = "./testdata/single-header-based-httproute-rollout.yml"
-	SINGLE_HEADER_BASED_GRPC_ROUTE_ROLLOUT_PATH = "./testdata/single-header-based-grpcroute-rollout.yml"
-	SINGLE_TCP_ROUTE_ROLLOUT_PATH               = "./testdata/single-tcproute-rollout.yml"
+	// HTTP Route test paths
+	HTTP_ROUTE_BASIC_PATH          = "./testdata/httproute-basic.yml"
+	HTTP_ROUTE_HEADER_PATH         = "./testdata/httproute-header.yml"
+	HTTP_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-httproute-rollout.yml"
+	HTTP_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-httproute-rollout.yml"
+
+	// GRPC Route test paths
+	GRPC_ROUTE_BASIC_PATH          = "./testdata/grpcroute-basic.yml"
+	GRPC_ROUTE_HEADER_PATH         = "./testdata/grpcroute-header.yml"
+	GRPC_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-grpcroute-rollout.yml"
+	GRPC_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-grpcroute-rollout.yml"
+
+	// TCP Route test paths
+	TCP_ROUTE_BASIC_PATH         = "./testdata/tcproute-basic.yml"
+	TCP_ROUTE_BASIC_ROLLOUT_PATH = "./testdata/single-tcproute-rollout.yml"
 
 	ROLLOUT_TEMPLATE_CONTAINERS_FIELD      = "spec.template.spec.containers"
 	ROLLOUT_TEMPLATE_FIRST_CONTAINER_FIELD = "spec.template.spec.containers.0"

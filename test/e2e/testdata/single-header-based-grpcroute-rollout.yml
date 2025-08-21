@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: rollouts-demo
+  name: grpcroute-header-rollout
   namespace: default
 spec:
   replicas: 2
@@ -15,7 +15,7 @@ spec:
         plugins:
           argoproj-labs/gatewayAPI:
             grpcRoutes:
-              - name: first-grpcroute
+              - name: grpcroute-header
                 useHeaderRoutes: true
             namespace: default
       steps:

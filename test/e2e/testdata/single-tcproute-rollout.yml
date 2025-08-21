@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: rollouts-demo
+  name: tcproute-rollout
   namespace: default
 spec:
   replicas: 2
@@ -12,7 +12,7 @@ spec:
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
-            tcpRoute: first-tcproute
+            tcpRoute: tcproute-basic
             namespace: default
       steps:
         - setWeight: 30

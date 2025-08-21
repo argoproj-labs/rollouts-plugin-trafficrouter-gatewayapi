@@ -41,36 +41,36 @@ func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.C
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstTCPRouteFile, err := os.Open(FIRST_TCP_ROUTE_PATH)
+	firstTCPRouteFile, err := os.Open(TCP_ROUTE_BASIC_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_TCP_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", TCP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstTCPRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_TCP_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_TCP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", TCP_ROUTE_BASIC_PATH)
+	rolloutFile, err := os.Open(TCP_ROUTE_BASIC_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_TCP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", TCP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_TCP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", TCP_ROUTE_BASIC_ROLLOUT_PATH)
 	err = decoder.Decode(firstTCPRouteFile, &tcpRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_TCP_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", TCP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_TCP_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", TCP_ROUTE_BASIC_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_TCP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", TCP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_TCP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", TCP_ROUTE_BASIC_ROLLOUT_PATH)
 	tcpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tcpRoute)
 	if err != nil {
 		logrus.Errorf("tcpRoute %q converting to unstructured was failed: %s", tcpRoute.GetName(), err)

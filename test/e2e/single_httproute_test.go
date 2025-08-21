@@ -43,36 +43,36 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstHTTPRouteFile, err := os.Open(FIRST_HTTP_ROUTE_PATH)
+	firstHTTPRouteFile, err := os.Open(HTTP_ROUTE_BASIC_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstHTTPRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_HTTP_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_PATH)
+	rolloutFile, err := os.Open(HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	err = decoder.Decode(firstHTTPRouteFile, &httpRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_HTTP_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_BASIC_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	httpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&httpRoute)
 	if err != nil {
 		logrus.Errorf("httpRoute %q converting to unstructured was failed: %s", httpRoute.GetName(), err)
