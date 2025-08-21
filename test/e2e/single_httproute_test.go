@@ -193,7 +193,7 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("httpRoute %q updating failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}

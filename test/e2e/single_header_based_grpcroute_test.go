@@ -195,7 +195,7 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("grpcRoute %q updation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("grpcRoute %q updating failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -268,14 +268,14 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 			getMatchHeaderBasedGRPCRouteFetcher(
 				t,
 				FIRST_CANARY_ROUTE_WEIGHT,
-				FIRST_HEADER_BASED_GRPC_ROUTE_VALUE,
+				LAST_HEADER_BASED_GRPC_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("last grpcRoute %q updation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("last grpcRoute %q update failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -318,14 +318,12 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 			t.Error()
 			return false
 		}
-		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredGRPCRoute.Object, &grpcRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured grpcRoute %q to the typed grpcRoute was failed", unstructuredGRPCRoute.GetName())
 			t.Error()
 			return false
 		}
-		// logrus.Infof("unstructured grpcRoute %q was converted to the typed grpcRoute", grpcRoute.GetName())
 		rules := grpcRoute.Spec.Rules
 		if targetHeaderBasedRouteValue.Type == nil {
 			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&

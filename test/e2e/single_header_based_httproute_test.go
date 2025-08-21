@@ -195,7 +195,7 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("httpRoute %q updating failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -268,14 +268,14 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 			getMatchHeaderBasedHTTPRouteFetcher(
 				t,
 				FIRST_CANARY_ROUTE_WEIGHT,
-				FIRST_HEADER_BASED_HTTP_ROUTE_VALUE,
+				LAST_HEADER_BASED_HTTP_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("last httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("last httpRoute %q update failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}

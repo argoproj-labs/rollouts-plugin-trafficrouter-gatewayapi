@@ -191,7 +191,7 @@ func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Confi
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("tcpRoute %q updation was failed: %s", resourcesMap[TCP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("tcpRoute %q updating failed: %s", resourcesMap[TCP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}

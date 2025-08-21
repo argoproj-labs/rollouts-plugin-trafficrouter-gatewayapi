@@ -191,7 +191,7 @@ func testSingleGRPCRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("grpcRoute %q updation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("grpcRoute %q updating failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
