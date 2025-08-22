@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: rollouts-demo
+  name: grpcroute-rollout
   namespace: default
 spec:
   replicas: 2
@@ -12,11 +12,11 @@ spec:
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
-            grpcRoute: first-grpcroute
+            grpcRoute: grpcroute-basic
             namespace: default
       steps:
         - setWeight: 30
-        - pause: { duration: 2 }
+        - pause: {  }
   revisionHistoryLimit: 1
   selector:
     matchLabels:

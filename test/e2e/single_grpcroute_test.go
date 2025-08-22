@@ -1,3 +1,5 @@
+//go:build !flaky
+
 package e2e
 
 import (
@@ -41,36 +43,36 @@ func setupSingleGRPCRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstGRPCRouteFile, err := os.Open(FIRST_GRPC_ROUTE_PATH)
+	firstGRPCRouteFile, err := os.Open(GRPC_ROUTE_BASIC_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_GRPC_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", GRPC_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstGRPCRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_GRPC_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_GRPC_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", GRPC_ROUTE_BASIC_PATH)
+	rolloutFile, err := os.Open(GRPC_ROUTE_BASIC_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_GRPC_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", GRPC_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_GRPC_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", GRPC_ROUTE_BASIC_ROLLOUT_PATH)
 	err = decoder.Decode(firstGRPCRouteFile, &grpcRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_GRPC_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", GRPC_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_GRPC_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", GRPC_ROUTE_BASIC_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_GRPC_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", GRPC_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_GRPC_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", GRPC_ROUTE_BASIC_ROLLOUT_PATH)
 	grpcRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&grpcRoute)
 	if err != nil {
 		logrus.Errorf("grpcRoute %q converting to unstructured was failed: %s", grpcRoute.GetName(), err)
@@ -107,6 +109,7 @@ func setupSingleGRPCRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for grpcRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[GRPC_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[GRPC_ROUTE_KEY],
@@ -180,6 +183,7 @@ func testSingleGRPCRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for grpcRoute %q to update canary weight to %d after rollout image change", resourcesMap[GRPC_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[GRPC_ROUTE_KEY],
@@ -189,7 +193,7 @@ func testSingleGRPCRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("grpcRoute %q updation was failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("grpcRoute %q updating failed: %s", resourcesMap[GRPC_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -221,25 +225,4 @@ func teardownSingleGRPCRouteEnv(ctx context.Context, t *testing.T, config *envco
 	}
 	logrus.Infof("grpcRoute %q was deleted", resourcesMap[GRPC_ROUTE_KEY].GetName())
 	return ctx
-}
-
-func getMatchGRPCRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var grpcRoute v1alpha2.GRPCRoute
-		unstructuredGRPCRoute, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s object type assertion was failed")
-			t.Error()
-			return false
-		}
-		logrus.Info("k8s object was type asserted")
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredGRPCRoute.Object, &grpcRoute)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured grpcRoute %q to the typed grpcRoute was failed", unstructuredGRPCRoute.GetName())
-			t.Error()
-			return false
-		}
-		logrus.Infof("unstructured grpcRoute %q was converted to the typed grpcRoute", grpcRoute.GetName())
-		return *grpcRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
-	}
 }

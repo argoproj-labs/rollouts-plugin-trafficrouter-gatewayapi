@@ -1,3 +1,5 @@
+//go:build !flaky
+
 package e2e
 
 import (
@@ -41,36 +43,36 @@ func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.C
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstTCPRouteFile, err := os.Open(FIRST_TCP_ROUTE_PATH)
+	firstTCPRouteFile, err := os.Open(TCP_ROUTE_BASIC_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_TCP_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", TCP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstTCPRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_TCP_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_TCP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", TCP_ROUTE_BASIC_PATH)
+	rolloutFile, err := os.Open(TCP_ROUTE_BASIC_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_TCP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", TCP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_TCP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", TCP_ROUTE_BASIC_ROLLOUT_PATH)
 	err = decoder.Decode(firstTCPRouteFile, &tcpRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_TCP_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", TCP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_TCP_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", TCP_ROUTE_BASIC_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_TCP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", TCP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_TCP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", TCP_ROUTE_BASIC_ROLLOUT_PATH)
 	tcpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tcpRoute)
 	if err != nil {
 		logrus.Errorf("tcpRoute %q converting to unstructured was failed: %s", tcpRoute.GetName(), err)
@@ -107,6 +109,7 @@ func setupSingleTCPRouteEnv(ctx context.Context, t *testing.T, config *envconf.C
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for tcpRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[TCP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[TCP_ROUTE_KEY],
@@ -180,6 +183,7 @@ func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Confi
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for tcpRoute %q to update canary weight to %d after rollout image change", resourcesMap[TCP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[TCP_ROUTE_KEY],
@@ -189,7 +193,7 @@ func testSingleTCPRoute(ctx context.Context, t *testing.T, config *envconf.Confi
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("tcpRoute %q updation was failed: %s", resourcesMap[TCP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("tcpRoute %q updating failed: %s", resourcesMap[TCP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -232,14 +236,14 @@ func getMatchTCPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) 
 			t.Error()
 			return false
 		}
-		logrus.Info("k8s object was type asserted")
+		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTCPRoute.Object, &tcpRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured tcpRoute %q to the typed tcpRoute was failed", unstructuredTCPRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured tcpRoute %q was converted to the typed tcpRoute", tcpRoute.GetName())
+		// logrus.Infof("unstructured tcpRoute %q was converted to the typed tcpRoute", tcpRoute.GetName())
 		return *tcpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
 	}
 }

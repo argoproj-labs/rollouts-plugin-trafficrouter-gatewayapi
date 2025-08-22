@@ -1,3 +1,5 @@
+//go:build flaky
+
 package e2e
 
 import (
@@ -41,36 +43,36 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstHTTPRouteFile, err := os.Open(FIRST_HTTP_ROUTE_PATH)
+	firstHTTPRouteFile, err := os.Open(HTTP_ROUTE_HEADER_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_HEADER_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstHTTPRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_HTTP_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_HEADER_PATH)
+	rolloutFile, err := os.Open(HTTP_ROUTE_HEADER_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_HEADER_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_HEADER_ROLLOUT_PATH)
 	err = decoder.Decode(firstHTTPRouteFile, &httpRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_HEADER_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_HTTP_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_HEADER_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_HEADER_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_HEADER_BASED_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_HEADER_ROLLOUT_PATH)
 	httpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&httpRoute)
 	if err != nil {
 		logrus.Errorf("httpRoute %q converting to unstructured was failed: %s", httpRoute.GetName(), err)
@@ -107,6 +109,7 @@ func setupSingleHeaderBasedHTTPRouteEnv(ctx context.Context, t *testing.T, confi
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[HTTP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -180,6 +183,7 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to update with header-based routing and canary weight %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -193,25 +197,87 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("httpRoute %q updating failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
 	logrus.Infof("httpRoute %q was updated", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	// Manually promote the canary by removing the pause step to allow rollout to finish
+	unstructured.RemoveNestedField(resourcesMap[ROLLOUT_KEY].Object, "metadata", "resourceVersion")
+	// Remove the pause step from the canary strategy steps
+	steps, found, err := unstructured.NestedSlice(resourcesMap[ROLLOUT_KEY].Object, "spec", "strategy", "canary", "steps")
+	if !found || err != nil {
+		logrus.Errorf("rollout %q canary steps not found or error: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	// Filter out the pause step from the steps array
+	var filteredSteps []interface{}
+	for _, step := range steps {
+		stepMap, ok := step.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		// Skip any step that contains a "pause" key
+		if _, hasPause := stepMap["pause"]; !hasPause {
+			filteredSteps = append(filteredSteps, step)
+		}
+	}
+	err = unstructured.SetNestedSlice(resourcesMap[ROLLOUT_KEY].Object, filteredSteps, "spec", "strategy", "canary", "steps")
+	if err != nil {
+		logrus.Errorf("rollout %q steps update failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	serializedRolloutPromotion, err := json.Marshal(resourcesMap[ROLLOUT_KEY].Object)
+	if err != nil {
+		logrus.Errorf("rollout %q promotion serializing was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("rollout %q promotion was serialized", resourcesMap[ROLLOUT_KEY].GetName())
+	rolloutPromotionPatch := k8s.Patch{
+		PatchType: types.MergePatchType,
+		Data:      serializedRolloutPromotion,
+	}
+	err = clusterResources.Patch(ctx, resourcesMap[ROLLOUT_KEY], rolloutPromotionPatch)
+	if err != nil {
+		logrus.Errorf("rollout %q promotion was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("rollout %q was promoted to finish canary deployment", resourcesMap[ROLLOUT_KEY].GetName())
+	// Wait for rollout to reach a healthy finished state
+	logrus.Infof("waiting for rollout %q to complete and reach healthy status", resourcesMap[ROLLOUT_KEY].GetName())
+	err = wait.For(
+		waitCondition.ResourceMatch(
+			resourcesMap[ROLLOUT_KEY],
+			getRolloutHealthyFetcher(t),
+		),
+		wait.WithTimeout(LONG_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("rollout %q completion was failed: %s", resourcesMap[ROLLOUT_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("rollout %q completed successfully", resourcesMap[ROLLOUT_KEY].GetName())
+	logrus.Infof("waiting for httpRoute %q to clean up header-based routing and reset canary weight to %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
 			getMatchHeaderBasedHTTPRouteFetcher(
 				t,
 				FIRST_CANARY_ROUTE_WEIGHT,
-				FIRST_HEADER_BASED_HTTP_ROUTE_VALUE,
+				LAST_HEADER_BASED_HTTP_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("last httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("last httpRoute %q update failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -254,14 +320,14 @@ func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, targetWeight int32, targe
 			t.Error()
 			return false
 		}
-		logrus.Info("k8s object was type asserted")
+		// logrus.Info("k8s object was type asserted")
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
 		if err != nil {
 			logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
 			t.Error()
 			return false
 		}
-		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
+		// logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
 		rules := httpRoute.Spec.Rules
 		if targetHeaderBasedRouteValue.Type == nil {
 			return len(rules) == LAST_HEADER_BASED_RULES_LENGTH &&

@@ -1,3 +1,5 @@
+//go:build !flaky
+
 package e2e
 
 import (
@@ -43,36 +45,36 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstHTTPRouteFile, err := os.Open(FIRST_HTTP_ROUTE_PATH)
+	firstHTTPRouteFile, err := os.Open(HTTP_ROUTE_BASIC_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstHTTPRouteFile.Close()
-	logrus.Infof("file %q was opened", FIRST_HTTP_ROUTE_PATH)
-	rolloutFile, err := os.Open(SINGLE_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_PATH)
+	rolloutFile, err := os.Open(HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", SINGLE_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", SINGLE_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	err = decoder.Decode(firstHTTPRouteFile, &httpRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", FIRST_HTTP_ROUTE_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", FIRST_HTTP_ROUTE_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_BASIC_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", SINGLE_HTTP_ROUTE_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", SINGLE_HTTP_ROUTE_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	httpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&httpRoute)
 	if err != nil {
 		logrus.Errorf("httpRoute %q converting to unstructured was failed: %s", httpRoute.GetName(), err)
@@ -109,6 +111,7 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	}
 	logrus.Infof("rollout %q was created", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to connect with rollout %q (expecting canary weight: %d)", resourcesMap[HTTP_ROUTE_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -182,6 +185,7 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
+	logrus.Infof("waiting for httpRoute %q to update canary weight to %d after rollout image change", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
@@ -191,7 +195,7 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updation was failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("httpRoute %q updating failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
@@ -223,25 +227,4 @@ func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envco
 	}
 	logrus.Infof("httpRoute %q was deleted", resourcesMap[HTTP_ROUTE_KEY].GetName())
 	return ctx
-}
-
-func getMatchHTTPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var httpRoute gatewayv1.HTTPRoute
-		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s object type assertion was failed")
-			t.Error()
-			return false
-		}
-		logrus.Info("k8s object was type asserted")
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
-			t.Error()
-			return false
-		}
-		logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
-		return *httpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
-	}
 }

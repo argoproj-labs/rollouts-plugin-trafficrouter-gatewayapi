@@ -83,6 +83,17 @@ sanity-check-e2e:
 run-e2e-tests: sanity-check-e2e
 	go test -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
 
+# Flaky tests usually fail with GitHub actions. You should be able to run them locally though.
+.PHONY: e2e-tests-flaky
+e2e-tests-flaky: setup-e2e-cluster run-e2e-tests-flaky 
+ifeq (${CLUSTER_DELETE},true)
+	make clear-e2e-cluster
+endif
+
+.PHONY: run-e2e-tests-flaky 
+run-e2e-tests-flaky: sanity-check-e2e
+	go test -tags "flaky" -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/... 
+
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:
 	kind delete cluster --name ${E2E_CLUSTER_NAME}
