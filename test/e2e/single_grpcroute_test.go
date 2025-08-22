@@ -1,3 +1,5 @@
+//go:build !flaky
+
 package e2e
 
 import (
@@ -223,25 +225,4 @@ func teardownSingleGRPCRouteEnv(ctx context.Context, t *testing.T, config *envco
 	}
 	logrus.Infof("grpcRoute %q was deleted", resourcesMap[GRPC_ROUTE_KEY].GetName())
 	return ctx
-}
-
-func getMatchGRPCRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var grpcRoute v1alpha2.GRPCRoute
-		unstructuredGRPCRoute, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s object type assertion was failed")
-			t.Error()
-			return false
-		}
-		// logrus.Info("k8s object was type asserted")
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredGRPCRoute.Object, &grpcRoute)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured grpcRoute %q to the typed grpcRoute was failed", unstructuredGRPCRoute.GetName())
-			t.Error()
-			return false
-		}
-		// logrus.Infof("Looking for grpcRoute %q to reach weight %d", grpcRoute.GetName(), targetWeight)
-		return *grpcRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
-	}
 }

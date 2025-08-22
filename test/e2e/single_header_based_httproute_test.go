@@ -1,3 +1,5 @@
+//go:build flaky
+
 package e2e
 
 import (

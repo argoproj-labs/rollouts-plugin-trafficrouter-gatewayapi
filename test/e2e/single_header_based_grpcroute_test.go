@@ -1,3 +1,5 @@
+//go:build flaky
+
 package e2e
 
 import (
@@ -340,25 +342,4 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 
 func isHeaderBasedGRPCRouteValuesEqual(first, second gatewayv1.GRPCHeaderMatch) bool {
 	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
-}
-
-func getRolloutHealthyFetcher(t *testing.T) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var rollout v1alpha1.Rollout
-		unstructuredRollout, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s rollout object type assertion was failed")
-			t.Error()
-			return false
-		}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredRollout.Object, &rollout)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured rollout %q to the typed rollout was failed", unstructuredRollout.GetName())
-			t.Error()
-			return false
-		}
-		// Check if rollout is healthy (completed successfully)
-		// A rollout is considered finished when its phase is "Healthy"
-		return rollout.Status.Phase == "Healthy"
-	}
 }

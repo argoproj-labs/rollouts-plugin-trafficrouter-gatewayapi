@@ -1,3 +1,5 @@
+//go:build !flaky
+
 package e2e
 
 import (
@@ -225,25 +227,4 @@ func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envco
 	}
 	logrus.Infof("httpRoute %q was deleted", resourcesMap[HTTP_ROUTE_KEY].GetName())
 	return ctx
-}
-
-func getMatchHTTPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var httpRoute gatewayv1.HTTPRoute
-		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s object type assertion was failed")
-			t.Error()
-			return false
-		}
-		// logrus.Info("k8s object was type asserted")
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
-			t.Error()
-			return false
-		}
-		// logrus.Infof("unstructured httpRoute %q was converted to the typed httpRoute", httpRoute.GetName())
-		return *httpRoute.Spec.Rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight == targetWeight
-	}
 }
