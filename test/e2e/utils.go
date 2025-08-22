@@ -3,34 +3,12 @@ package e2e
 import (
 	"testing"
 
-	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
-
-func getRolloutHealthyFetcher(t *testing.T) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var rollout v1alpha1.Rollout
-		unstructuredRollout, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s rollout object type assertion was failed")
-			t.Error()
-			return false
-		}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredRollout.Object, &rollout)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured rollout %q to the typed rollout was failed", unstructuredRollout.GetName())
-			t.Error()
-			return false
-		}
-		// Check if rollout is healthy (completed successfully)
-		// A rollout is considered finished when its phase is "Healthy"
-		return rollout.Status.Phase == "Healthy"
-	}
-}
 
 func getMatchHTTPRouteFetcher(t *testing.T, targetWeight int32) func(k8s.Object) bool {
 	return func(obj k8s.Object) bool {

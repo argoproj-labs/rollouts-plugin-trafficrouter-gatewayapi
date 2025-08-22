@@ -68,7 +68,7 @@ jobs:
           make e2e-tests
 
   e2e-tests-flaky:
-    name: E2E tests running
+    name: E2E Flaky tests
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
