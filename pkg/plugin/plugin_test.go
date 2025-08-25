@@ -222,6 +222,220 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
 		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
 	})
+	t.Run("SetGRPCHeaderRouteWithFilters", func(t *testing.T) {
+		// Create a GRPCRoute mock with filters
+		grpcRouteWithFilters := mocks.GRPCRouteObj
+		grpcRouteWithFilters.Spec.Rules[0].Filters = []gatewayv1.GRPCRouteFilter{
+			{
+				Type: gatewayv1.GRPCRouteFilterRequestHeaderModifier,
+				RequestHeaderModifier: &gatewayv1.HTTPHeaderFilter{
+					Add: []gatewayv1.HTTPHeader{
+						{
+							Name:  "X-Custom-Header",
+							Value: "custom-value",
+						},
+					},
+				},
+			},
+			{
+				Type: gatewayv1.GRPCRouteFilterResponseHeaderModifier,
+				ResponseHeaderModifier: &gatewayv1.HTTPHeaderFilter{
+					Set: []gatewayv1.HTTPHeader{
+						{
+							Name:  "X-Response-Header",
+							Value: "response-value",
+						},
+					},
+				},
+			},
+		}
+
+		// Update the plugin's GRPCRouteClient with the new mock
+		rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(&grpcRouteWithFilters).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+
+		headerName := "X-Test"
+		headerValue := "test"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+
+		assert.Empty(t, err.Error())
+		// Verify that the new header route rule (index 1) has the same filters as the original route rule (index 0)
+		originalFilters := grpcRouteWithFilters.Spec.Rules[0].Filters
+		newRouteFilters := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Filters
+
+		assert.Equal(t, len(originalFilters), len(newRouteFilters), "New route should have same number of filters as original")
+
+		// Verify first filter (RequestHeaderModifier)
+		assert.Equal(t, originalFilters[0].Type, newRouteFilters[0].Type)
+		assert.Equal(t, originalFilters[0].RequestHeaderModifier.Add[0].Name, newRouteFilters[0].RequestHeaderModifier.Add[0].Name)
+		assert.Equal(t, originalFilters[0].RequestHeaderModifier.Add[0].Value, newRouteFilters[0].RequestHeaderModifier.Add[0].Value)
+
+		// Verify second filter (ResponseHeaderModifier)
+		assert.Equal(t, originalFilters[1].Type, newRouteFilters[1].Type)
+		assert.Equal(t, originalFilters[1].ResponseHeaderModifier.Set[0].Name, newRouteFilters[1].ResponseHeaderModifier.Set[0].Name)
+		assert.Equal(t, originalFilters[1].ResponseHeaderModifier.Set[0].Value, newRouteFilters[1].ResponseHeaderModifier.Set[0].Value)
+	})
+	t.Run("SetGRPCHeaderRouteWithoutFilters", func(t *testing.T) {
+		// Create a GRPCRoute mock without filters (using the original mock which has no filters)
+		grpcRouteWithoutFilters := mocks.GRPCRouteObj
+		grpcRouteWithoutFilters.Spec.Rules[0].Filters = nil // Explicitly set to nil
+
+		// Update the plugin's GRPCRouteClient with the mock without filters
+		rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(&grpcRouteWithoutFilters).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+
+		headerName := "X-Test"
+		headerValue := "test"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+
+		assert.Empty(t, err.Error())
+		// Verify that the new header route rule (index 1) has no filters, same as the original route rule (index 0)
+		originalFilters := grpcRouteWithoutFilters.Spec.Rules[0].Filters
+		newRouteFilters := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Filters
+
+		assert.Nil(t, originalFilters, "Original route should have no filters")
+		assert.Equal(t, len(originalFilters), len(newRouteFilters), "New route should have same number of filters as original (none)")
+		assert.Empty(t, newRouteFilters, "New route should have no filters when original has none")
+	})
+	t.Run("SetHTTPHeaderRouteWithFilters", func(t *testing.T) {
+		// Create an HTTPRoute mock with filters
+		httpRouteWithFilters := mocks.HTTPRouteObj
+		httpRouteWithFilters.Spec.Rules[0].Filters = []gatewayv1.HTTPRouteFilter{
+			{
+				Type: gatewayv1.HTTPRouteFilterRequestHeaderModifier,
+				RequestHeaderModifier: &gatewayv1.HTTPHeaderFilter{
+					Add: []gatewayv1.HTTPHeader{
+						{
+							Name:  "X-Custom-Header",
+							Value: "custom-value",
+						},
+					},
+				},
+			},
+			{
+				Type: gatewayv1.HTTPRouteFilterResponseHeaderModifier,
+				ResponseHeaderModifier: &gatewayv1.HTTPHeaderFilter{
+					Set: []gatewayv1.HTTPHeader{
+						{
+							Name:  "X-Response-Header",
+							Value: "response-value",
+						},
+					},
+				},
+			},
+		}
+
+		// Update the plugin's HTTPRouteClient with the new mock
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(&httpRouteWithFilters).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+
+		headerName := "X-Test"
+		headerValue := "test"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+
+		assert.Empty(t, err.Error())
+		// Verify that the new header route rule (index 1) has the same filters as the original route rule (index 0)
+		originalFilters := httpRouteWithFilters.Spec.Rules[0].Filters
+		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters
+
+		assert.Equal(t, len(originalFilters), len(newRouteFilters), "New route should have same number of filters as original")
+
+		// Verify first filter (RequestHeaderModifier)
+		assert.Equal(t, originalFilters[0].Type, newRouteFilters[0].Type)
+		assert.Equal(t, originalFilters[0].RequestHeaderModifier.Add[0].Name, newRouteFilters[0].RequestHeaderModifier.Add[0].Name)
+		assert.Equal(t, originalFilters[0].RequestHeaderModifier.Add[0].Value, newRouteFilters[0].RequestHeaderModifier.Add[0].Value)
+
+		// Verify second filter (ResponseHeaderModifier)
+		assert.Equal(t, originalFilters[1].Type, newRouteFilters[1].Type)
+		assert.Equal(t, originalFilters[1].ResponseHeaderModifier.Set[0].Name, newRouteFilters[1].ResponseHeaderModifier.Set[0].Name)
+		assert.Equal(t, originalFilters[1].ResponseHeaderModifier.Set[0].Value, newRouteFilters[1].ResponseHeaderModifier.Set[0].Value)
+	})
+	t.Run("SetHTTPHeaderRouteWithoutFilters", func(t *testing.T) {
+		// Create an HTTPRoute mock without filters (using the original mock which has no filters)
+		httpRouteWithoutFilters := mocks.HTTPRouteObj
+		httpRouteWithoutFilters.Spec.Rules[0].Filters = nil // Explicitly set to nil
+
+		// Update the plugin's HTTPRouteClient with the mock without filters
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(&httpRouteWithoutFilters).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+
+		headerName := "X-Test"
+		headerValue := "test"
+		headerMatch := v1alpha1.StringMatch{
+			Prefix: headerValue,
+		}
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  headerName,
+					HeaderValue: &headerMatch,
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+
+		assert.Empty(t, err.Error())
+		// Verify that the new header route rule (index 1) has no filters, same as the original route rule (index 0)
+		originalFilters := httpRouteWithoutFilters.Spec.Rules[0].Filters
+		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters
+
+		assert.Nil(t, originalFilters, "Original route should have no filters")
+		assert.Equal(t, len(originalFilters), len(newRouteFilters), "New route should have same number of filters as original (none)")
+		assert.Empty(t, newRouteFilters, "New route should have no filters when original has none")
+	})
 	t.Run("RemoveHTTPManagedRoutes", func(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,

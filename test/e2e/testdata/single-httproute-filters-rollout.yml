@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-filters-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service 
+      stableService: argo-rollouts-stable-service 
+      trafficRouting:
+        managedRoutes:
+        - name: filter-preservation-route
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-filters
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+      - setWeight: 30
+      - setHeaderRoute:
+          name: filter-preservation-route
+          match:
+            - headerName: X-Filter-Test
+              headerValue:
+                exact: preserve-filters  
+      - pause: {  }
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

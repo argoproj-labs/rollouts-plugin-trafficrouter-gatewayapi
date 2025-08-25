@@ -1,0 +1,51 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpcroute-filters
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: default
+  rules:
+    - matches:
+        - method:
+            service: rollouts.demo.Service
+      filters:
+        # RequestHeaderModifier - adds, sets, and removes request headers
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-GRPC-Request-Header
+                value: grpc-request-value
+              - name: X-Service-Environment
+                value: test
+            add:
+              - name: X-GRPC-Added-Header
+                value: grpc-added-value
+            remove:
+              - X-Remove-GRPC-Header
+        # ResponseHeaderModifier - adds, sets, and removes response headers  
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-GRPC-Response-Header
+                value: grpc-response-value
+              - name: X-GRPC-Server
+                value: gateway-api-grpc-test
+            add:
+              - name: X-GRPC-Response-Added
+                value: grpc-response-added-value
+            remove:
+              - grpc-status-details-bin
+        # RequestMirror - mirrors gRPC requests to another backend
+        - type: RequestMirror
+          requestMirror:
+            backendRef:
+              name: argo-rollouts-grpc-mirror-service
+              port: 80
+      backendRefs:
+        - name: argo-rollouts-stable-service
+          port: 80
+        - name: argo-rollouts-canary-service
+          port: 80

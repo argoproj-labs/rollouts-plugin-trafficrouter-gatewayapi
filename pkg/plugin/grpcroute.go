@@ -130,6 +130,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	}
 	grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
 		Matches: []gatewayv1.GRPCRouteMatch{},
+		Filters: []gatewayv1.GRPCRouteFilter{},
 		BackendRefs: []gatewayv1.GRPCBackendRef{
 			{
 				BackendRef: gatewayv1.BackendRef{
@@ -142,6 +143,13 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				},
 			},
 		},
+	}
+
+	// Copy filters from original route
+	if grpcRouteRule.Filters != nil {
+		for i := 0; i < len(grpcRouteRule.Filters); i++ {
+			grpcHeaderRouteRule.Filters = append(grpcHeaderRouteRule.Filters, *grpcRouteRule.Filters[i].DeepCopy())
+		}
 	}
 	matchLength := len(grpcRouteRule.Matches)
 	if matchLength == 0 {
