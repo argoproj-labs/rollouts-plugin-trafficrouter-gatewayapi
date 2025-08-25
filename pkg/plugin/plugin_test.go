@@ -250,6 +250,58 @@ func TestRunSuccessfully(t *testing.T) {
 	<-closeCh
 }
 
+func TestHTTPRouteWithSelector(t *testing.T) {
+	// Simple test to verify selector parsing works
+	config := &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRouteSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"app":            "test-app",
+				"canary-enabled": "true",
+			},
+		},
+	}
+
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config)
+
+	// Just test that config parsing works with selector
+	assert.NotNil(t, rollout)
+	assert.NotNil(t, rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName])
+
+	// Parse back the config to verify selector is preserved
+	var parsedConfig GatewayAPITrafficRouting
+	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &parsedConfig)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedConfig.HTTPRouteSelector)
+	assert.Equal(t, "test-app", parsedConfig.HTTPRouteSelector.MatchLabels["app"])
+	assert.Equal(t, "true", parsedConfig.HTTPRouteSelector.MatchLabels["canary-enabled"])
+}
+
+func TestCombinedSelectorAndExplicitRoute(t *testing.T) {
+	// Test that both selector and explicit route can coexist
+	config := &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: "explicit-route",
+		HTTPRouteSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"app": "test-app",
+			},
+		},
+	}
+
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config)
+
+	// Parse config to verify both are preserved
+	parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedConfig.HTTPRouteSelector)
+	assert.Equal(t, "explicit-route", parsedConfig.HTTPRoute)
+
+	// After insertGatewayAPIRouteLists, we should have the explicit route in the list
+	assert.Len(t, parsedConfig.HTTPRoutes, 1)
+	assert.Equal(t, "explicit-route", parsedConfig.HTTPRoutes[0].Name)
+}
+
 func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
 	encodedConfig, err := json.Marshal(config)
 	if err != nil {

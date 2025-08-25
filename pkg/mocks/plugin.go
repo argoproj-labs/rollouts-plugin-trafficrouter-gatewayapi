@@ -33,6 +33,49 @@ var (
 	}
 )
 
+func CreateHTTPRouteWithLabels(name string, labels map[string]string) *gatewayv1.HTTPRoute {
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	return &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+			Labels:    labels,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: StableServiceName,
+									Port: &port,
+								},
+								Weight: &stableWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: CanaryServiceName,
+									Port: &port,
+								},
+								Weight: &canaryWeight,
+							},
+						},
+					},
+					Matches: []gatewayv1.HTTPRouteMatch{
+						{
+							Path: &httpPathMatch,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 var HTTPRouteObj = gatewayv1.HTTPRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      HTTPRouteName,
@@ -69,6 +112,78 @@ var HTTPRouteObj = gatewayv1.HTTPRoute{
 			},
 		},
 	},
+}
+
+func CreateGRPCRouteWithLabels(name string, labels map[string]string) *gatewayv1.GRPCRoute {
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	return &gatewayv1.GRPCRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+			Labels:    labels,
+		},
+		Spec: gatewayv1.GRPCRouteSpec{
+			Rules: []gatewayv1.GRPCRouteRule{
+				{
+					BackendRefs: []gatewayv1.GRPCBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: StableServiceName,
+									Port: &port,
+								},
+								Weight: &stableWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: CanaryServiceName,
+									Port: &port,
+								},
+								Weight: &canaryWeight,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateTCPRouteWithLabels(name string, labels map[string]string) *v1alpha2.TCPRoute {
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	return &v1alpha2.TCPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+			Labels:    labels,
+		},
+		Spec: v1alpha2.TCPRouteSpec{
+			Rules: []v1alpha2.TCPRouteRule{
+				{
+					BackendRefs: []v1alpha2.BackendRef{
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: StableServiceName,
+								Port: &port,
+							},
+							Weight: &stableWeight,
+						},
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: CanaryServiceName,
+								Port: &port,
+							},
+							Weight: &canaryWeight,
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 var GRPCRouteObj = gatewayv1.GRPCRoute{
