@@ -386,6 +386,37 @@ func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gate
 	return nil, routeRuleList.Error()
 }
 
+// This will return the backendRefs slices that matched the backendRefName but split by the routeRule index to be used for updating the weight
+// under consideration of the managedRoute rules present from the configmap (identifiable by the index of the rule on an HttpRoute)
+func getIndexedBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3) ([]IndexedBackendRefs[T1], error) {
+	var results []IndexedBackendRefs[T1]
+	var backendRef T1
+	var routeRule T2
+	ruleIndex := 0
+	for next, hasNext := routeRuleList.Iterator(); hasNext; {
+		// Has to be inside of the for loop since it will be reset to 0 for each routeRule
+		var matchedRefs []T1
+		routeRule, hasNext = next()
+		for nextRef, hasNextRef := routeRule.Iterator(); hasNextRef; {
+			backendRef, hasNextRef = nextRef()
+			if backendRefName == backendRef.GetName() {
+				matchedRefs = append(matchedRefs, backendRef)
+			}
+		}
+		if len(matchedRefs) > 0 {
+			results = append(results, IndexedBackendRefs[T1]{
+				RuleIndex: ruleIndex,
+				Refs:      matchedRefs,
+			})
+		}
+		ruleIndex++
+	}
+	if len(results) > 0 {
+		return results, nil
+	}
+	return nil, routeRuleList.Error()
+}
+
 func isConfigHasRoutes(config *GatewayAPITrafficRouting) bool {
 	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0 || len(config.GRPCRoutes) > 0
 }
