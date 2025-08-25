@@ -1,12 +1,14 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/go-playground/validator/v10"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
@@ -64,7 +66,7 @@ func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash
 }
 
 func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
-	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+	gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -100,7 +102,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 }
 
 func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError {
-	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+	gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -150,7 +152,7 @@ func (r *RpcPlugin) VerifyWeight(rollout *v1alpha1.Rollout, desiredWeight int32,
 }
 
 func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.RpcError {
-	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+	gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -195,6 +197,23 @@ func (r *RpcPlugin) Type() string {
 	return Type
 }
 
+func (r *RpcPlugin) getGatewayAPIConfigWithDiscovery(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
+	gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+	if err != nil {
+		return nil, err
+	}
+
+	if gatewayAPIConfig.HTTPRouteSelector != nil ||
+		gatewayAPIConfig.GRPCRouteSelector != nil ||
+		gatewayAPIConfig.TCPRouteSelector != nil {
+		if err := r.discoverRoutesBySelector(rollout, gatewayAPIConfig); err != nil {
+			return nil, err
+		}
+	}
+
+	return gatewayAPIConfig, nil
+}
+
 func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	gatewayAPIConfig := &GatewayAPITrafficRouting{
@@ -210,6 +229,93 @@ func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITr
 		return gatewayAPIConfig, err
 	}
 	return gatewayAPIConfig, err
+}
+
+func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) error {
+	namespace := gatewayAPIConfig.Namespace
+	if namespace == "" {
+		namespace = rollout.Namespace
+	}
+
+	if gatewayAPIConfig.HTTPRouteSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.HTTPRouteSelector)
+		if err != nil {
+			return err
+		}
+
+		httpRouteList, err := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(namespace).List(
+			context.TODO(),
+			metav1.ListOptions{LabelSelector: selector.String()},
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, route := range httpRouteList.Items {
+			gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, HTTPRoute{
+				Name:            route.Name,
+				UseHeaderRoutes: false,
+			})
+		}
+
+		if len(httpRouteList.Items) > 0 {
+			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d HTTPRoutes via selector", len(httpRouteList.Items)))
+		}
+	}
+
+	if gatewayAPIConfig.GRPCRouteSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.GRPCRouteSelector)
+		if err != nil {
+			return err
+		}
+
+		grpcRouteList, err := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(namespace).List(
+			context.TODO(),
+			metav1.ListOptions{LabelSelector: selector.String()},
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, route := range grpcRouteList.Items {
+			gatewayAPIConfig.GRPCRoutes = append(gatewayAPIConfig.GRPCRoutes, GRPCRoute{
+				Name:            route.Name,
+				UseHeaderRoutes: false,
+			})
+		}
+
+		if len(grpcRouteList.Items) > 0 {
+			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d GRPCRoutes via selector", len(grpcRouteList.Items)))
+		}
+	}
+
+	if gatewayAPIConfig.TCPRouteSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.TCPRouteSelector)
+		if err != nil {
+			return err
+		}
+
+		tcpRouteList, err := r.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(namespace).List(
+			context.TODO(),
+			metav1.ListOptions{LabelSelector: selector.String()},
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, route := range tcpRouteList.Items {
+			gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, TCPRoute{
+				Name:            route.Name,
+				UseHeaderRoutes: false,
+			})
+		}
+
+		if len(tcpRouteList.Items) > 0 {
+			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d TCPRoutes via selector", len(tcpRouteList.Items)))
+		}
+	}
+
+	return nil
 }
 
 func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {

@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -56,6 +57,12 @@ type GatewayAPITrafficRouting struct {
 	// GRPCRoutes refer to names of GRPCRoute resources used to route traffic to the
 	// service
 	GRPCRoutes []GRPCRoute `json:"grpcRoutes,omitempty"`
+	// HTTPRouteSelector refers to label selector for auto-discovery of HTTPRoutes
+	HTTPRouteSelector *metav1.LabelSelector `json:"httpRouteSelector,omitempty"`
+	// GRPCRouteSelector refers to label selector for auto-discovery of GRPCRoutes
+	GRPCRouteSelector *metav1.LabelSelector `json:"grpcRouteSelector,omitempty"`
+	// TCPRouteSelector refers to label selector for auto-discovery of TCPRoutes
+	TCPRouteSelector *metav1.LabelSelector `json:"tcpRouteSelector,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
 	// critical section is config map
 	ConfigMapRWMutex sync.RWMutex
