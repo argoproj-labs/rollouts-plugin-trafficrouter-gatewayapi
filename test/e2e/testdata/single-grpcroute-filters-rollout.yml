@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: grpcroute-filters-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service 
+      stableService: argo-rollouts-stable-service 
+      trafficRouting:
+        managedRoutes:
+        - name: grpc-filter-preservation-route
+        plugins:
+          argoproj-labs/gatewayAPI:
+            grpcRoutes:
+              - name: grpcroute-filters
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+      - setWeight: 30
+      - setHeaderRoute:
+          name: grpc-filter-preservation-route
+          match:
+            - headerName: X-GRPC-Filter-Test
+              headerValue:
+                exact: preserve-grpc-filters  
+      - pause: {  }
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

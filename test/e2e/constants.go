@@ -23,6 +23,14 @@ const (
 	TCP_ROUTE_BASIC_PATH         = "./testdata/tcproute-basic.yml"
 	TCP_ROUTE_BASIC_ROLLOUT_PATH = "./testdata/single-tcproute-rollout.yml"
 
+	// HTTP Route filter test paths
+	HTTP_ROUTE_FILTERS_PATH         = "./testdata/httproute-filters.yml"
+	HTTP_ROUTE_FILTERS_ROLLOUT_PATH = "./testdata/single-httproute-filters-rollout.yml"
+
+	// GRPC Route filter test paths
+	GRPC_ROUTE_FILTERS_PATH         = "./testdata/grpcroute-filters.yml"
+	GRPC_ROUTE_FILTERS_ROLLOUT_PATH = "./testdata/single-grpcroute-filters-rollout.yml"
+
 	ROLLOUT_TEMPLATE_CONTAINERS_FIELD      = "spec.template.spec.containers"
 	ROLLOUT_TEMPLATE_FIRST_CONTAINER_FIELD = "spec.template.spec.containers.0"
 	NEW_IMAGE_FIELD_VALUE                  = "argoproj/rollouts-demo:green"

@@ -1,0 +1,59 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-filters
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: default
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        # RequestHeaderModifier - adds, sets, and removes request headers
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Custom-Request-Header
+                value: custom-request-value
+              - name: X-Environment
+                value: test
+            add:
+              - name: X-Added-Header
+                value: added-value
+            remove:
+              - X-Remove-Me
+        # ResponseHeaderModifier - adds, sets, and removes response headers
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Custom-Response-Header
+                value: custom-response-value
+              - name: X-Server
+                value: gateway-api-test
+            add:
+              - name: X-Response-Added
+                value: response-added-value
+            remove:
+              - Server
+        # RequestMirror - mirrors requests to another backend for testing/monitoring
+        - type: RequestMirror
+          requestMirror:
+            backendRef:
+              name: argo-rollouts-mirror-service
+              port: 80
+        # URLRewrite - rewrites the request URL path and hostname
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /api/v2
+            hostname: api.example.com
+      backendRefs:
+        - name: argo-rollouts-stable-service
+          port: 80
+        - name: argo-rollouts-canary-service
+          port: 80
