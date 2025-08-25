@@ -1,4 +1,4 @@
-//go:build flaky
+//go:build !flaky
 
 package e2e
 
