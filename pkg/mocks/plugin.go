@@ -12,11 +12,13 @@ import (
 const (
 	HTTPRoute         = "HTTPRoute"
 	TCPRoute          = "TCPRoute"
+	TLSRoute          = "TLSRoute"
 	StableServiceName = "argo-rollouts-stable-service"
 	CanaryServiceName = "argo-rollouts-canary-service"
 	HTTPRouteName     = "argo-rollouts-http-route"
 	GRPCRouteName     = "argo-rollouts-grpc-route"
 	TCPRouteName      = "argo-rollouts-tcp-route"
+	TLSRouteName      = "argo-rollouts-tls-route"
 	RolloutNamespace  = "default"
 	ConfigMapName     = "test-config"
 	ManagedRouteName  = "test-header-route"
@@ -186,6 +188,40 @@ func CreateTCPRouteWithLabels(name string, labels map[string]string) *v1alpha2.T
 	}
 }
 
+func CreateTLSRouteWithLabels(name string, labels map[string]string) *v1alpha2.TLSRoute {
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	return &v1alpha2.TLSRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+			Labels:    labels,
+		},
+		Spec: v1alpha2.TLSRouteSpec{
+			Rules: []v1alpha2.TLSRouteRule{
+				{
+					BackendRefs: []v1alpha2.BackendRef{
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: StableServiceName,
+								Port: &port,
+							},
+							Weight: &stableWeight,
+						},
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: CanaryServiceName,
+								Port: &port,
+							},
+							Weight: &canaryWeight,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 var GRPCRouteObj = gatewayv1.GRPCRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      GRPCRouteName,
@@ -226,6 +262,35 @@ var TCPPRouteObj = v1alpha2.TCPRoute{
 	},
 	Spec: v1alpha2.TCPRouteSpec{
 		Rules: []v1alpha2.TCPRouteRule{
+			{
+				BackendRefs: []v1alpha2.BackendRef{
+					{
+						BackendObjectReference: v1alpha2.BackendObjectReference{
+							Name: StableServiceName,
+							Port: &port,
+						},
+						Weight: &weight,
+					},
+					{
+						BackendObjectReference: v1alpha2.BackendObjectReference{
+							Name: CanaryServiceName,
+							Port: &port,
+						},
+						Weight: &weight,
+					},
+				},
+			},
+		},
+	},
+}
+
+var TLSRouteObj = v1alpha2.TLSRoute{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      TLSRouteName,
+		Namespace: RolloutNamespace,
+	},
+	Spec: v1alpha2.TLSRouteSpec{
+		Rules: []v1alpha2.TLSRouteRule{
 			{
 				BackendRefs: []v1alpha2.BackendRef{
 					{

@@ -36,6 +36,7 @@ func TestRunSuccessfully(t *testing.T) {
 		HTTPRouteClient: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
 		GRPCRouteClient: gwFake.NewSimpleClientset(&mocks.GRPCRouteObj).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
 		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
+		TLSRouteClient:  gwFake.NewSimpleClientset(&mocks.TLSRouteObj).GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace),
 		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
@@ -138,6 +139,19 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
+	t.Run("SetTLSRouteWeight", func(t *testing.T) {
+		var desiredWeight int32 = 30
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.RolloutNamespace,
+				TLSRoute:  mocks.TLSRouteName,
+			})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTLSRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTLSRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
 	t.Run("SetWeightViaRoutes", func(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
@@ -155,6 +169,12 @@ func TestRunSuccessfully(t *testing.T) {
 						UseHeaderRoutes: true,
 					},
 				},
+				TLSRoutes: []TLSRoute{
+					{
+						Name:            mocks.TLSRouteName,
+						UseHeaderRoutes: true,
+					},
+				},
 			})
 		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
 
@@ -163,6 +183,8 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTLSRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
+		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTLSRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
 	t.Run("SetHTTPHeaderRoute", func(t *testing.T) {
 		headerName := "X-Test"

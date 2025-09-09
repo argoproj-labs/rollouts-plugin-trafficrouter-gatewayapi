@@ -24,6 +24,7 @@ nav:
   - Multiple Routes: features/multiple-routes.md
   - Header Based Routing: features/header-based-routing.md    
   - TCP Routing: features/tcp.md
+  - TLS Routing: features/tls.md
   - GRPC Routing: features/grpc.md  
 
 - Contributing: CONTRIBUTING.md

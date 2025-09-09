@@ -24,12 +24,14 @@ type RpcPlugin struct {
 	HTTPRouteClient      gatewayApiClientv1.HTTPRouteInterface
 	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
 	GRPCRouteClient      gatewayApiClientv1.GRPCRouteInterface
+	TLSRouteClient       gatewayApiClientv1alpha2.TLSRouteInterface
 	TestClientset        v1.ConfigMapInterface
 	GatewayAPIClientset  *gatewayAPIClientset.Clientset
 	Clientset            *kubernetes.Clientset
 	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
 	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
 	UpdatedGRPCRouteMock *gatewayv1.GRPCRoute
+	UpdatedTLSRouteMock  *v1alpha2.TLSRoute
 	LogCtx               *logrus.Entry
 	IsTest               bool
 }
@@ -44,6 +46,9 @@ type GatewayAPITrafficRouting struct {
 	// TCPRoute refers to the name of the TCPRoute used to route traffic to the
 	// service
 	TCPRoute string `json:"tcpRoute,omitempty"`
+	// TLSRoute refers to the name of the TLSRoute used to route traffic to the
+	// service
+	TLSRoute string `json:"tlsRoute,omitempty"`
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace,omitempty"`
 	// ConfigMap refers to the config map where plugin stores data about managed routes
@@ -57,12 +62,17 @@ type GatewayAPITrafficRouting struct {
 	// GRPCRoutes refer to names of GRPCRoute resources used to route traffic to the
 	// service
 	GRPCRoutes []GRPCRoute `json:"grpcRoutes,omitempty"`
+	// TLSRoutes refer to names of TLSRoute resources used to route traffic to the
+	// service
+	TLSRoutes []TLSRoute `json:"tlsRoutes,omitempty"`
 	// HTTPRouteSelector refers to label selector for auto-discovery of HTTPRoutes
 	HTTPRouteSelector *metav1.LabelSelector `json:"httpRouteSelector,omitempty"`
 	// GRPCRouteSelector refers to label selector for auto-discovery of GRPCRoutes
 	GRPCRouteSelector *metav1.LabelSelector `json:"grpcRouteSelector,omitempty"`
 	// TCPRouteSelector refers to label selector for auto-discovery of TCPRoutes
 	TCPRouteSelector *metav1.LabelSelector `json:"tcpRouteSelector,omitempty"`
+	// TLSRouteSelector refers to label selector for auto-discovery of TLSRoutes
+	TLSRouteSelector *metav1.LabelSelector `json:"tlsRouteSelector,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
 	// critical section is config map
 	ConfigMapRWMutex sync.RWMutex
@@ -92,6 +102,14 @@ type GRPCRoute struct {
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
 }
 
+type TLSRoute struct {
+	// Name refers to the TLSRoute name
+	Name string `json:"name" validate:"required"`
+	// UseHeaderRoutes indicates header routes will be added to this route or not
+	// during setHeaderRoute step
+	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+}
+
 type ManagedRouteMap map[string]map[string]int
 
 type HTTPRouteRule gatewayv1.HTTPRouteRule
@@ -100,11 +118,15 @@ type GRPCRouteRule gatewayv1.GRPCRouteRule
 
 type TCPRouteRule v1alpha2.TCPRouteRule
 
+type TLSRouteRule v1alpha2.TLSRouteRule
+
 type HTTPRouteRuleList []gatewayv1.HTTPRouteRule
 
 type GRPCRouteRuleList []gatewayv1.GRPCRouteRule
 
 type TCPRouteRuleList []v1alpha2.TCPRouteRule
+
+type TLSRouteRuleList []v1alpha2.TLSRouteRule
 
 type HTTPBackendRef gatewayv1.HTTPBackendRef
 
@@ -112,24 +134,26 @@ type GRPCBackendRef gatewayv1.GRPCBackendRef
 
 type TCPBackendRef gatewayv1.BackendRef
 
+type TLSBackendRef gatewayv1.BackendRef
+
 type GatewayAPIRoute interface {
-	HTTPRoute | GRPCRoute | TCPRoute
+	HTTPRoute | GRPCRoute | TCPRoute | TLSRoute
 	GetName() string
 }
 
 type GatewayAPIRouteRule[T1 GatewayAPIBackendRef] interface {
-	*HTTPRouteRule | *GRPCRouteRule | *TCPRouteRule
+	*HTTPRouteRule | *GRPCRouteRule | *TCPRouteRule | *TLSRouteRule
 	Iterator() (GatewayAPIRouteRuleIterator[T1], bool)
 }
 
 type GatewayAPIRouteRuleList[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]] interface {
-	HTTPRouteRuleList | GRPCRouteRuleList | TCPRouteRuleList
+	HTTPRouteRuleList | GRPCRouteRuleList | TCPRouteRuleList | TLSRouteRuleList
 	Iterator() (GatewayAPIRouteRuleListIterator[T1, T2], bool)
 	Error() error
 }
 
 type GatewayAPIBackendRef interface {
-	*HTTPBackendRef | *GRPCBackendRef | *TCPBackendRef
+	*HTTPBackendRef | *GRPCBackendRef | *TCPBackendRef | *TLSBackendRef
 	GetName() string
 }
 

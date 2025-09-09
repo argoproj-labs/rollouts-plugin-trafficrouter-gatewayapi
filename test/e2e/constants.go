@@ -23,6 +23,10 @@ const (
 	TCP_ROUTE_BASIC_PATH         = "./testdata/tcproute-basic.yml"
 	TCP_ROUTE_BASIC_ROLLOUT_PATH = "./testdata/single-tcproute-rollout.yml"
 
+	// TLS Route test paths
+	TLS_ROUTE_BASIC_PATH         = "./testdata/tlsroute-basic.yml"
+	TLS_ROUTE_BASIC_ROLLOUT_PATH = "./testdata/single-tlsroute-rollout.yml"
+
 	// HTTP Route filter test paths
 	HTTP_ROUTE_FILTERS_PATH         = "./testdata/httproute-filters.yml"
 	HTTP_ROUTE_FILTERS_ROLLOUT_PATH = "./testdata/single-httproute-filters-rollout.yml"
@@ -54,6 +58,7 @@ const (
 	HTTP_ROUTE_KEY = "httpRoute"
 	GRPC_ROUTE_KEY = "grpcRoute"
 	TCP_ROUTE_KEY  = "tcpRoute"
+	TLS_ROUTE_KEY  = "tlsRoute"
 	ROLLOUT_KEY    = "rollout"
 )
 
