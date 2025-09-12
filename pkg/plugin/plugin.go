@@ -98,6 +98,14 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		gatewayAPIConfig.TCPRoute = route.Name
 		return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
 	})
+	if rpcError.HasError() {
+		return rpcError
+	}
+	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TLSRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes)))
+	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TLSRoutes, func(route TLSRoute) pluginTypes.RpcError {
+		gatewayAPIConfig.TLSRoute = route.Name
+		return r.setTLSRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+	})
 	return rpcError
 }
 
@@ -205,7 +213,8 @@ func (r *RpcPlugin) getGatewayAPIConfigWithDiscovery(rollout *v1alpha1.Rollout) 
 
 	if gatewayAPIConfig.HTTPRouteSelector != nil ||
 		gatewayAPIConfig.GRPCRouteSelector != nil ||
-		gatewayAPIConfig.TCPRouteSelector != nil {
+		gatewayAPIConfig.TCPRouteSelector != nil ||
+		gatewayAPIConfig.TLSRouteSelector != nil {
 		if err := r.discoverRoutesBySelector(rollout, gatewayAPIConfig); err != nil {
 			return nil, err
 		}
@@ -315,6 +324,32 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 		}
 	}
 
+	if gatewayAPIConfig.TLSRouteSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.TLSRouteSelector)
+		if err != nil {
+			return err
+		}
+
+		tlsRouteList, err := r.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(namespace).List(
+			context.TODO(),
+			metav1.ListOptions{LabelSelector: selector.String()},
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, route := range tlsRouteList.Items {
+			gatewayAPIConfig.TLSRoutes = append(gatewayAPIConfig.TLSRoutes, TLSRoute{
+				Name:            route.Name,
+				UseHeaderRoutes: false,
+			})
+		}
+
+		if len(tlsRouteList.Items) > 0 {
+			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d TLSRoutes via selector", len(tlsRouteList.Items)))
+		}
+	}
+
 	return nil
 }
 
@@ -334,6 +369,12 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 	if gatewayAPIConfig.TCPRoute != "" {
 		gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, TCPRoute{
 			Name:            gatewayAPIConfig.TCPRoute,
+			UseHeaderRoutes: true,
+		})
+	}
+	if gatewayAPIConfig.TLSRoute != "" {
+		gatewayAPIConfig.TLSRoutes = append(gatewayAPIConfig.TLSRoutes, TLSRoute{
+			Name:            gatewayAPIConfig.TLSRoute,
 			UseHeaderRoutes: true,
 		})
 	}
@@ -387,7 +428,7 @@ func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gate
 }
 
 func isConfigHasRoutes(config *GatewayAPITrafficRouting) bool {
-	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0 || len(config.GRPCRoutes) > 0
+	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0 || len(config.GRPCRoutes) > 0 || len(config.TLSRoutes) > 0
 }
 
 func forEachGatewayAPIRoute[T1 GatewayAPIRoute](routeList []T1, fn func(route T1) pluginTypes.RpcError) pluginTypes.RpcError {
