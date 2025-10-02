@@ -8,8 +8,8 @@ spec:
   replicas: 5
   strategy:
     canary:
-      canaryService: argo-rollouts-canary-service # our created canary service
-      stableService: argo-rollouts-stable-service # our created stable service
+      canaryService: argo-rollouts-canary-service
+      stableService: argo-rollouts-stable-service
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
         - name: http-echo
-          image: hashicorp/http-echo
+          image: hashicorp/http-echo:1.0
           args:
           - "-text=Hello from $(POD_NAME)"
           ports:
@@ -52,7 +52,7 @@ spec:
               protocol: TCP
           env:
           - name: APP_VERSION
-            value: "1.0"
+            value: "1.0.0"
           - name: POD_NAME
             valueFrom:
               fieldRef:
