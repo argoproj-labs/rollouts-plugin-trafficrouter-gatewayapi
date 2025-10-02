@@ -12,9 +12,10 @@ spec:
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
-            httpRoute: argo-rollouts-http-route # our created httproute
-            namespace: default # namespace where this rollout resides
-            useHeaderRoutes: true
+            httpRoutes:
+              - name: argo-rollouts-http-route
+                useHeaderRoutes: true
+            namespace: default
         managedRoutes:
           - name: argo-rollouts
       steps:
@@ -30,7 +31,6 @@ spec:
         - pause: {}
         - setHeaderRoute: # remove header route
             name: argo-rollouts
-
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -41,20 +41,22 @@ spec:
         app: rollouts-demo
     spec:
       containers:
-        - name: rollouts-demo
-          image: argoproj/rollouts-demo:red
+        - name: http-echo
+          image: hashicorp/http-echo
+          args:
+          - "-text=Hello from $(POD_NAME)"
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 5678
               protocol: TCP
           env:
-            - name: APP_VERSION
-              value: "1.0.0"
+          - name: APP_VERSION
+            value: "1.0"
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
           resources:
             requests:
               memory: 32Mi
               cpu: 5m
-
-
-
-
