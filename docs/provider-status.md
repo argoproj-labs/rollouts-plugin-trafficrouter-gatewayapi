@@ -21,7 +21,7 @@ For convenience we are including here a list of those actually tested with the p
 | [Gloo Gateway](https://docs.solo.io/gloo-gateway/v2/)     | 2.0.0-beta | 1.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/gloo-gateway)    |
 | [Google Cloud](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api)     | N/A | 0.7.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/google-cloud)    |
 | [Kong](https://docs.konghq.com/kubernetes-ingress-controller/latest/concepts/gateway-api/)     | 2.9.x  | 0.7.1    | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kong)    |
-| [Linkerd](https://linkerd.io/)     | 2.13.0 |   Unknown    | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/linkerd)    |
+| [Linkerd](https://linkerd.io/)     | edge-25.9.4 |   1.2.1    | 0.8.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/linkerd-header-based)    |
 | [NGINX Gateway](https://github.com/nginxinc/nginx-gateway-fabric)     | Unknown | 0.8.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/nginx)    |
 | [Traefik](https://doc.traefik.io/traefik/providers/kubernetes-gateway/)     | 3.1.3 | 1.1      | 0.4.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/traefik)    |
 

@@ -22,7 +22,7 @@ I tested this guide with Linkerd version `edge-25.9.4`.
 
 ```shell
 export LINKERD2_VERSION=edge-25.9.4; curl --proto '=https' --tlsv1.2 -sSfL https://run.linkerd.io/install-edge | sh
-export PATH=$PATH:/home/baburciu/.linkerd2/bin
+export PATH=$PATH:$HOME/.linkerd2/bin
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml # Gateway API CRDs must be installed prior to installing Linkerd
 linkerd install --crds | kubectl apply -f -
 linkerd install | kubectl apply -f - && linkerd check
