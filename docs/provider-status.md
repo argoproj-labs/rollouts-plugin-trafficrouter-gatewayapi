@@ -16,7 +16,7 @@ For convenience we are including here a list of those actually tested with the p
 | Provider   |    Version | API Version | Plugin   | Code     |
 |------------|------------|-------------| ---------| ---------|
 | [Amazon VPC Lattice](https://www.gateway-api-controller.eks.aws.dev/latest//)     | 1.1.2 |   1.3.0    | 0.6.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/aws-gateway-api-controller-lattice )    |
-| [Cilium](https://cilium.io/)     |  Unknown      | 0.7.0 | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/cilium)    |
+| [Cilium](https://cilium.io/)     | 1.18.2 | 1.2.0 | 0.8.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/cilium-header-based)    |
 | [Envoy Gateway](https://gateway.envoyproxy.io/)     | 0.5.0  |   Unknown  | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/envoygateway)    |
 | [Gloo Gateway](https://docs.solo.io/gloo-gateway/v2/)     | 2.0.0-beta | 1.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/gloo-gateway)    |
 | [Google Cloud](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api)     | N/A | 0.7.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/google-cloud)    |
