@@ -29,7 +29,7 @@ linkerd install | kubectl apply -f - && linkerd check
 linkerd viz install | kubectl apply -f - && linkerd check
 ```
 
-## Step 3 - Install Argo Rollouts and Argo Rollouts plugin to allow Linkerd to manage the traffic:
+## Step 3 - Install Argo Rollouts and Argo Rollouts plugin to instruct Linkerd to manage the traffic
 
 ```shell
 kubectl create namespace argo-rollouts
