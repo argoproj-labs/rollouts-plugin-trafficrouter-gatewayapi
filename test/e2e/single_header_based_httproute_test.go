@@ -183,13 +183,19 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
-	logrus.Infof("waiting for httpRoute %q to update with header-based routing and canary weight %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
+	newRouteName := "canary-route1"
+	newHttpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      newRouteName,
+			Namespace: "default",
+		},
+	}
+	logrus.Infof("waiting for new httpRoute %q to be created with header-based routing", newRouteName)
 	err = wait.For(
 		waitCondition.ResourceMatch(
-			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHeaderBasedHTTPRouteFetcher(
+			newHttpRoute,
+			getMatchNewHeaderBasedHTTPRouteFetcher(
 				t,
-				LAST_CANARY_ROUTE_WEIGHT,
 				LAST_HEADER_BASED_HTTP_ROUTE_VALUE,
 			),
 		),
@@ -197,11 +203,25 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updating failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("new httpRoute %q creation failed: %s", newRouteName, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was updated", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("new httpRoute %q was created", newRouteName)
+	logrus.Infof("waiting for httpRoute %q to update canary weight to %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
+	err = wait.For(
+		waitCondition.ResourceMatch(
+			resourcesMap[HTTP_ROUTE_KEY],
+			getMatchHTTPRouteFetcher(t, LAST_CANARY_ROUTE_WEIGHT),
+		),
+		wait.WithTimeout(LONG_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("httpRoute %q weight update failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
 	// Manually promote the canary by removing the pause step to allow rollout to finish
 	unstructured.RemoveNestedField(resourcesMap[ROLLOUT_KEY].Object, "metadata", "resourceVersion")
 	// Remove the pause step from the canary strategy steps
@@ -263,15 +283,23 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		return ctx
 	}
 	logrus.Infof("rollout %q completed successfully", resourcesMap[ROLLOUT_KEY].GetName())
-	logrus.Infof("waiting for httpRoute %q to clean up header-based routing and reset canary weight to %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
+	logrus.Infof("waiting for new httpRoute %q to be deleted", newRouteName)
+	err = wait.For(
+		waitCondition.ResourceDeleted(newHttpRoute),
+		wait.WithTimeout(LONG_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("new httpRoute %q deletion failed: %s", newRouteName, err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("new httpRoute %q was deleted", newRouteName)
+	logrus.Infof("waiting for httpRoute %q to reset canary weight to %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHeaderBasedHTTPRouteFetcher(
-				t,
-				FIRST_CANARY_ROUTE_WEIGHT,
-				LAST_HEADER_BASED_HTTP_ROUTE_VALUE,
-			),
+			getMatchHTTPRouteFetcher(t, FIRST_CANARY_ROUTE_WEIGHT),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
@@ -344,4 +372,48 @@ func getMatchHeaderBasedHTTPRouteFetcher(t *testing.T, targetWeight int32, targe
 
 func isHeaderBasedHTTPRouteValuesEqual(first, second gatewayv1.HTTPHeaderMatch) bool {
 	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
+}
+
+func getMatchNewHeaderBasedHTTPRouteFetcher(t *testing.T, targetHeaderBasedRouteValue gatewayv1.HTTPHeaderMatch) func(k8s.Object) bool {
+	return func(obj k8s.Object) bool {
+		var httpRoute gatewayv1.HTTPRoute
+		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			if typed, ok := obj.(*gatewayv1.HTTPRoute); ok {
+				httpRoute = *typed
+			} else {
+				logrus.Error("k8s object type assertion was failed")
+				t.Error()
+				return false
+			}
+		} else {
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
+			if err != nil {
+				logrus.Errorf("conversation from unstructured httpRoute %q to the typed httpRoute was failed", unstructuredHTTPRoute.GetName())
+				t.Error()
+				return false
+			}
+		}
+
+		rules := httpRoute.Spec.Rules
+		if len(rules) != 1 {
+			return false
+		}
+		if len(rules[0].Matches) == 0 {
+			return false
+		}
+		found := false
+		for _, match := range rules[0].Matches {
+			for _, header := range match.Headers {
+				if isHeaderBasedHTTPRouteValuesEqual(header, targetHeaderBasedRouteValue) {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		return found
+	}
 }

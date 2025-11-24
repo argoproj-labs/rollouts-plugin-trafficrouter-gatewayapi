@@ -211,9 +211,9 @@ func TestRunSuccessfully(t *testing.T) {
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
-		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
-		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
-		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
+		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].Matches[0].Headers[0].Name))
+		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].Matches[0].Headers[0].Value)
+		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].Matches[0].Headers[0].Type)
 	})
 	t.Run("SetGRPCHeaderRoute", func(t *testing.T) {
 		headerName := "X-Test"
@@ -404,9 +404,9 @@ func TestRunSuccessfully(t *testing.T) {
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
-		// Verify that the new header route rule (index 1) has the same filters as the original route rule (index 0)
+		// Verify that the new header route rule (index 0) has the same filters as the original route rule (index 0)
 		originalFilters := httpRouteWithFilters.Spec.Rules[0].Filters
-		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters
+		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].Filters
 
 		assert.Equal(t, len(originalFilters), len(newRouteFilters), "New route should have same number of filters as original")
 
@@ -450,9 +450,9 @@ func TestRunSuccessfully(t *testing.T) {
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
-		// Verify that the new header route rule (index 1) has no filters, same as the original route rule (index 0)
+		// Verify that the new header route rule (index 0) has no filters, same as the original route rule (index 0)
 		originalFilters := httpRouteWithoutFilters.Spec.Rules[0].Filters
-		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters
+		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].Filters
 
 		assert.Nil(t, originalFilters, "Original route should have no filters")
 		assert.Equal(t, len(originalFilters), len(newRouteFilters), "New route should have same number of filters as original (none)")

@@ -9,6 +9,7 @@ import (
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -132,21 +133,23 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			break
 		}
 	}
-	httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
-		Matches: []gatewayv1.HTTPRouteMatch{},
-		Filters: []gatewayv1.HTTPRouteFilter{},
-		BackendRefs: []gatewayv1.HTTPBackendRef{
-			{
-				BackendRef: gatewayv1.BackendRef{
-					BackendObjectReference: gatewayv1.BackendObjectReference{
-						Group: &canaryServiceGroup,
-						Kind:  &canaryServiceKind,
-						Name:  canaryServiceName,
-						Port:  canaryBackendRef.Port,
-					},
-				},
+
+	newHTTPRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      headerRouting.Name,
+			Namespace: gatewayAPIConfig.Namespace,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			CommonRouteSpec: gatewayv1.CommonRouteSpec{
+				ParentRefs: httpRoute.Spec.ParentRefs,
 			},
 		},
+	}
+
+	httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
+		Matches:     []gatewayv1.HTTPRouteMatch{},
+		Filters:     []gatewayv1.HTTPRouteFilter{},
+		BackendRefs: []gatewayv1.HTTPBackendRef{},
 	}
 
 	// Copy filters from original route
@@ -158,16 +161,31 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 
 	// Copy matches from original route
 	for i := 0; i < len(httpRouteRule.Matches); i++ {
-		httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
-			Path:        httpRouteRule.Matches[i].Path,
-			Headers:     httpHeaderRouteRuleList,
-			QueryParams: httpRouteRule.Matches[i].QueryParams,
-		})
+		match := httpRouteRule.Matches[i]
+		newMatch := gatewayv1.HTTPRouteMatch{
+			Path:        match.Path,
+			Method:      match.Method,
+			QueryParams: match.QueryParams,
+			Headers:     append(match.Headers, httpHeaderRouteRuleList...),
+		}
+		httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, newMatch)
 	}
 
-	httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
-	oldHTTPRuleList := httpRoute.Spec.Rules
-	httpRoute.Spec.Rules = httpRouteRuleList
+	httpHeaderRouteRule.BackendRefs = []gatewayv1.HTTPBackendRef{
+		{
+			BackendRef: gatewayv1.BackendRef{
+				BackendObjectReference: gatewayv1.BackendObjectReference{
+					Group: &canaryServiceGroup,
+					Kind:  &canaryServiceKind,
+					Name:  canaryServiceName,
+					Port:  canaryBackendRef.Port,
+				},
+			},
+		},
+	}
+
+	newHTTPRoute.Spec.Rules = []gatewayv1.HTTPRouteRule{httpHeaderRouteRule}
+
 	oldConfigMapData := make(ManagedRouteMap)
 	err = utils.GetConfigMapData(configMap, HTTPConfigMapKey, &oldConfigMapData)
 	if err != nil {
@@ -178,22 +196,30 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	taskList := []utils.Task{
 		{
 			Action: func() error {
-				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				createdRoute, err := httpRouteClient.Create(ctx, newHTTPRoute, metav1.CreateOptions{})
 				if r.IsTest {
-					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+					r.UpdatedHTTPRouteMock = createdRoute
 				}
 				if err != nil {
+					if kubeErrors.IsAlreadyExists(err) {
+						existingRoute, err := httpRouteClient.Get(ctx, headerRouting.Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						newHTTPRoute.ResourceVersion = existingRoute.ResourceVersion
+						updatedRoute, err := httpRouteClient.Update(ctx, newHTTPRoute, metav1.UpdateOptions{})
+						if r.IsTest {
+							r.UpdatedHTTPRouteMock = updatedRoute
+						}
+						return err
+					}
 					return err
 				}
 				return nil
 			},
 			ReverseAction: func() error {
-				httpRoute.Spec.Rules = oldHTTPRuleList
-				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
-				if r.IsTest {
-					r.UpdatedHTTPRouteMock = updatedHTTPRoute
-				}
-				if err != nil {
+				err := httpRouteClient.Delete(ctx, headerRouting.Name, metav1.DeleteOptions{})
+				if err != nil && !kubeErrors.IsNotFound(err) {
 					return err
 				}
 				return nil
@@ -204,7 +230,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				if managedRouteMap[headerRouting.Name] == nil {
 					managedRouteMap[headerRouting.Name] = make(map[string]int)
 				}
-				managedRouteMap[headerRouting.Name][httpRouteName] = len(httpRouteRuleList) - 1
+				managedRouteMap[headerRouting.Name][headerRouting.Name] = 0
 				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
 					ConfigMapKey: HTTPConfigMapKey,
@@ -300,22 +326,42 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 	}
 	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
 	isHTTPRouteRuleListChanged := false
+	isConfigMapChanged := false
+
 	for _, managedRoute := range managedRouteNameList {
 		managedRouteName := managedRoute.Name
-		_, isOk := managedRouteMap[managedRouteName]
+		routeMap, isOk := managedRouteMap[managedRouteName]
 		if !isOk {
 			r.LogCtx.Logger.Info(fmt.Sprintf("%s is not in httpHeaderManagedRouteMap", managedRouteName))
 			continue
 		}
-		isHTTPRouteRuleListChanged = true
-		httpRouteRuleList, err = removeManagedHTTPRouteEntry(managedRouteMap, httpRouteRuleList, managedRouteName, httpRouteName)
-		if err != nil {
-			return pluginTypes.RpcError{
-				ErrorString: err.Error(),
+
+		isNewLogic := false
+		for routeName := range routeMap {
+			if routeName == managedRouteName {
+				isNewLogic = true
+				break
+			}
+		}
+
+		if isNewLogic {
+			err := httpRouteClient.Delete(ctx, managedRouteName, metav1.DeleteOptions{})
+			if err != nil && !kubeErrors.IsNotFound(err) {
+				return pluginTypes.RpcError{ErrorString: err.Error()}
+			}
+			delete(managedRouteMap, managedRouteName)
+			isConfigMapChanged = true
+		} else {
+			isHTTPRouteRuleListChanged = true
+			httpRouteRuleList, err = removeManagedHTTPRouteEntry(managedRouteMap, httpRouteRuleList, managedRouteName, httpRouteName)
+			if err != nil {
+				return pluginTypes.RpcError{
+					ErrorString: err.Error(),
+				}
 			}
 		}
 	}
-	if !isHTTPRouteRuleListChanged {
+	if !isHTTPRouteRuleListChanged && !isConfigMapChanged {
 		return pluginTypes.RpcError{}
 	}
 	oldHTTPRuleList := httpRoute.Spec.Rules
@@ -327,8 +373,10 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			ErrorString: err.Error(),
 		}
 	}
-	taskList := []utils.Task{
-		{
+	taskList := []utils.Task{}
+
+	if isHTTPRouteRuleListChanged {
+		taskList = append(taskList, utils.Task{
 			Action: func() error {
 				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 				if r.IsTest {
@@ -350,8 +398,11 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 				}
 				return nil
 			},
-		},
-		{
+		})
+	}
+
+	if isConfigMapChanged || isHTTPRouteRuleListChanged {
+		taskList = append(taskList, utils.Task{
 			Action: func() error {
 				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
@@ -374,8 +425,9 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 				}
 				return nil
 			},
-		},
+		})
 	}
+
 	err = utils.DoTransaction(r.LogCtx, taskList...)
 	if err != nil {
 		return pluginTypes.RpcError{
