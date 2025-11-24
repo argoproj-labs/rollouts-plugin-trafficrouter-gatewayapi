@@ -8,10 +8,11 @@ import (
 
 const (
 	// HTTP Route test paths
-	HTTP_ROUTE_BASIC_PATH          = "./testdata/httproute-basic.yml"
-	HTTP_ROUTE_HEADER_PATH         = "./testdata/httproute-header.yml"
-	HTTP_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-httproute-rollout.yml"
-	HTTP_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-httproute-rollout.yml"
+	HTTP_ROUTE_BASIC_PATH                 = "./testdata/httproute-basic.yml"
+	HTTP_ROUTE_HEADER_PATH                = "./testdata/httproute-header.yml"
+	HTTP_ROUTE_BASIC_ROLLOUT_PATH         = "./testdata/single-httproute-rollout.yml"
+	HTTP_ROUTE_HEADER_ROLLOUT_PATH        = "./testdata/single-header-based-httproute-rollout.yml"
+	HTTP_ROUTE_HEADER_UPDATE_ROLLOUT_PATH = "./testdata/update-header-based-httproute-rollout.yml"
 
 	// GRPC Route test paths
 	GRPC_ROUTE_BASIC_PATH          = "./testdata/grpcroute-basic.yml"
