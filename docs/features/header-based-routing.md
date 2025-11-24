@@ -97,17 +97,19 @@ spec:
 
 This manifest instructs Argo Rollouts to do the following:
 
-1. Create 2 **brand new** HTTP routes called `canary-route1` and `canary-route2`
-1. The first route will be created on the fly when the canary is at 10% traffic. The second when the canary is at 50% traffic.
-1. These routes will be cloned/copied from the provided `argo-rollouts-http-route`
-1. Both of these 2 routes will always point to the canary pods
-1. All requests with an HTTP header `X-Canary-start: ten-per-cent` will be sent to the first route while all requests with an http header `X-Canary-middle:half-traffic` will be sent to the second route
+1. Create 2 brand new rules called `canary-route1` and `canary-route2` **on the existing HTTPRoute**  
+1. The first rule/match will be created on the fly when the canary is at 10% traffic. The second when the canary is at 50% traffic.
+1. These rules/matches will be cloned/copied from the provided `argo-rollouts-http-route` rule
+1. Both of these 2 rules/matches will always point to the canary pods
+1. All requests with an HTTP header `X-Canary-start: ten-per-cent` will be sent to the first rule while all requests with an http header `X-Canary-middle:half-traffic` will be sent to the second rule.
 
-Notice that the route names used for headers in `setHeaderRoute` must also be defined in the `managedRoutes` block as well.
+Notice that the rule names used for headers in `setHeaderRoute` must also be defined in the `managedRoutes` block as well.
 
 Now when the canary reaches 10% an extra route will be created that uses the `X-Canary-start` header with value `ten-per-cent`. When the canary reaches 50% a different header route will be created. At the end of the canary all header routes are discarded.
 
-These smart routes will be created by Argo Rollouts and will be destroyed automatically when the rollout has finished. In your manifests you only need to provide the `argo-rollouts-http-route` definition. See also the [HTTP routing](https://gateway-api.sigs.k8s.io/guides/http-routing/) documentation.
+These smart rules will be created by Argo Rollouts and will be destroyed automatically when the rollout has finished. In your manifests you only need to provide the `argo-rollouts-http-route` definition. See also the [HTTP routing](https://gateway-api.sigs.k8s.io/guides/http-routing/) documentation.
+
+If you are using Argo CD you can use the [ignoreDifferences feature](https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/) to make sure that Argo CD [honors the rule changes](https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/istio/#integrating-with-gitops).
 
 ## Using multiple routes with headers
 
