@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/mocks"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
@@ -114,6 +115,25 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
+	t.Run("SetHTTPRouteWeightAddsAndRemovesLabel", func(t *testing.T) {
+		httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		})
+
+		err := pluginInstance.SetWeight(rollout, 25, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels := rpcPluginImp.UpdatedHTTPRouteMock.Labels
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey])
+
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels = rpcPluginImp.UpdatedHTTPRouteMock.Labels
+		_, exists := labels[defaults.InProgressLabelKey]
+		assert.False(t, exists)
+	})
 	t.Run("SetGRPCRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
@@ -125,6 +145,25 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
+	t.Run("SetGRPCRouteWeightAddsAndRemovesLabel", func(t *testing.T) {
+		grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
+		rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+		})
+
+		err := pluginInstance.SetWeight(rollout, 40, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels := rpcPluginImp.UpdatedGRPCRouteMock.Labels
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey])
+
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels = rpcPluginImp.UpdatedGRPCRouteMock.Labels
+		_, exists := labels[defaults.InProgressLabelKey]
+		assert.False(t, exists)
 	})
 	t.Run("SetTCPRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
@@ -139,6 +178,26 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTCPRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
 	})
+	t.Run("SetTCPRouteWeightAddsAndRemovesLabel", func(t *testing.T) {
+		tcpRoute := mocks.CreateTCPRouteWithLabels(mocks.TCPRouteName, nil)
+		rpcPluginImp.TCPRouteClient = gwFake.NewSimpleClientset(tcpRoute).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace)
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.RolloutNamespace,
+				TCPRoute:  mocks.TCPRouteName,
+			})
+
+		err := pluginInstance.SetWeight(rollout, 15, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels := rpcPluginImp.UpdatedTCPRouteMock.Labels
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey])
+
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels = rpcPluginImp.UpdatedTCPRouteMock.Labels
+		_, exists := labels[defaults.InProgressLabelKey]
+		assert.False(t, exists)
+	})
 	t.Run("SetTLSRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
@@ -151,6 +210,26 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 100-desiredWeight, *(rpcPluginImp.UpdatedTLSRouteMock.Spec.Rules[0].BackendRefs[0].Weight))
 		assert.Equal(t, desiredWeight, *(rpcPluginImp.UpdatedTLSRouteMock.Spec.Rules[0].BackendRefs[1].Weight))
+	})
+	t.Run("SetTLSRouteWeightAddsAndRemovesLabel", func(t *testing.T) {
+		tlsRoute := mocks.CreateTLSRouteWithLabels(mocks.TLSRouteName, nil)
+		rpcPluginImp.TLSRouteClient = gwFake.NewSimpleClientset(tlsRoute).GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace)
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName,
+			&GatewayAPITrafficRouting{
+				Namespace: mocks.RolloutNamespace,
+				TLSRoute:  mocks.TLSRouteName,
+			})
+
+		err := pluginInstance.SetWeight(rollout, 60, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels := rpcPluginImp.UpdatedTLSRouteMock.Labels
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey])
+
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+		labels = rpcPluginImp.UpdatedTLSRouteMock.Labels
+		_, exists := labels[defaults.InProgressLabelKey]
+		assert.False(t, exists)
 	})
 	t.Run("SetWeightViaRoutes", func(t *testing.T) {
 		var desiredWeight int32 = 30

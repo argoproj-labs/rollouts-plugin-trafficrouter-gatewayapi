@@ -5,7 +5,7 @@ to control your Http Routes. In this guide we will see how to use [the Rollouts 
 
 You can find more examples at the [provider status page](provider-status.md).
 
-## Prerequisites 
+## Prerequisites
 
 Get access to a Kubernetes cluster. You can use a cluster on the cloud or on your workstation like [k3s](https://k3s.io/), [k3d](https://k3d.io/) or [Docker for Desktop](https://www.docker.com/products/docker-desktop/).
 
@@ -40,7 +40,7 @@ kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for
 !!! note
     This process needs to happen only once per cluster. The task is normally handled by infrastructure operators.
 
-Create a Gateway 
+Create a Gateway
 
 ```yaml
 ---
@@ -63,7 +63,7 @@ spec:
     - name: http
       protocol: HTTP
       port: 80
-```      
+```
 Apply the file with kubectl and then verify it works correctly with
 
 ```
@@ -109,12 +109,12 @@ subjects:
   - namespace: argo-rollouts
     kind: ServiceAccount
     name: argo-rollouts
-```  
+```
 
 Apply the file with kubectl. Note that this role is **NOT** to be used in production clusters as it is super permissive.
 
 
-## Step 4 - Create an HTTP route 
+## Step 4 - Create an HTTP route
 
 !!! note
     This process needs to happen only once per application. The task is normally handled by cluster operators or application developers.
@@ -135,7 +135,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: /  
+        value: /
     backendRefs:
     - name: argo-rollouts-stable-service
       kind: Service
@@ -148,7 +148,7 @@ spec:
 Apply the file with kubectl.
 Verify it with `kubectl get httproutes`
 
-## Step 5 - Create a Rollout 
+## Step 5 - Create a Rollout
 
 !!! note
     This process needs to happen only once per application. The task is normally handled by cluster operators or application developers.
@@ -207,6 +207,10 @@ spec:
           argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
             namespace: default
+            # Optional: customize or disable the temporary label that marks routes as managed during a canary
+            # inProgressLabelKey: rollouts.argoproj.io/gatewayapi-canary
+            # inProgressLabelValue: in-progress
+            # disableInProgressLabel: false
       steps:
       - setWeight: 50
       - pause: {}
@@ -241,7 +245,7 @@ You should see that all requests return with blue color:
 ![First deployment](images/quick-start/canary-start.png)
 
 
-## Daily Task - Perform a Canary 
+## Daily Task - Perform a Canary
 
 !!! note
     This process happens multiple times per day/week. The task is normally handled by application developers.
@@ -260,13 +264,33 @@ At this point each color should get 50% of requests. You can see this visually i
 
 You should also inspect the Http Route and verify that Argo Rollouts has changed the weights of the backend services
 
-Run 
+Run
 
 ```
 kubectl get httproute -o yaml
 ```
 
 In the response you should see the following information about the weights for each backing service.
+
+!!! info
+    While the canary is running, the plugin adds the label `rollouts.argoproj.io/gatewayapi-canary=in-progress` to every managed
+    Gateway API route so that GitOps tools such as Argo CD can be configured to ignore those temporary changes. The label is
+    removed automatically once the stable service goes back to 100% weight. Use `disableInProgressLabel`, `inProgressLabelKey`
+    or `inProgressLabelValue` if you need to adjust this behaviour.
+
+    **Argo CD example (Helm chart values)**
+
+    ```yaml
+    configs:
+      cm:
+        resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
+          jqPathExpressions:
+            - if .metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress" then .spec.rules
+    ```
+
+    Apply the same snippet to `GRPCRoute`, `TCPRoute` and `TLSRoute` kinds if you manage them. If you configure `resource.customizations`
+    directly inside an Application manifest rather than Helm values, reuse the same structure under `spec.source.plugin` or
+    `spec.source.helm.values`.
 
 ```yaml
 [...snip...]
