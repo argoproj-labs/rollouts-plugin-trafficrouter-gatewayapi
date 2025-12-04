@@ -20,7 +20,6 @@ define add_helm_repo
 	helm repo add argo https://argoproj.github.io/argo-helm
 endef
 
-# Part of Traefik Chart, kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/experimental-install.yaml
 define setup_cluster
 	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version ${ARGO_ROLLOUTS_HELM_VERSION} --wait
 	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version ${TRAEFIK_HELM_VERSION} --wait
