@@ -110,7 +110,7 @@ spec:
 
 If you now start a canary deployment both routes will change to 10%, 50% and 100% as the canary progresses to all its steps.
 
-### Working with GitOps controllers
+## Working with GitOps controllers
 
 GitOps tools such as Argo CD continuously reconcile Gateway API resources and can revert the temporary weight changes that occur
 while a canary is progressing. The plugin automatically adds the label
@@ -119,7 +119,7 @@ configure your GitOps policy to ignore those resources during a rollout. The lab
 returns to 100% weight. You can customise the key/value or disable the feature altogether with the
 `inProgressLabelKey`, `inProgressLabelValue` and `disableInProgressLabel` fields under the plugin configuration.
 
-#### Argo CD `ignoreDifferences`
+### Argo CD `ignoreDifferences`
 
 When you use Argo CD (either through the Application CRD or its Helm chart), add the following snippet so that Argo CD skips the
 temporary rule edits while the `rollouts.argoproj.io/gatewayapi-canary` label is present:

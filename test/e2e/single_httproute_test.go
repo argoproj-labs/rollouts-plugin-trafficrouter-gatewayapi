@@ -115,7 +115,7 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHTTPRouteFetcher(t, FIRST_CANARY_ROUTE_WEIGHT),
+			getMatchHTTPRouteWithLabelFetcher(t, FIRST_CANARY_ROUTE_WEIGHT, false),
 		),
 		wait.WithTimeout(MEDIUM_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
@@ -189,7 +189,7 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHTTPRouteFetcher(t, LAST_CANARY_ROUTE_WEIGHT),
+			getMatchHTTPRouteWithLabelFetcher(t, LAST_CANARY_ROUTE_WEIGHT, true),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
