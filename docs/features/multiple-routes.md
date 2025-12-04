@@ -129,7 +129,7 @@ configs:
   cm:
     resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
       jqPathExpressions:
-        - if .metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress" then .spec.rules
+        - select(.metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress") | .spec.rules
 ```
 
 Duplicate the block for `GRPCRoute`, `TCPRoute` and `TLSRoute` if you manage those kinds as well. If you have customised the
