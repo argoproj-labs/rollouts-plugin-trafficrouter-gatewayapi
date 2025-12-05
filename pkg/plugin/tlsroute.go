@@ -44,6 +44,7 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	for _, ref := range stableBackendRefs {
 		ref.Weight = &restWeight
 	}
+	ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
 	updatedTLSRoute, err := tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
 	if r.IsTest {
 		r.UpdatedTLSRouteMock = updatedTLSRoute

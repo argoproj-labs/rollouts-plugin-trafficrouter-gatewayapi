@@ -3,8 +3,11 @@
 # Exit immediately if any command fails
 set -e
 
+echo ">> Waiting for traefik gateway class to be accepted ..."
+sleep 10
+
 echo ">>> Sanity checks for e2e tests. If these tests fail, your e2e tests will also fail. <<<"
- 
+
 echo "Checking e2egateway class traefik with accepted condition=true ..."
 kubectl get gatewayclasses traefik -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}' | grep -q "True"
 

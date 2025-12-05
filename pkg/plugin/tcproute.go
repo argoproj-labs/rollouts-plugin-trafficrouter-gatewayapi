@@ -44,6 +44,7 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	for _, ref := range stableBackendRefs {
 		ref.Weight = &restWeight
 	}
+	ensureInProgressLabel(tcpRoute, desiredWeight, gatewayAPIConfig)
 	updatedTCPRoute, err := tcpRouteClient.Update(ctx, tcpRoute, metav1.UpdateOptions{})
 	if r.IsTest {
 		r.UpdatedTCPRouteMock = updatedTCPRoute

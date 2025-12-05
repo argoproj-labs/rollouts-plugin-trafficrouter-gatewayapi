@@ -73,6 +73,12 @@ type GatewayAPITrafficRouting struct {
 	TCPRouteSelector *metav1.LabelSelector `json:"tcpRouteSelector,omitempty"`
 	// TLSRouteSelector refers to label selector for auto-discovery of TLSRoutes
 	TLSRouteSelector *metav1.LabelSelector `json:"tlsRouteSelector,omitempty"`
+	// DisableInProgressLabel disables the automatic label that marks routes as managed during canary steps
+	DisableInProgressLabel bool `json:"disableInProgressLabel,omitempty"`
+	// InProgressLabelKey overrides the label key used while a canary is running
+	InProgressLabelKey string `json:"inProgressLabelKey,omitempty"`
+	// InProgressLabelValue overrides the label value used while a canary is running
+	InProgressLabelValue string `json:"inProgressLabelValue,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
 	// critical section is config map
 	ConfigMapRWMutex sync.RWMutex
