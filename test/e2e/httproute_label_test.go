@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -25,21 +26,27 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-func TestSingleHTTPRoute(t *testing.T) {
-	feature := features.New("Single HTTPRoute feature").Setup(
+func TestHTTPRouteLabelBehavior(t *testing.T) {
+	feature := features.New("HTTPRoute label behavior").Setup(
 		setupEnvironment,
 	).Setup(
-		setupSingleHTTPRouteEnv,
+		setupHTTPRouteLabelEnv,
 	).Assess(
-		"Testing single HTTPRoute feature",
-		testSingleHTTPRoute,
+		"Label should not be present when canary weight is 0",
+		testLabelAbsentWhenWeightZero,
+	).Assess(
+		"Label should be present during canary step",
+		testLabelPresentDuringCanary,
+	).Assess(
+		"Label should be removed when rollout completes",
+		testLabelRemovedWhenComplete,
 	).Teardown(
-		teardownSingleHTTPRouteEnv,
+		teardownHTTPRouteLabelEnv,
 	).Feature()
 	_ = global.Test(t, feature)
 }
 
-func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+func setupHTTPRouteLabelEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	var httpRoute gatewayv1.HTTPRoute
 	var rollout v1alpha1.Rollout
 	clusterResources := config.Client().Resources()
@@ -47,7 +54,7 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
 	firstHTTPRouteFile, err := os.Open(HTTP_ROUTE_BASIC_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
+		logrus.Errorf("file %q opening was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
 		t.Error()
 		return ctx
 	}
@@ -55,7 +62,7 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_PATH)
 	rolloutFile, err := os.Open(HTTP_ROUTE_BASIC_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q openning was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q opening was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
@@ -129,7 +136,33 @@ func setupSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.
 	return ctx
 }
 
-func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+func testLabelAbsentWhenWeightZero(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
+	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
+	if !ok {
+		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("Checking that label is absent when canary weight is 0")
+	err := wait.For(
+		conditions.New(clusterResources).ResourceMatch(
+			resourcesMap[HTTP_ROUTE_KEY],
+			getMatchHTTPRouteLabelFetcher(t, false),
+		),
+		wait.WithTimeout(MEDIUM_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("httpRoute %q should not have label when weight is 0: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("httpRoute %q correctly has no label when weight is 0", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	return ctx
+}
+
+func testLabelPresentDuringCanary(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
@@ -185,25 +218,66 @@ func testSingleHTTPRoute(ctx context.Context, t *testing.T, config *envconf.Conf
 	}
 	logrus.Infof("rollout %q was updated", resourcesMap[ROLLOUT_KEY].GetName())
 	waitCondition := conditions.New(clusterResources)
-	logrus.Infof("waiting for httpRoute %q to update canary weight to %d after rollout image change", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
+	logrus.Infof("waiting for httpRoute %q to have label during canary step (weight: %d)", resourcesMap[HTTP_ROUTE_KEY].GetName(), LAST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[HTTP_ROUTE_KEY],
-			getMatchHTTPRouteFetcher(t, LAST_CANARY_ROUTE_WEIGHT),
+			getMatchHTTPRouteLabelFetcher(t, true),
 		),
 		wait.WithTimeout(LONG_PERIOD),
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
-		logrus.Errorf("httpRoute %q updating failed: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		logrus.Errorf("httpRoute %q should have label during canary: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("httpRoute %q was updated", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	logrus.Infof("httpRoute %q correctly has label during canary step", resourcesMap[HTTP_ROUTE_KEY].GetName())
 	return ctx
 }
 
-func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+func testLabelRemovedWhenComplete(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
+	clusterResources := config.Client().Resources()
+	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
+	if !ok {
+		logrus.Errorf("%q type assertion was failed", RESOURCES_MAP_KEY)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("Waiting for rollout to complete and label to be removed")
+	waitCondition := conditions.New(clusterResources)
+	err := wait.For(
+		waitCondition.ResourceMatch(
+			resourcesMap[HTTP_ROUTE_KEY],
+			getMatchHTTPRouteFetcher(t, FIRST_CANARY_ROUTE_WEIGHT),
+		),
+		wait.WithTimeout(LONG_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("httpRoute %q weight did not return to 0: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("httpRoute %q weight returned to 0, checking label removal", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	err = wait.For(
+		waitCondition.ResourceMatch(
+			resourcesMap[HTTP_ROUTE_KEY],
+			getMatchHTTPRouteLabelFetcher(t, false),
+		),
+		wait.WithTimeout(MEDIUM_PERIOD),
+		wait.WithInterval(SHORT_PERIOD),
+	)
+	if err != nil {
+		logrus.Errorf("httpRoute %q label should be removed when rollout completes: %s", resourcesMap[HTTP_ROUTE_KEY].GetName(), err)
+		t.Error()
+		return ctx
+	}
+	logrus.Infof("httpRoute %q correctly has no label after rollout completion", resourcesMap[HTTP_ROUTE_KEY].GetName())
+	return ctx
+}
+
+func teardownHTTPRouteLabelEnv(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	clusterResources := config.Client().Resources()
 	resourcesMap, ok := ctx.Value(RESOURCES_MAP_KEY).(map[string]*unstructured.Unstructured)
 	if !ok {
@@ -228,3 +302,29 @@ func teardownSingleHTTPRouteEnv(ctx context.Context, t *testing.T, config *envco
 	logrus.Infof("httpRoute %q was deleted", resourcesMap[HTTP_ROUTE_KEY].GetName())
 	return ctx
 }
+
+func getMatchHTTPRouteLabelFetcher(t *testing.T, expectLabel bool) func(k8s.Object) bool {
+	return func(obj k8s.Object) bool {
+		var httpRoute gatewayv1.HTTPRoute
+		unstructuredHTTPRoute, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			logrus.Error("k8s object type assertion was failed")
+			t.Error()
+			return false
+		}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredHTTPRoute.Object, &httpRoute)
+		if err != nil {
+			logrus.Errorf("conversion from unstructured httpRoute %q to the typed httpRoute was failed: %s", unstructuredHTTPRoute.GetName(), err)
+			t.Error()
+			return false
+		}
+		labels := httpRoute.GetLabels()
+		value, ok := labels[defaults.InProgressLabelKey]
+		if expectLabel {
+			return ok && value == defaults.InProgressLabelValue
+		}
+		// we explicitly expect the label to be absent
+		return !ok
+	}
+}
+
