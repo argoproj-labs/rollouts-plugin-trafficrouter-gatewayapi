@@ -25,7 +25,6 @@ spec:
                 value: grpc-added-value
             remove:
               - X-Remove-GRPC-Header
-        # Unsupported filters
         # ResponseHeaderModifier - adds, sets, and removes response headers
         - type: ResponseHeaderModifier
           responseHeaderModifier:
