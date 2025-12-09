@@ -52,36 +52,36 @@ func setupHTTPRouteLabelEnv(ctx context.Context, t *testing.T, config *envconf.C
 	clusterResources := config.Client().Resources()
 	resourcesMap := map[string]*unstructured.Unstructured{}
 	ctx = context.WithValue(ctx, RESOURCES_MAP_KEY, resourcesMap)
-	firstHTTPRouteFile, err := os.Open(HTTP_ROUTE_BASIC_PATH)
+	firstHTTPRouteFile, err := os.Open(HTTP_ROUTE_LABEL_PATH)
 	if err != nil {
-		logrus.Errorf("file %q opening was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
+		logrus.Errorf("file %q opening was failed: %s", HTTP_ROUTE_LABEL_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer firstHTTPRouteFile.Close()
-	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_PATH)
-	rolloutFile, err := os.Open(HTTP_ROUTE_BASIC_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_LABEL_PATH)
+	rolloutFile, err := os.Open(HTTP_ROUTE_LABEL_ROLLOUT_PATH)
 	if err != nil {
-		logrus.Errorf("file %q opening was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q opening was failed: %s", HTTP_ROUTE_LABEL_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
 	defer rolloutFile.Close()
-	logrus.Infof("file %q was opened", HTTP_ROUTE_BASIC_ROLLOUT_PATH)
+	logrus.Infof("file %q was opened", HTTP_ROUTE_LABEL_ROLLOUT_PATH)
 	err = decoder.Decode(firstHTTPRouteFile, &httpRoute)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_BASIC_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_LABEL_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", HTTP_ROUTE_BASIC_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_LABEL_PATH)
 	err = decoder.Decode(rolloutFile, &rollout)
 	if err != nil {
-		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_BASIC_ROLLOUT_PATH, err)
+		logrus.Errorf("file %q decoding was failed: %s", HTTP_ROUTE_LABEL_ROLLOUT_PATH, err)
 		t.Error()
 		return ctx
 	}
-	logrus.Infof("file %q was decoded", HTTP_ROUTE_BASIC_ROLLOUT_PATH)
+	logrus.Infof("file %q was decoded", HTTP_ROUTE_LABEL_ROLLOUT_PATH)
 	httpRouteObject, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&httpRoute)
 	if err != nil {
 		logrus.Errorf("httpRoute %q converting to unstructured was failed: %s", httpRoute.GetName(), err)
@@ -327,4 +327,3 @@ func getMatchHTTPRouteLabelFetcher(t *testing.T, expectLabel bool) func(k8s.Obje
 		return !ok
 	}
 }
-

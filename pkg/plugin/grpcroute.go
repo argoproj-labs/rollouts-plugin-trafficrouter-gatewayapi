@@ -397,6 +397,16 @@ func removeManagedGRPCRouteEntry(managedRouteMap ManagedRouteMap, routeRuleList 
 		managedRouteMapKey := managedRouteName + "." + grpcRouteName
 		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteMapKey, managedRouteMapKey)
 	}
+	if managedRouteIndex < 0 || managedRouteIndex >= len(routeRuleList) {
+		// stale or corrupted managed route index; clean references for this route and continue gracefully
+		for name, managedMap := range managedRouteMap {
+			delete(managedMap, grpcRouteName)
+			if len(managedMap) == 0 {
+				delete(managedRouteMap, name)
+			}
+		}
+		return routeRuleList, nil
+	}
 	delete(routeManagedRouteMap, grpcRouteName)
 	if len(managedRouteMap[managedRouteName]) == 0 {
 		delete(managedRouteMap, managedRouteName)

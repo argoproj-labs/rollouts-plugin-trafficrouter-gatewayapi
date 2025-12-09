@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: httproute-rollout
+  name: httproute-label
   namespace: default
 spec:
   replicas: 2
@@ -16,7 +16,8 @@ spec:
             namespace: default
       steps:
         - setWeight: 30
-        - pause: {}
+        - pause:
+            duration: 10s
   revisionHistoryLimit: 1
   selector:
     matchLabels:
