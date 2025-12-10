@@ -218,7 +218,7 @@ func TestRunSuccessfully(t *testing.T) {
 	t.Run("SetGRPCHeaderRoute", func(t *testing.T) {
 		headerName := "X-Test"
 		headerValue := "test"
-		headerValueType := gatewayv1.HeaderMatchRegularExpression
+		headerValueType := gatewayv1.GRPCHeaderMatchRegularExpression
 		prefixedHeaderValue := headerValue + ".*"
 		headerMatch := v1alpha1.StringMatch{
 			Prefix: headerValue,
