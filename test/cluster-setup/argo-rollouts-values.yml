@@ -18,9 +18,8 @@ controller:
       name: gatewayapi-plugin
 
   trafficRouterPlugins:
-    trafficRouterPlugins: |-
-      - name: "argoproj-labs/gatewayAPI"
-        location: "file:///argo-rollouts-gatewayapi-plugin/gatewayapi-plugin-linux-amd64"
+    - name: "argoproj-labs/gatewayAPI"
+      location: "file:///argo-rollouts-gatewayapi-plugin/gatewayapi-plugin-linux-amd64"
 
 providerRBAC:
   providers:

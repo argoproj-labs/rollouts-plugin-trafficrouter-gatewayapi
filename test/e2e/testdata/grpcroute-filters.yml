@@ -25,7 +25,7 @@ spec:
                 value: grpc-added-value
             remove:
               - X-Remove-GRPC-Header
-        # ResponseHeaderModifier - adds, sets, and removes response headers  
+        # ResponseHeaderModifier - adds, sets, and removes response headers
         - type: ResponseHeaderModifier
           responseHeaderModifier:
             set:

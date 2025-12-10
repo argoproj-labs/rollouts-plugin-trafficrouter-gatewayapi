@@ -4,11 +4,11 @@ E2E_CLUSTER_NAME=gatewayapi-plugin-e2e
 IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
 
 # Versions of components used in e2e tests
-GATEWAY_API_VERSION=v1.1.0
+GATEWAY_API_VERSION=v1.4.0
 # See more versions at https://artifacthub.io/packages/helm/argo/argo-rollouts
-ARGO_ROLLOUTS_HELM_VERSION=2.37.2 # Contains Argo Rollouts 1.7.1
+ARGO_ROLLOUTS_HELM_VERSION=2.40.5 # Contains Argo Rollouts 1.8.3
 # See more versions at https://artifacthub.io/packages/helm/traefik/traefik
-TRAEFIK_HELM_VERSION=31.0.0 # Contains Traefik proxy v3.1.2
+TRAEFIK_HELM_VERSION=37.4.0 # Contains Traefik proxy v3.6.2
 
 
 
@@ -21,9 +21,9 @@ define add_helm_repo
 endef
 
 define setup_cluster
-	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/experimental-install.yaml
 	helm install argo-rollouts argo/argo-rollouts --values ./test/cluster-setup/argo-rollouts-values.yml --version ${ARGO_ROLLOUTS_HELM_VERSION} --wait
 	helm install traefik traefik/traefik --values ./test/cluster-setup/traefik-values.yml --version ${TRAEFIK_HELM_VERSION} --wait
+	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/experimental-install.yaml --server-side=true --force-conflicts
 endef
 
 define install_k8s_resources
@@ -60,7 +60,7 @@ unit-tests:
 	go test -v -count=1 ./pkg/...
 
 .PHONY: setup-e2e-cluster
-setup-e2e-cluster:	
+setup-e2e-cluster:
 	make BIN_NAME=gatewayapi-plugin-linux-amd64 GOOS=linux GOARCH=amd64 gatewayapi-plugin-build
 ifeq (${IS_E2E_CLUSTER},)
 	kind create cluster --name ${E2E_CLUSTER_NAME} --config ./test/cluster-setup/cluster-config.yml
@@ -79,20 +79,20 @@ endif
 sanity-check-e2e:
 	./test/cluster-setup/sanity-check.sh
 
-.PHONY: run-e2e-tests 
+.PHONY: run-e2e-tests
 run-e2e-tests: sanity-check-e2e
 	go test -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
 
 # Flaky tests usually fail with GitHub actions. You should be able to run them locally though.
 .PHONY: e2e-tests-flaky
-e2e-tests-flaky: setup-e2e-cluster run-e2e-tests-flaky 
+e2e-tests-flaky: setup-e2e-cluster run-e2e-tests-flaky
 ifeq (${CLUSTER_DELETE},true)
 	make clear-e2e-cluster
 endif
 
-.PHONY: run-e2e-tests-flaky 
+.PHONY: run-e2e-tests-flaky
 run-e2e-tests-flaky: sanity-check-e2e
-	go test -tags "flaky" -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/... 
+	go test -tags "flaky" -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
 
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:

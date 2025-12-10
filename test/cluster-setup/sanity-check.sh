@@ -4,9 +4,20 @@
 set -e
 
 echo ">>> Sanity checks for e2e tests. If these tests fail, your e2e tests will also fail. <<<"
- 
-echo "Checking e2egateway class traefik with accepted condition=true ..."
-kubectl get gatewayclasses traefik -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}' | grep -q "True"
+
+echo "Checking e2egateway class traefik with accepted condition=true (up to 5 attempts) ..."
+for i in {1..5}; do
+  if kubectl get gatewayclasses traefik -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}' | grep -q "True"; then
+    echo "traefik gatewayclass accepted"
+    break
+  fi
+  if [ "$i" -eq 5 ]; then
+    echo "gatewayclass traefik not accepted after 5 attempts"
+    exit 1
+  fi
+  echo "gatewayclass not ready yet, retrying ($i/5)..."
+  sleep 5
+done
 
 echo "Checking e2egateway traefik-gateway with programmed condition=true ..."
 kubectl get gateway traefik-gateway -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' | grep -q "True"

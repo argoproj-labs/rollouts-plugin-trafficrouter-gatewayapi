@@ -35,6 +35,10 @@ const (
 	GRPC_ROUTE_FILTERS_PATH         = "./testdata/grpcroute-filters.yml"
 	GRPC_ROUTE_FILTERS_ROLLOUT_PATH = "./testdata/single-grpcroute-filters-rollout.yml"
 
+	// HTTP Route label test paths
+	HTTP_ROUTE_LABEL_PATH         = "./testdata/httproute-basic.yml"
+	HTTP_ROUTE_LABEL_ROLLOUT_PATH = "./testdata/single-httproute-label-rollout.yml"
+
 	ROLLOUT_TEMPLATE_CONTAINERS_FIELD      = "spec.template.spec.containers"
 	ROLLOUT_TEMPLATE_FIRST_CONTAINER_FIELD = "spec.template.spec.containers.0"
 	NEW_IMAGE_FIELD_VALUE                  = "argoproj/rollouts-demo:green"

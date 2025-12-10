@@ -52,6 +52,7 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	for _, ref := range stableBackendRefs {
 		ref.Weight = &restWeight
 	}
+	ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
 	updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 	if r.IsTest {
 		r.UpdatedGRPCRouteMock = updatedGRPCRoute
@@ -395,6 +396,16 @@ func removeManagedGRPCRouteEntry(managedRouteMap ManagedRouteMap, routeRuleList 
 	if !isOk {
 		managedRouteMapKey := managedRouteName + "." + grpcRouteName
 		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteMapKey, managedRouteMapKey)
+	}
+	if managedRouteIndex < 0 || managedRouteIndex >= len(routeRuleList) {
+		// stale or corrupted managed route index; clean references for this route and continue gracefully
+		for name, managedMap := range managedRouteMap {
+			delete(managedMap, grpcRouteName)
+			if len(managedMap) == 0 {
+				delete(managedRouteMap, name)
+			}
+		}
+		return routeRuleList, nil
 	}
 	delete(routeManagedRouteMap, grpcRouteName)
 	if len(managedRouteMap[managedRouteName]) == 0 {
