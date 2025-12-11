@@ -4,7 +4,7 @@ E2E_CLUSTER_NAME=gatewayapi-plugin-e2e
 IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
 
 # Versions of components used in e2e tests
-GATEWAY_API_VERSION=v1.1.0
+GATEWAY_API_VERSION=v1.4.0
 # See more versions at https://artifacthub.io/packages/helm/argo/argo-rollouts
 ARGO_ROLLOUTS_HELM_VERSION=2.37.2 # Contains Argo Rollouts 1.7.1
 # See more versions at https://artifacthub.io/packages/helm/traefik/traefik
