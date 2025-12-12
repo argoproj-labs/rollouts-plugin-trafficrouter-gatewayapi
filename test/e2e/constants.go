@@ -82,7 +82,7 @@ var (
 	}
 
 	FIRST_HEADER_BASED_GRPC_ROUTE_VALUE gatewayv1.GRPCHeaderMatch
-	headerBasedGRPCRouteValueType       = gatewayv1.HeaderMatchExact
+	headerBasedGRPCRouteValueType       = gatewayv1.GRPCHeaderMatchExact
 	LAST_HEADER_BASED_GRPC_ROUTE_VALUE  = gatewayv1.GRPCHeaderMatch{
 		Name:  "X-Test",
 		Type:  &headerBasedGRPCRouteValueType,

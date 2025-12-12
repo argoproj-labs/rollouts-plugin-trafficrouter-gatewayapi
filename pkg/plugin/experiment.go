@@ -98,13 +98,13 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 				portName := "http"
 				for _, servicePort := range service.Spec.Ports {
 					if servicePort.Name == portName {
-						port = gatewayv1.PortNumber(servicePort.Port)
+						port = servicePort.Port
 						break
 					}
 				}
 
 				if len(service.Spec.Ports) > 0 && port == 8080 {
-					port = gatewayv1.PortNumber(service.Spec.Ports[0].Port)
+					port = service.Spec.Ports[0].Port
 				}
 
 				namespace := gatewayv1.Namespace(rollout.Namespace)
