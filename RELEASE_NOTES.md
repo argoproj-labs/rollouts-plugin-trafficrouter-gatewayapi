@@ -1,1 +1,3 @@
- Gateway API routes are labeled while a canary is running to avoid GitOps drift and the label is removed once traffic returns to 100% stable. This is useful when you use Argo Rollouts with Argo CD.
+- Compiled against Gateway API v1.4 (previously v1.1)
+- Now supports the standard CORS filter type in HTTPRoute
+- Golang updated to 1.24 and K8s client libraries to 0.34.x
