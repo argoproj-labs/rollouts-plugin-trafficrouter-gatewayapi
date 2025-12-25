@@ -334,9 +334,12 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 		if len(rules) != FIRST_HEADER_BASED_RULES_LENGTH {
 			return false
 		}
+		if *rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight != targetWeight {
+			return false
+		}
 		headerBasedRouteValue := rules[HEADER_BASED_RULE_INDEX].Matches[HEADER_BASED_MATCH_INDEX].Headers[HEADER_BASED_HEADER_INDEX]
-		weight := *rules[HEADER_BASED_RULE_INDEX].BackendRefs[HEADER_BASED_BACKEND_REF_INDEX].Weight
-		return weight == targetWeight && isHeaderBasedGRPCRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue)
+		weight := rules[HEADER_BASED_RULE_INDEX].BackendRefs[HEADER_BASED_BACKEND_REF_INDEX].Weight
+		return weight == nil && isHeaderBasedGRPCRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue)
 	}
 }
 

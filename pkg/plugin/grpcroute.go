@@ -20,9 +20,11 @@ const (
 func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	grpcRouteClient := r.GRPCRouteClient
+	clientset := r.TestClientset
 	if !r.IsTest {
 		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
 		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
 	if err != nil {
@@ -30,28 +32,49 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			ErrorString: err.Error(),
 		}
 	}
+
+	managedRouteMap := make(ManagedRouteMap)
+	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+		Clientset: clientset,
+		Ctx:       ctx,
+	})
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	err = utils.GetConfigMapData(configMap, GRPCConfigMapKey, &managedRouteMap)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	managedIndexes := make(map[int]bool)
+	for _, routeMap := range managedRouteMap {
+		if idx, ok := routeMap[gatewayAPIConfig.GRPCRoute]; ok {
+			managedIndexes[idx] = true
+		}
+	}
+
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+
+	for i := range grpcRoute.Spec.Rules {
+		if managedIndexes[i] {
+			continue
+		}
+		rule := &grpcRoute.Spec.Rules[i]
+		for j := range rule.BackendRefs {
+			ref := &rule.BackendRefs[j]
+			if string(ref.Name) == canaryServiceName {
+				ref.Weight = &desiredWeight
+			} else if string(ref.Name) == stableServiceName {
+				restWeight := 100 - desiredWeight
+				ref.Weight = &restWeight
+			}
 		}
 	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
+
 	ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
 	updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 	if r.IsTest {
