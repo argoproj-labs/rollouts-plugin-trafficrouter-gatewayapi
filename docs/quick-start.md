@@ -48,7 +48,6 @@ apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
   name: eg
-  namespace: default
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
@@ -86,7 +85,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: gateway-controller-role
-  namespace: argo-rollouts
 rules:
   - apiGroups:
       - gateway.networking.k8s.io
