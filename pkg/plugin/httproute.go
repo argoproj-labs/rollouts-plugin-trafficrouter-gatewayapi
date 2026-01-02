@@ -20,9 +20,11 @@ const (
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
+	clientset := r.TestClientset
 	if !r.IsTest {
 		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
 		httpRouteClient = gatewayClientV1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
 	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 	if err != nil {
@@ -30,28 +32,49 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			ErrorString: err.Error(),
 		}
 	}
+
+	managedRouteMap := make(ManagedRouteMap)
+	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+		Clientset: clientset,
+		Ctx:       ctx,
+	})
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	err = utils.GetConfigMapData(configMap, HTTPConfigMapKey, &managedRouteMap)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	managedIndexes := make(map[int]bool)
+	for _, routeMap := range managedRouteMap {
+		if idx, ok := routeMap[gatewayAPIConfig.HTTPRoute]; ok {
+			managedIndexes[idx] = true
+		}
+	}
+
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+
+	for i := range httpRoute.Spec.Rules {
+		if managedIndexes[i] {
+			continue
+		}
+		rule := &httpRoute.Spec.Rules[i]
+		for j := range rule.BackendRefs {
+			ref := &rule.BackendRefs[j]
+			if string(ref.Name) == canaryServiceName {
+				ref.Weight = &desiredWeight
+			} else if string(ref.Name) == stableServiceName {
+				restWeight := 100 - desiredWeight
+				ref.Weight = &restWeight
+			}
 		}
 	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
+
 	err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
 	if err != nil {
 		r.LogCtx.Error(err, "Failed to handle experiment services")
