@@ -79,6 +79,11 @@ type GatewayAPITrafficRouting struct {
 	InProgressLabelKey string `json:"inProgressLabelKey,omitempty"`
 	// InProgressLabelValue overrides the label value used while a canary is running
 	InProgressLabelValue string `json:"inProgressLabelValue,omitempty"`
+	// SkipManagedRoutesOnSetWeight controls whether setWeight should skip managed routes (header routes).
+	// When true, setWeight will not modify the weight of routes created by setHeaderRoute,
+	// ensuring those routes always send 100% traffic to canary.
+	// Default is false to maintain backward compatibility.
+	SkipManagedRoutesOnSetWeight bool `json:"skipManagedRoutesOnSetWeight,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
 	// critical section is config map
 	ConfigMapRWMutex sync.RWMutex

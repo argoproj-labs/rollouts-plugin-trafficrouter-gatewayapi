@@ -427,6 +427,31 @@ func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gate
 	return nil, routeRuleList.Error()
 }
 
+func getBackendRefsWithSkipIndexes[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3, skipIndexes map[int]bool) ([]T1, error) {
+	var backendRef T1
+	var routeRule T2
+	var matchedRefs []T1
+	index := 0
+	for next, hasNext := routeRuleList.Iterator(); hasNext; {
+		routeRule, hasNext = next()
+		if skipIndexes[index] {
+			index++
+			continue
+		}
+		for next, hasNext := routeRule.Iterator(); hasNext; {
+			backendRef, hasNext = next()
+			if backendRefName == backendRef.GetName() {
+				matchedRefs = append(matchedRefs, backendRef)
+			}
+		}
+		index++
+	}
+	if len(matchedRefs) > 0 {
+		return matchedRefs, nil
+	}
+	return nil, routeRuleList.Error()
+}
+
 func isConfigHasRoutes(config *GatewayAPITrafficRouting) bool {
 	return len(config.HTTPRoutes) > 0 || len(config.TCPRoutes) > 0 || len(config.GRPCRoutes) > 0 || len(config.TLSRoutes) > 0
 }
