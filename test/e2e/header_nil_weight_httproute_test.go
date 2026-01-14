@@ -269,6 +269,7 @@ func testHeaderNilWeightHTTPRoute(ctx context.Context, t *testing.T, config *env
 	}
 	logrus.Infof("rollout %q completed successfully", resourcesMap[ROLLOUT_KEY].GetName())
 	// Wait for header route to be removed and main route to be reset
+	// Use FIRST_HEADER_BASED_HTTP_ROUTE_VALUE (Type is nil) to indicate header route was removed
 	logrus.Infof("waiting for httpRoute %q to clean up header-based routing and reset canary weight to %d", resourcesMap[HTTP_ROUTE_KEY].GetName(), FIRST_CANARY_ROUTE_WEIGHT)
 	err = wait.For(
 		waitCondition.ResourceMatch(
@@ -276,7 +277,7 @@ func testHeaderNilWeightHTTPRoute(ctx context.Context, t *testing.T, config *env
 			getMatchHeaderNilWeightHTTPRouteFetcher(
 				t,
 				FIRST_CANARY_ROUTE_WEIGHT,
-				LAST_HEADER_BASED_HTTP_ROUTE_VALUE,
+				FIRST_HEADER_BASED_HTTP_ROUTE_VALUE,
 			),
 		),
 		wait.WithTimeout(LONG_PERIOD),
