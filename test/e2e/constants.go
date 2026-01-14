@@ -13,11 +13,19 @@ const (
 	HTTP_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-httproute-rollout.yml"
 	HTTP_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-httproute-rollout.yml"
 
+	// HTTP Route header nil weight test paths (header route weight should be nil)
+	HTTP_ROUTE_HEADER_NIL_WEIGHT_PATH         = "./testdata/httproute-header-nil-weight.yml"
+	HTTP_ROUTE_HEADER_NIL_WEIGHT_ROLLOUT_PATH = "./testdata/single-header-nil-weight-httproute-rollout.yml"
+
 	// GRPC Route test paths
 	GRPC_ROUTE_BASIC_PATH          = "./testdata/grpcroute-basic.yml"
 	GRPC_ROUTE_HEADER_PATH         = "./testdata/grpcroute-header.yml"
 	GRPC_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-grpcroute-rollout.yml"
 	GRPC_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-grpcroute-rollout.yml"
+
+	// GRPC Route header nil weight test paths (header route weight should be nil)
+	GRPC_ROUTE_HEADER_NIL_WEIGHT_PATH         = "./testdata/grpcroute-header-nil-weight.yml"
+	GRPC_ROUTE_HEADER_NIL_WEIGHT_ROLLOUT_PATH = "./testdata/single-header-nil-weight-grpcroute-rollout.yml"
 
 	// TCP Route test paths
 	TCP_ROUTE_BASIC_PATH         = "./testdata/tcproute-basic.yml"

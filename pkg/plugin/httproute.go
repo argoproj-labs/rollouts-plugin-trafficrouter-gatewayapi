@@ -20,20 +20,42 @@ const (
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
+	httpRouteName := gatewayAPIConfig.HTTPRoute
+	clientset := r.TestClientset
 	if !r.IsTest {
 		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
 		httpRouteClient = gatewayClientV1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
-	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+	httpRoute, err := httpRouteClient.Get(ctx, httpRouteName, metav1.GetOptions{})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
+	// Get managed route indexes from ConfigMap to skip them when updating weights
+	// Only skip if SkipManagedRoutesOnSetWeight is enabled
+	managedRouteIndexes := make(map[int]bool)
+	if gatewayAPIConfig.SkipManagedRoutesOnSetWeight {
+		configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+			Clientset: clientset,
+			Ctx:       ctx,
+		})
+		if err == nil {
+			managedRouteMap := make(ManagedRouteMap)
+			if err := utils.GetConfigMapData(configMap, HTTPConfigMapKey, &managedRouteMap); err == nil {
+				for _, routeMap := range managedRouteMap {
+					if idx, ok := routeMap[httpRouteName]; ok {
+						managedRouteIndexes[idx] = true
+					}
+				}
+			}
+		}
+	}
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+	canaryBackendRefs, err := getBackendRefsWithSkipIndexes(canaryServiceName, routeRuleList, managedRouteIndexes)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -42,7 +64,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	for _, ref := range canaryBackendRefs {
 		ref.Weight = &desiredWeight
 	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+	stableBackendRefs, err := getBackendRefsWithSkipIndexes(stableServiceName, routeRuleList, managedRouteIndexes)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

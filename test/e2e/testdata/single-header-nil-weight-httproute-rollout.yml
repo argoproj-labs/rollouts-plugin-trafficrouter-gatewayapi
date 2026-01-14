@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-header-nil-weight-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service 
+      stableService: argo-rollouts-stable-service 
+      trafficRouting:
+        managedRoutes:
+        - name: canary-route1
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-header-nil-weight
+                useHeaderRoutes: true
+            namespace: default
+            skipManagedRoutesOnSetWeight: true
+      steps:
+      - setWeight: 30
+      - setHeaderRoute:
+          name: canary-route1
+          match:
+            - headerName: X-Test
+              headerValue:
+                exact: test  
+      - pause: {  }
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
