@@ -79,6 +79,8 @@ type GatewayAPITrafficRouting struct {
 	InProgressLabelKey string `json:"inProgressLabelKey,omitempty"`
 	// InProgressLabelValue overrides the label value used while a canary is running
 	InProgressLabelValue string `json:"inProgressLabelValue,omitempty"`
+	// ActiveRolloutsAnnotationKey overrides the annotation key used to track active rollouts for reference counting
+	ActiveRolloutsAnnotationKey string `json:"activeRolloutsAnnotationKey,omitempty"`
 	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
 	// critical section is config map
 	ConfigMapRWMutex sync.RWMutex
@@ -114,6 +116,12 @@ type TLSRoute struct {
 	// UseHeaderRoutes indicates header routes will be added to this route or not
 	// during setHeaderRoute step
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+}
+
+// RolloutInfo contains identifying information about a rollout
+type RolloutInfo struct {
+	Namespace string
+	Name      string
 }
 
 type ManagedRouteMap map[string]map[string]int

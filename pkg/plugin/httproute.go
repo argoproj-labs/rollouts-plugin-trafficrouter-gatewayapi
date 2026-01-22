@@ -56,7 +56,8 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	if err != nil {
 		r.LogCtx.Error(err, "Failed to handle experiment services")
 	}
-	ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)
+	rolloutInfo := &RolloutInfo{Namespace: rollout.Namespace, Name: rollout.Name}
+	ensureInProgressMetadata(httpRoute, desiredWeight, gatewayAPIConfig, rolloutInfo)
 	updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 	if r.IsTest {
 		r.UpdatedHTTPRouteMock = updatedHTTPRoute

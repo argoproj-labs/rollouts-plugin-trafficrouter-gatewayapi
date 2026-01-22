@@ -52,7 +52,8 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	for _, ref := range stableBackendRefs {
 		ref.Weight = &restWeight
 	}
-	ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
+	rolloutInfo := &RolloutInfo{Namespace: rollout.Namespace, Name: rollout.Name}
+	ensureInProgressMetadata(grpcRoute, desiredWeight, gatewayAPIConfig, rolloutInfo)
 	updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 	if r.IsTest {
 		r.UpdatedGRPCRouteMock = updatedGRPCRoute

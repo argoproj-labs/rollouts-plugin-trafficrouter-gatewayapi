@@ -209,6 +209,8 @@ spec:
             # inProgressLabelKey: rollouts.argoproj.io/gatewayapi-canary
             # inProgressLabelValue: in-progress
             # disableInProgressLabel: false
+            # Optional: customize the annotation used for reference counting (multiple rollouts sharing a route)
+            # activeRolloutsAnnotationKey: rollouts.argoproj.io/gatewayapi-active-rollouts
       steps:
       - setWeight: 50
       - pause: {}
@@ -275,6 +277,11 @@ In the response you should see the following information about the weights for e
     Gateway API route so that GitOps tools such as Argo CD can be configured to ignore those temporary changes. The label is
     removed automatically once the stable service goes back to 100% weight. Use `disableInProgressLabel`, `inProgressLabelKey`
     or `inProgressLabelValue` if you need to adjust this behaviour.
+
+    **Reference Counting for Shared Routes**: When multiple rollouts share the same route, the plugin uses an annotation
+    (`rollouts.argoproj.io/gatewayapi-active-rollouts`) to track which rollouts are currently active. The label is only
+    removed when *all* rollouts have finished, preventing premature drift detection. Use `activeRolloutsAnnotationKey` to customize
+    the annotation key.
 
     **Argo CD example (Helm chart values)**
 
