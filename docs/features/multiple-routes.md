@@ -82,7 +82,7 @@ spec:
             httpRoutes:
               - name: backend-route
               - name: api-route
-            namespace: default
+            namespace: default # Optional: defaults to rollout namespace
       steps:
       - setWeight: 10
       - pause: {}
@@ -163,7 +163,7 @@ spec:
               matchLabels:
                 app: my-app
                 canary-enabled: "true"
-            namespace: default
+            namespace: default # Optional: defaults to rollout namespace
       steps:
       - setWeight: 10
       - pause: {}
@@ -218,7 +218,7 @@ trafficRouting:
       httpRouteSelector:        # Plus all routes matching this selector
         matchLabels:
           auto-discover: "true"
-      namespace: default
+      namespace: default # Optional: defaults to rollout namespace
 ```
 
 ### Selector Types
@@ -241,7 +241,7 @@ trafficRouting:
       grpcRouteSelector:
         matchLabels:
           protocol: grpc
-      namespace: default
+      namespace: default # Optional: defaults to rollout namespace
 ```
 
 ### Advanced Selectors

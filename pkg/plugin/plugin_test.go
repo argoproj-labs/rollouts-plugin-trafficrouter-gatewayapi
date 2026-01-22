@@ -617,7 +617,63 @@ func TestCombinedSelectorAndExplicitRoute(t *testing.T) {
 	assert.Equal(t, "explicit-route", parsedConfig.HTTPRoutes[0].Name)
 }
 
-func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
+func TestNamespaceDefaulting(t *testing.T) {
+	t.Run("DefaultsToRolloutNamespaceWhenNotSpecified", func(t *testing.T) {
+		// Create a rollout with namespace "my-namespace" but config without namespace
+		config := &GatewayAPITrafficRouting{
+			// Namespace intentionally not set (empty string)
+			HTTPRoute: mocks.HTTPRouteName,
+		}
+		rolloutNamespace := "my-namespace"
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
+
+		// Parse the config - this is where namespace defaulting should happen
+		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+
+		assert.NoError(t, err)
+		// Before the fix, this would be empty string. After the fix, it should default to rollout's namespace.
+		assert.Equal(t, rolloutNamespace, parsedConfig.Namespace, "Namespace should default to rollout's namespace when not specified")
+	})
+
+	t.Run("UsesExplicitNamespaceWhenSpecified", func(t *testing.T) {
+		// Create a rollout with explicit namespace in config
+		explicitNamespace := "explicit-namespace"
+		config := &GatewayAPITrafficRouting{
+			Namespace: explicitNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		}
+		rolloutNamespace := "rollout-namespace"
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
+
+		// Parse the config
+		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+
+		assert.NoError(t, err)
+		// Should use the explicitly specified namespace, not the rollout's namespace
+		assert.Equal(t, explicitNamespace, parsedConfig.Namespace, "Should use explicit namespace when specified")
+	})
+
+	t.Run("DefaultsToRolloutNamespaceWithEmptyString", func(t *testing.T) {
+		// Explicitly set namespace to empty string
+		config := &GatewayAPITrafficRouting{
+			Namespace: "", // Explicitly empty
+			GRPCRoute: mocks.GRPCRouteName,
+		}
+		rolloutNamespace := "another-namespace"
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
+
+		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+
+		assert.NoError(t, err)
+		assert.Equal(t, rolloutNamespace, parsedConfig.Namespace, "Empty namespace should default to rollout's namespace")
+	})
+}
+
+func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting, namespace ...string) *v1alpha1.Rollout {
+	ns := mocks.RolloutNamespace
+	if len(namespace) > 0 {
+		ns = namespace[0]
+	}
 	encodedConfig, err := json.Marshal(config)
 	if err != nil {
 		log.Fatal(err)
@@ -625,7 +681,7 @@ func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *
 	return &v1alpha1.Rollout{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rollout",
-			Namespace: mocks.RolloutNamespace,
+			Namespace: ns,
 		},
 		Spec: v1alpha1.RolloutSpec{
 			Strategy: v1alpha1.RolloutStrategy{

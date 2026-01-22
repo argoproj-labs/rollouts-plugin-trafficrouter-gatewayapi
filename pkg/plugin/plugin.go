@@ -232,6 +232,10 @@ func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITr
 	if err != nil {
 		return gatewayAPIConfig, err
 	}
+	// Default namespace to rollout's namespace if not specified
+	if gatewayAPIConfig.Namespace == "" {
+		gatewayAPIConfig.Namespace = rollout.Namespace
+	}
 	insertGatewayAPIRouteLists(gatewayAPIConfig)
 	err = validate.Struct(gatewayAPIConfig)
 	if err != nil {
@@ -242,9 +246,6 @@ func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITr
 
 func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) error {
 	namespace := gatewayAPIConfig.Namespace
-	if namespace == "" {
-		namespace = rollout.Namespace
-	}
 
 	if gatewayAPIConfig.HTTPRouteSelector != nil {
 		selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.HTTPRouteSelector)

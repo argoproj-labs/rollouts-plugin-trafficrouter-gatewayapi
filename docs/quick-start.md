@@ -204,7 +204,7 @@ spec:
         plugins:
           argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
-            namespace: default
+            namespace: default # Optional: defaults to rollout namespace
             # Optional: customize or disable the temporary label that marks routes as managed during a canary
             # inProgressLabelKey: rollouts.argoproj.io/gatewayapi-canary
             # inProgressLabelValue: in-progress
