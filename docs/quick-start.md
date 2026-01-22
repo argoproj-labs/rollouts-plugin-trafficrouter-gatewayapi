@@ -283,7 +283,7 @@ In the response you should see the following information about the weights for e
       cm:
         resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
           jqPathExpressions:
-            - if .metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress" then .spec.rules
+            - select(.metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress") | .spec.rules
     ```
 
     Apply the same snippet to `GRPCRoute`, `TCPRoute` and `TLSRoute` kinds if you manage them. If you configure `resource.customizations`
