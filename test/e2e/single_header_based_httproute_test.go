@@ -249,20 +249,42 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 	}
 	logrus.Infof("rollout %q was promoted to finish canary deployment", resourcesMap[ROLLOUT_KEY].GetName())
 
-	// Give informer cache time to observe the spec change before polling status
-	// This reduces race conditions between observedGeneration and phase updates
-	// Similar to the fix in Argo Rollouts PR #1698
-	// Increased to 10s for slower CI environments
-	time.Sleep(10 * time.Second)
+	// Force controller to reconcile immediately by adding an annotation
+	// This increments metadata.generation and triggers the controller's watch
+	err = forceRolloutReconciliation(ctx, clusterResources, resourcesMap[ROLLOUT_KEY])
+	if err != nil {
+		logrus.Errorf("failed to force reconciliation: %s", err)
+		t.Error()
+		return ctx
+	}
 
-	// Wait for rollout to reach a healthy finished state
+	// Refetch the rollout to get the updated generation after annotation
+	err = clusterResources.Get(ctx, resourcesMap[ROLLOUT_KEY].GetName(), resourcesMap[ROLLOUT_KEY].GetNamespace(), resourcesMap[ROLLOUT_KEY])
+	if err != nil {
+		logrus.Errorf("failed to refetch rollout after annotation: %s", err)
+		t.Error()
+		return ctx
+	}
+
+	// Wait for controller to observe the change (verify observedGeneration matches)
+	// This implements the principle from Argo Rollouts PR #1698 - ensuring cache consistency
+	expectedGeneration := resourcesMap[ROLLOUT_KEY].GetGeneration()
+	logrus.Infof("expecting controller to observe generation %d for rollout %q", expectedGeneration, resourcesMap[ROLLOUT_KEY].GetName())
+	err = waitForGenerationObserved(ctx, clusterResources, resourcesMap[ROLLOUT_KEY], expectedGeneration, 30*time.Second)
+	if err != nil {
+		logrus.Errorf("controller did not observe generation %d: %s", expectedGeneration, err)
+		t.Error()
+		return ctx
+	}
+
+	// Now wait for rollout to reach a healthy finished state
 	logrus.Infof("waiting for rollout %q to complete and reach healthy status", resourcesMap[ROLLOUT_KEY].GetName())
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[ROLLOUT_KEY],
 			getRolloutHealthyFetcher(t, 2), // Pass desired replica count from rollout YAML
 		),
-		wait.WithTimeout(VERY_LONG_PERIOD), // Increased from LONG_PERIOD to 120s
+		wait.WithTimeout(VERY_LONG_PERIOD), // 180s timeout for full rollout completion
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
