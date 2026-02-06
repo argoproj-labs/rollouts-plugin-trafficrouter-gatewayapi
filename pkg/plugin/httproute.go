@@ -157,12 +157,22 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 	}
 
-	// Copy matches from original route
+	// Copy matches from original route and merge headers
 	for i := 0; i < len(httpRouteRule.Matches); i++ {
+		// Merge existing headers with new canary headers
+		mergedHeaders := make([]gatewayv1.HTTPHeaderMatch, 0)
+		// First, add existing headers from the original match
+		if httpRouteRule.Matches[i].Headers != nil {
+			mergedHeaders = append(mergedHeaders, httpRouteRule.Matches[i].Headers...)
+		}
+		// Then, add the new canary headers
+		mergedHeaders = append(mergedHeaders, httpHeaderRouteRuleList...)
+
 		httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
 			Path:        httpRouteRule.Matches[i].Path,
-			Headers:     httpHeaderRouteRuleList,
+			Headers:     mergedHeaders,
 			QueryParams: httpRouteRule.Matches[i].QueryParams,
+			Method:      httpRouteRule.Matches[i].Method,
 		})
 	}
 

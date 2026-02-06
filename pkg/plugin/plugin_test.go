@@ -647,3 +647,763 @@ func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *
 		},
 	}
 }
+
+// Helper function to create HTTPRoute with various match criteria for testing
+func createHTTPRouteWithMatches(name string, headers []gatewayv1.HTTPHeaderMatch, method *gatewayv1.HTTPMethod, queryParams []gatewayv1.HTTPQueryParamMatch, path *gatewayv1.HTTPPathMatch) *gatewayv1.HTTPRoute {
+	port := gatewayv1.PortNumber(80)
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+
+	match := gatewayv1.HTTPRouteMatch{}
+	if len(headers) > 0 {
+		match.Headers = headers
+	}
+	if method != nil {
+		match.Method = method
+	}
+	if len(queryParams) > 0 {
+		match.QueryParams = queryParams
+	}
+	if path != nil {
+		match.Path = path
+	}
+
+	return &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: mocks.StableServiceName,
+									Port: &port,
+								},
+								Weight: &stableWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: mocks.CanaryServiceName,
+									Port: &port,
+								},
+								Weight: &canaryWeight,
+							},
+						},
+					},
+					Matches: []gatewayv1.HTTPRouteMatch{match},
+				},
+			},
+		},
+	}
+}
+
+// Helper function to create GRPCRoute with various match criteria for testing
+func createGRPCRouteWithMatches(name string, headers []gatewayv1.GRPCHeaderMatch, method *gatewayv1.GRPCMethodMatch) *gatewayv1.GRPCRoute {
+	port := gatewayv1.PortNumber(80)
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+
+	match := gatewayv1.GRPCRouteMatch{}
+	if len(headers) > 0 {
+		match.Headers = headers
+	}
+	if method != nil {
+		match.Method = method
+	}
+
+	return &gatewayv1.GRPCRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: gatewayv1.GRPCRouteSpec{
+			Rules: []gatewayv1.GRPCRouteRule{
+				{
+					BackendRefs: []gatewayv1.GRPCBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: mocks.StableServiceName,
+									Port: &port,
+								},
+								Weight: &stableWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: mocks.CanaryServiceName,
+									Port: &port,
+								},
+								Weight: &canaryWeight,
+							},
+						},
+					},
+					Matches: []gatewayv1.GRPCRouteMatch{match},
+				},
+			},
+		},
+	}
+}
+
+// Tests to verify that SetHeaderRoute preserves and merges existing match criteria
+
+// TestSetHTTPHeaderRouteWithExistingHeaders verifies that when adding canary header-based routing
+// to an HTTPRoute that already has header match criteria (e.g., Host header), the plugin preserves
+// the original headers and merges them with the new canary headers. This ensures that existing
+// routing rules based on headers continue to work alongside the new canary routing.
+func TestSetHTTPHeaderRouteWithExistingHeaders(t *testing.T) {
+	// Create HTTPRoute with existing header match
+	existingHeaderType := gatewayv1.HeaderMatchExact
+	existingHeaders := []gatewayv1.HTTPHeaderMatch{
+		{
+			Type:  &existingHeaderType,
+			Name:  "Host",
+			Value: "example.com",
+		},
+	}
+	httpRoute := createHTTPRouteWithMatches(mocks.HTTPRouteName, existingHeaders, nil, nil, nil)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes BOTH original header AND canary header
+	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify headers are merged correctly
+	if len(managedRouteMatches) > 0 && len(managedRouteMatches[0].Headers) > 0 {
+		headers := managedRouteMatches[0].Headers
+		assert.Equal(t, 2, len(headers), "Should have both original and canary headers")
+
+		// Check if both headers are present
+		hasOriginalHeader := false
+		hasCanaryHeader := false
+		for _, h := range headers {
+			if string(h.Name) == "Host" && h.Value == "example.com" {
+				hasOriginalHeader = true
+			}
+			if string(h.Name) == canaryHeaderName {
+				hasCanaryHeader = true
+			}
+		}
+		assert.True(t, hasOriginalHeader, "Original Host header should be preserved")
+		assert.True(t, hasCanaryHeader, "Canary header should be added")
+	} else {
+		t.Fatal("Managed route should have at least one match with headers")
+	}
+}
+
+// TestSetHTTPHeaderRouteWithExistingMethod verifies that when adding canary header-based routing
+// to an HTTPRoute that already has HTTP method match criteria (e.g., POST), the plugin preserves
+// the original method specification. This ensures method-based routing continues to function
+// correctly when canary headers are added for progressive delivery.
+func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
+	// Create HTTPRoute with existing method match
+	postMethod := gatewayv1.HTTPMethodPost
+	httpRoute := createHTTPRouteWithMatches(mocks.HTTPRouteName, nil, &postMethod, nil, nil)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes BOTH method AND canary header
+	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify method and headers are both preserved
+	if len(managedRouteMatches) > 0 {
+		match := managedRouteMatches[0]
+		assert.NotNil(t, match.Method, "Method should be preserved")
+		if match.Method != nil {
+			assert.Equal(t, postMethod, *match.Method, "POST method should be preserved")
+		}
+		assert.NotEmpty(t, match.Headers, "Canary headers should be present")
+	} else {
+		t.Fatal("Managed route should have at least one match")
+	}
+}
+
+// TestSetHTTPHeaderRouteWithExistingQueryParams verifies that when adding canary header-based
+// routing to an HTTPRoute that already has query parameter match criteria (e.g., version=v2),
+// the plugin preserves the original query parameter specifications. This ensures query
+// parameter-based routing continues to work correctly alongside canary header routing.
+func TestSetHTTPHeaderRouteWithExistingQueryParams(t *testing.T) {
+	// Create HTTPRoute with existing query param matches
+	queryParamType := gatewayv1.QueryParamMatchExact
+	queryParams := []gatewayv1.HTTPQueryParamMatch{
+		{
+			Type:  &queryParamType,
+			Name:  "version",
+			Value: "v2",
+		},
+	}
+	httpRoute := createHTTPRouteWithMatches(mocks.HTTPRouteName, nil, nil, queryParams, nil)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes BOTH query params AND canary header
+	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify query params and headers are both preserved
+	if len(managedRouteMatches) > 0 {
+		match := managedRouteMatches[0]
+		assert.NotEmpty(t, match.QueryParams, "Query params should be preserved")
+		if len(match.QueryParams) > 0 {
+			assert.Equal(t, "version", string(match.QueryParams[0].Name))
+			assert.Equal(t, "v2", match.QueryParams[0].Value)
+		}
+		assert.NotEmpty(t, match.Headers, "Canary headers should be present")
+	} else {
+		t.Fatal("Managed route should have at least one match")
+	}
+}
+
+// TestSetHTTPHeaderRouteWithMultipleExistingHeaders verifies that when adding canary header-based
+// routing to an HTTPRoute that already has multiple header match criteria (e.g., Host and User-Agent),
+// the plugin preserves all original headers and merges them with the new canary headers. This ensures
+// complex header-based routing rules continue to work when implementing progressive delivery.
+func TestSetHTTPHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
+	// Create HTTPRoute with multiple existing header matches
+	exactType := gatewayv1.HeaderMatchExact
+	regexType := gatewayv1.HeaderMatchRegularExpression
+	existingHeaders := []gatewayv1.HTTPHeaderMatch{
+		{
+			Type:  &exactType,
+			Name:  "Host",
+			Value: "example.com",
+		},
+		{
+			Type:  &regexType,
+			Name:  "User-Agent",
+			Value: ".*Mobile.*",
+		},
+	}
+	httpRoute := createHTTPRouteWithMatches(mocks.HTTPRouteName, existingHeaders, nil, nil, nil)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes ALL original headers plus canary header
+	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify all headers are merged correctly
+	if len(managedRouteMatches) > 0 && len(managedRouteMatches[0].Headers) > 0 {
+		headers := managedRouteMatches[0].Headers
+		assert.Equal(t, 3, len(headers), "Should have 2 original headers plus 1 canary header")
+
+		// Check for all three headers
+		hasHostHeader := false
+		hasUserAgentHeader := false
+		hasCanaryHeader := false
+		for _, h := range headers {
+			if string(h.Name) == "Host" {
+				hasHostHeader = true
+			}
+			if string(h.Name) == "User-Agent" {
+				hasUserAgentHeader = true
+			}
+			if string(h.Name) == canaryHeaderName {
+				hasCanaryHeader = true
+			}
+		}
+		assert.True(t, hasHostHeader, "Original Host header should be preserved")
+		assert.True(t, hasUserAgentHeader, "Original User-Agent header should be preserved")
+		assert.True(t, hasCanaryHeader, "Canary header should be added")
+	} else {
+		t.Fatal("Managed route should have at least one match with headers")
+	}
+}
+
+// TestSetHTTPHeaderRouteWithCombinedMatches verifies that when adding canary header-based routing
+// to an HTTPRoute that has multiple types of match criteria (headers, HTTP method, query parameters,
+// and path), the plugin preserves all original match criteria and merges headers appropriately. This
+// ensures comprehensive routing rules with multiple conditions continue to work during canary deployments.
+func TestSetHTTPHeaderRouteWithCombinedMatches(t *testing.T) {
+	// Create HTTPRoute with headers, method, query params, and path
+	exactType := gatewayv1.HeaderMatchExact
+	existingHeaders := []gatewayv1.HTTPHeaderMatch{
+		{
+			Type:  &exactType,
+			Name:  "Host",
+			Value: "example.com",
+		},
+	}
+	postMethod := gatewayv1.HTTPMethodPost
+	queryParamType := gatewayv1.QueryParamMatchExact
+	queryParams := []gatewayv1.HTTPQueryParamMatch{
+		{
+			Type:  &queryParamType,
+			Name:  "version",
+			Value: "v2",
+		},
+	}
+	pathType := gatewayv1.PathMatchPathPrefix
+	pathValue := "/api"
+	path := &gatewayv1.HTTPPathMatch{
+		Type:  &pathType,
+		Value: &pathValue,
+	}
+
+	httpRoute := createHTTPRouteWithMatches(mocks.HTTPRouteName, existingHeaders, &postMethod, queryParams, path)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes ALL original match criteria plus canary header
+	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify all match criteria are preserved
+	if len(managedRouteMatches) > 0 {
+		match := managedRouteMatches[0]
+
+		// Check headers (should have both original and canary)
+		assert.NotEmpty(t, match.Headers, "Headers should be present")
+		if len(match.Headers) > 0 {
+			assert.Equal(t, 2, len(match.Headers), "Should have original Host header and canary header")
+		}
+
+		// Check method
+		assert.NotNil(t, match.Method, "Method should be preserved")
+		if match.Method != nil {
+			assert.Equal(t, postMethod, *match.Method, "POST method should be preserved")
+		}
+
+		// Check query params
+		assert.NotEmpty(t, match.QueryParams, "Query params should be preserved")
+		if len(match.QueryParams) > 0 {
+			assert.Equal(t, "version", string(match.QueryParams[0].Name))
+			assert.Equal(t, "v2", match.QueryParams[0].Value)
+		}
+
+		// Check path
+		assert.NotNil(t, match.Path, "Path should be preserved")
+		if match.Path != nil {
+			assert.Equal(t, "/api", *match.Path.Value)
+		}
+	} else {
+		t.Fatal("Managed route should have at least one match")
+	}
+}
+
+// TestSetGRPCHeaderRouteWithExistingHeaders verifies that when adding canary header-based routing
+// to a GRPCRoute that already has header match criteria (e.g., Host header), the plugin preserves
+// the original headers and merges them with the new canary headers. This ensures that existing
+// gRPC routing rules based on headers continue to work alongside the new canary routing.
+func TestSetGRPCHeaderRouteWithExistingHeaders(t *testing.T) {
+	// Create GRPCRoute with existing header match
+	exactType := gatewayv1.GRPCHeaderMatchExact
+	existingHeaders := []gatewayv1.GRPCHeaderMatch{
+		{
+			Type:  &exactType,
+			Name:  "Host",
+			Value: "example.com",
+		},
+	}
+	grpcRoute := createGRPCRouteWithMatches(mocks.GRPCRouteName, existingHeaders, nil)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes BOTH original header AND canary header
+	managedRouteMatches := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify headers are merged correctly
+	if len(managedRouteMatches) > 0 && len(managedRouteMatches[0].Headers) > 0 {
+		headers := managedRouteMatches[0].Headers
+		assert.Equal(t, 2, len(headers), "Should have both original and canary headers")
+
+		// Check if both headers are present
+		hasOriginalHeader := false
+		hasCanaryHeader := false
+		for _, h := range headers {
+			if string(h.Name) == "Host" && h.Value == "example.com" {
+				hasOriginalHeader = true
+			}
+			if string(h.Name) == canaryHeaderName {
+				hasCanaryHeader = true
+			}
+		}
+		assert.True(t, hasOriginalHeader, "Original Host header should be preserved")
+		assert.True(t, hasCanaryHeader, "Canary header should be added")
+	} else {
+		t.Fatal("Managed route should have at least one match with headers")
+	}
+}
+
+// TestSetGRPCHeaderRouteWithMultipleExistingHeaders verifies that when adding canary header-based
+// routing to a GRPCRoute that already has multiple header match criteria (e.g., Host and User-Agent),
+// the plugin preserves all original headers and merges them with the new canary headers. This ensures
+// complex gRPC header-based routing rules continue to work when implementing progressive delivery.
+func TestSetGRPCHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
+	// Create GRPCRoute with multiple existing header matches
+	exactType := gatewayv1.GRPCHeaderMatchExact
+	regexType := gatewayv1.GRPCHeaderMatchRegularExpression
+	existingHeaders := []gatewayv1.GRPCHeaderMatch{
+		{
+			Type:  &exactType,
+			Name:  "Host",
+			Value: "example.com",
+		},
+		{
+			Type:  &regexType,
+			Name:  "User-Agent",
+			Value: ".*gRPC.*",
+		},
+	}
+	grpcRoute := createGRPCRouteWithMatches(mocks.GRPCRouteName, existingHeaders, nil)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes ALL original headers plus canary header
+	managedRouteMatches := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify all headers are merged correctly
+	if len(managedRouteMatches) > 0 && len(managedRouteMatches[0].Headers) > 0 {
+		headers := managedRouteMatches[0].Headers
+		assert.Equal(t, 3, len(headers), "Should have 2 original headers plus 1 canary header")
+
+		// Check for all three headers
+		hasHostHeader := false
+		hasUserAgentHeader := false
+		hasCanaryHeader := false
+		for _, h := range headers {
+			if string(h.Name) == "Host" {
+				hasHostHeader = true
+			}
+			if string(h.Name) == "User-Agent" {
+				hasUserAgentHeader = true
+			}
+			if string(h.Name) == canaryHeaderName {
+				hasCanaryHeader = true
+			}
+		}
+		assert.True(t, hasHostHeader, "Original Host header should be preserved")
+		assert.True(t, hasUserAgentHeader, "Original User-Agent header should be preserved")
+		assert.True(t, hasCanaryHeader, "Canary header should be added")
+	} else {
+		t.Fatal("Managed route should have at least one match with headers")
+	}
+}
+
+// TestSetGRPCHeaderRouteWithMethodAndHeaders verifies that when adding canary header-based routing
+// to a GRPCRoute that already has both gRPC method match criteria (service/method) and header match
+// criteria, the plugin preserves the method specification and merges the headers appropriately. This
+// ensures method-specific gRPC routing with header conditions continues to work during canary deployments.
+func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
+	// Create GRPCRoute with method match and header matches
+	exactType := gatewayv1.GRPCHeaderMatchExact
+	existingHeaders := []gatewayv1.GRPCHeaderMatch{
+		{
+			Type:  &exactType,
+			Name:  "Host",
+			Value: "example.com",
+		},
+	}
+	methodMatchType := gatewayv1.GRPCMethodMatchExact
+	service := "my.service.v1.MyService"
+	method := "GetUser"
+	grpcMethod := &gatewayv1.GRPCMethodMatch{
+		Type:    &methodMatchType,
+		Service: &service,
+		Method:  &method,
+	}
+	grpcRoute := createGRPCRouteWithMatches(mocks.GRPCRouteName, existingHeaders, grpcMethod)
+
+	// Setup plugin
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
+		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	// Setup canary header
+	canaryHeaderName := "X-Canary"
+	canaryHeaderValue := "true"
+	headerMatch := v1alpha1.StringMatch{
+		Exact: canaryHeaderValue,
+	}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  canaryHeaderName,
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// Call SetHeaderRoute
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	// Verify that managed route (index 1) includes method AND all headers (original + canary)
+	managedRouteMatches := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches
+	assert.NotEmpty(t, managedRouteMatches, "Managed route should have matches")
+
+	// Verify method and headers are both preserved
+	if len(managedRouteMatches) > 0 {
+		match := managedRouteMatches[0]
+
+		// Check method
+		assert.NotNil(t, match.Method, "Method should be preserved")
+		if match.Method != nil {
+			assert.NotNil(t, match.Method.Service, "Service should be preserved")
+			if match.Method.Service != nil {
+				assert.Equal(t, service, *match.Method.Service)
+			}
+			assert.NotNil(t, match.Method.Method, "Method name should be preserved")
+			if match.Method.Method != nil {
+				assert.Equal(t, method, *match.Method.Method)
+			}
+		}
+
+		// Check headers (should have both original and canary)
+		assert.NotEmpty(t, match.Headers, "Headers should be present")
+		if len(match.Headers) > 0 {
+			assert.Equal(t, 2, len(match.Headers), "Should have original Host header and canary header")
+			hasOriginalHeader := false
+			hasCanaryHeader := false
+			for _, h := range match.Headers {
+				if string(h.Name) == "Host" {
+					hasOriginalHeader = true
+				}
+				if string(h.Name) == canaryHeaderName {
+					hasCanaryHeader = true
+				}
+			}
+			assert.True(t, hasOriginalHeader, "Original Host header should be preserved")
+			assert.True(t, hasCanaryHeader, "Canary header should be added")
+		}
+	} else {
+		t.Fatal("Managed route should have at least one match")
+	}
+}

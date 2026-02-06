@@ -160,10 +160,20 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			},
 		}
 	} else {
+		// Copy matches from original route and merge headers
 		for i := 0; i < matchLength; i++ {
+			// Merge existing headers with new canary headers
+			mergedHeaders := make([]gatewayv1.GRPCHeaderMatch, 0)
+			// First, add existing headers from the original match
+			if grpcRouteRule.Matches[i].Headers != nil {
+				mergedHeaders = append(mergedHeaders, grpcRouteRule.Matches[i].Headers...)
+			}
+			// Then, add the new canary headers
+			mergedHeaders = append(mergedHeaders, grpcHeaderRouteRuleList...)
+
 			grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, gatewayv1.GRPCRouteMatch{
 				Method:  grpcRouteRule.Matches[i].Method,
-				Headers: grpcHeaderRouteRuleList,
+				Headers: mergedHeaders,
 			})
 		}
 	}
