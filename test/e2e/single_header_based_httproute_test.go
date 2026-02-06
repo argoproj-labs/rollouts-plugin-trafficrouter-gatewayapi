@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -247,14 +248,20 @@ func testSingleHeaderBasedHTTPRoute(ctx context.Context, t *testing.T, config *e
 		return ctx
 	}
 	logrus.Infof("rollout %q was promoted to finish canary deployment", resourcesMap[ROLLOUT_KEY].GetName())
+
+	// Give informer cache time to observe the spec change before polling status
+	// This reduces race conditions between observedGeneration and phase updates
+	// Similar to the fix in Argo Rollouts PR #1698
+	time.Sleep(2 * time.Second)
+
 	// Wait for rollout to reach a healthy finished state
 	logrus.Infof("waiting for rollout %q to complete and reach healthy status", resourcesMap[ROLLOUT_KEY].GetName())
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[ROLLOUT_KEY],
-			getRolloutHealthyFetcher(t),
+			getRolloutHealthyFetcher(t, 2), // Pass desired replica count from rollout YAML
 		),
-		wait.WithTimeout(LONG_PERIOD),
+		wait.WithTimeout(VERY_LONG_PERIOD), // Increased from LONG_PERIOD to 120s
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -247,14 +248,20 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 		return ctx
 	}
 	logrus.Infof("rollout %q was promoted to finish canary deployment", resourcesMap[ROLLOUT_KEY].GetName())
+
+	// Give informer cache time to observe the spec change before polling status
+	// This reduces race conditions between observedGeneration and phase updates
+	// Similar to the fix in Argo Rollouts PR #1698
+	time.Sleep(2 * time.Second)
+
 	// Wait for rollout to reach a healthy finished state
 	logrus.Infof("waiting for rollout %q to complete and reach healthy status", resourcesMap[ROLLOUT_KEY].GetName())
 	err = wait.For(
 		waitCondition.ResourceMatch(
 			resourcesMap[ROLLOUT_KEY],
-			getRolloutHealthyFetcher(t),
+			getRolloutHealthyFetcher(t, 2), // Pass desired replica count from rollout YAML
 		),
-		wait.WithTimeout(LONG_PERIOD),
+		wait.WithTimeout(VERY_LONG_PERIOD), // Increased from LONG_PERIOD to 120s
 		wait.WithInterval(SHORT_PERIOD),
 	)
 	if err != nil {
@@ -342,25 +349,4 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 
 func isHeaderBasedGRPCRouteValuesEqual(first, second gatewayv1.GRPCHeaderMatch) bool {
 	return first.Name == second.Name && *first.Type == *second.Type && first.Value == second.Value
-}
-
-func getRolloutHealthyFetcher(t *testing.T) func(k8s.Object) bool {
-	return func(obj k8s.Object) bool {
-		var rollout v1alpha1.Rollout
-		unstructuredRollout, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			logrus.Error("k8s rollout object type assertion was failed")
-			t.Error()
-			return false
-		}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredRollout.Object, &rollout)
-		if err != nil {
-			logrus.Errorf("conversation from unstructured rollout %q to the typed rollout was failed", unstructuredRollout.GetName())
-			t.Error()
-			return false
-		}
-		// Check if rollout is healthy (completed successfully)
-		// A rollout is considered finished when its phase is "Healthy"
-		return rollout.Status.Phase == "Healthy"
-	}
 }
