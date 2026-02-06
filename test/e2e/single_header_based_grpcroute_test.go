@@ -252,7 +252,8 @@ func testSingleHeaderBasedGRPCRoute(ctx context.Context, t *testing.T, config *e
 	// Give informer cache time to observe the spec change before polling status
 	// This reduces race conditions between observedGeneration and phase updates
 	// Similar to the fix in Argo Rollouts PR #1698
-	time.Sleep(2 * time.Second)
+	// Increased to 10s for slower CI environments
+	time.Sleep(10 * time.Second)
 
 	// Wait for rollout to reach a healthy finished state
 	logrus.Infof("waiting for rollout %q to complete and reach healthy status", resourcesMap[ROLLOUT_KEY].GetName())

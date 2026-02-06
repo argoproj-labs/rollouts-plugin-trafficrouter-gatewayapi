@@ -70,7 +70,7 @@ const (
 	SHORT_PERIOD     = time.Second
 	MEDIUM_PERIOD    = 30 * time.Second
 	LONG_PERIOD      = 60 * time.Second
-	VERY_LONG_PERIOD = 120 * time.Second // For rollout promotion in CI environments
+	VERY_LONG_PERIOD = 180 * time.Second // For rollout promotion in CI environments (3 minutes)
 )
 
 var (
