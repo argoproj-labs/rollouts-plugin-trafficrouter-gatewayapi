@@ -109,7 +109,7 @@ subjects:
     name: argo-rollouts
 ```
 
-Apply the file with kubectl. Note that this role is **NOT** to be used in production clusters as it is super permissive.
+Apply the file with kubectl. More information on permissions can be found on the [installation guide](installation.md#permissions).
 
 
 ## Step 4 - Create an HTTP route

@@ -92,6 +92,82 @@ time="YYY" level=info msg="Download complete, it took 7.792426599s"
 
 You are now ready to use the Gateway API in your [Rollout definitions](https://argoproj.github.io/argo-rollouts/features/specification/). See also our [Quick Start Guide](quick-start.md).
 
+## Permissions
+
+The Plugin needs extra permissions to manage Gateway API resources, on top of the permissions needed by the main Argo Rollouts controller.
+
+### Example ClusterRole
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-rollouts-gateway-api-plugin
+rules:
+  # Core API resources
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
+
+  # Gateway API v1 resources
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes", "grpcroutes"]
+    verbs: ["get", "list", "update", "patch"]
+
+  # Gateway API v1alpha2 resources
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["tcproutes", "tlsroutes"]
+    verbs: ["get", "list", "update", "patch"]
+```
+
+### Example Namespace-Scoped Role
+
+If you only need the plugin to work in a specific namespace:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-rollouts-gateway-api-plugin
+  namespace: your-namespace
+rules:
+  # Core API resources
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
+
+  # Gateway API v1 resources
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes", "grpcroutes"]
+    verbs: ["get", "list", "update", "patch"]
+
+  # Gateway API v1alpha2 resources
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["tcproutes", "tlsroutes"]
+    verbs: ["get", "list", "update", "patch"]
+```
+
+### Notes
+
+The plugin does NOT need permissions for:
+
+- **Rollout resources** - The plugin does not read or modify Rollouts; that's handled by the Argo Rollouts controller
+- **Gateways** - The plugin does not modify Gateway resources
+- **GatewayClasses** - The plugin does not interact with GatewayClasses
+- **Pods, Deployments, ReplicaSets** - The plugin does not manage workload resources
+- **Delete permissions** - The plugin only adds/modifies/removes rules within routes, never deletes entire resources
+
+If you want to further fine-tune permissions:
+
+- [Label selector discovery](features/multiple-routes.md#automatic-route-discovery-with-label-selectors) requires `list` permissions; using explicit route names only requires `get`
+- If not using [header-based routing](features/header-based-routing.md), ConfigMap permissions can be omitted
+
 ## Configuration 
 
 The `kubeClientQPS` and `kubeClientBurst` options configure the behavior of the Kubernetes client. These
