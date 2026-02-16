@@ -96,7 +96,7 @@ You are now ready to use the Gateway API in your [Rollout definitions](https://a
 
 The Plugin needs extra permissions to manage Gateway API resources, on top of the permissions needed by the main Argo Rollouts controller.
 
-### Example ClusterRole
+Example permissions (cluster wide) are shown below:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -122,8 +122,6 @@ rules:
     resources: ["tcproutes", "tlsroutes"]
     verbs: ["get", "list", "update", "patch"]
 ```
-
-### Example Namespace-Scoped Role
 
 If you only need the plugin to work in a specific namespace:
 
@@ -152,8 +150,6 @@ rules:
     resources: ["tcproutes", "tlsroutes"]
     verbs: ["get", "list", "update", "patch"]
 ```
-
-### Notes
 
 The plugin does NOT need permissions for:
 
