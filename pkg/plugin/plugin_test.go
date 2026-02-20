@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,8 +13,12 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	k8sTesting "k8s.io/client-go/testing"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -723,6 +728,45 @@ func TestNamespaceDefaulting(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, rolloutNamespace, parsedConfig.Namespace, "Empty namespace should default to rollout's namespace")
 	})
+}
+
+func TestHTTPRouteConflictRetry(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+	fakeClientset := gwFake.NewSimpleClientset(httpRoute)
+
+	updateCount := 0
+	fakeClientset.PrependReactor("update", "httproutes", func(action k8sTesting.Action) (bool, runtime.Object, error) {
+		updateCount++
+		if updateCount == 1 {
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Group: "gateway.networking.k8s.io", Resource: "httproutes"},
+				mocks.HTTPRouteName,
+				fmt.Errorf("the object has been modified"),
+			)
+		}
+		return false, nil, nil
+	})
+
+	rpcPlugin := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: fakeClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+	}
+
+	config := &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config)
+	var desiredWeight int32 = 30
+
+	rpcError := rpcPlugin.setHTTPRouteWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{}, config)
+
+	assert.Empty(t, rpcError.ErrorString)
+	assert.Equal(t, 2, updateCount, "Update should have been called twice (first conflict, then success)")
+	assert.NotNil(t, rpcPlugin.UpdatedHTTPRouteMock)
+	assert.Equal(t, desiredWeight, *rpcPlugin.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+	assert.Equal(t, 100-desiredWeight, *rpcPlugin.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
 }
 
 func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
