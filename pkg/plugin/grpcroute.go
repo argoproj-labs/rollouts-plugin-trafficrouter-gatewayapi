@@ -33,8 +33,13 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			ErrorString: err.Error(),
 		}
 	}
-	// Get managed route indexes from ConfigMap to skip them when updating weights
-	// Managed routes (header routes) should always keep 100% traffic to canary
+	// Get managed route indexes to skip them when updating weights.
+	// Managed routes (header routes) should always keep 100% traffic to canary.
+	// We use two detection methods for robustness:
+	// 1. Read from ConfigMap (primary source of truth)
+	// 2. Detect by structure: managed routes have only canary backend ref, no stable
+	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	managedRouteIndexes := make(map[int]bool)
 	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
 		Clientset: clientset,
@@ -50,8 +55,25 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			}
 		}
 	}
-	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	// Fallback: detect managed routes by structure (only canary backend ref, no stable)
+	for i, rule := range grpcRoute.Spec.Rules {
+		if managedRouteIndexes[i] {
+			continue
+		}
+		hasCanary := false
+		hasStable := false
+		for _, ref := range rule.BackendRefs {
+			if string(ref.Name) == canaryServiceName {
+				hasCanary = true
+			}
+			if string(ref.Name) == stableServiceName {
+				hasStable = true
+			}
+		}
+		if hasCanary && !hasStable && len(rule.Matches) > 0 {
+			managedRouteIndexes[i] = true
+		}
+	}
 	routeRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
 	canaryBackendRefs, err := getBackendRefsWithSkipIndexes(canaryServiceName, routeRuleList, managedRouteIndexes)
 	if err != nil {
