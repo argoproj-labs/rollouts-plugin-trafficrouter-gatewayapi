@@ -13,21 +13,11 @@ const (
 	HTTP_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-httproute-rollout.yml"
 	HTTP_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-httproute-rollout.yml"
 
-	// HTTP Route setWeight skips managed routes test paths
-	// These tests verify that setWeight does not modify managed route weights
-	HTTP_ROUTE_SETWEIGHT_SKIPS_MANAGED_PATH         = "./testdata/httproute-setweight-skips-managed.yml"
-	HTTP_ROUTE_SETWEIGHT_SKIPS_MANAGED_ROLLOUT_PATH = "./testdata/single-setweight-skips-managed-httproute-rollout.yml"
-
 	// GRPC Route test paths
 	GRPC_ROUTE_BASIC_PATH          = "./testdata/grpcroute-basic.yml"
 	GRPC_ROUTE_HEADER_PATH         = "./testdata/grpcroute-header.yml"
 	GRPC_ROUTE_BASIC_ROLLOUT_PATH  = "./testdata/single-grpcroute-rollout.yml"
 	GRPC_ROUTE_HEADER_ROLLOUT_PATH = "./testdata/single-header-based-grpcroute-rollout.yml"
-
-	// GRPC Route setWeight skips managed routes test paths
-	// These tests verify that setWeight does not modify managed route weights
-	GRPC_ROUTE_SETWEIGHT_SKIPS_MANAGED_PATH         = "./testdata/grpcroute-setweight-skips-managed.yml"
-	GRPC_ROUTE_SETWEIGHT_SKIPS_MANAGED_ROLLOUT_PATH = "./testdata/single-setweight-skips-managed-grpcroute-rollout.yml"
 
 	// TCP Route test paths
 	TCP_ROUTE_BASIC_PATH         = "./testdata/tcproute-basic.yml"

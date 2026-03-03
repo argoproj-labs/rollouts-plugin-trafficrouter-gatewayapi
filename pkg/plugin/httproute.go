@@ -35,9 +35,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	}
 	// Get managed route indexes to skip them when updating weights.
 	// Managed routes (header routes) should always keep 100% traffic to canary.
-	// We use two detection methods for robustness:
-	// 1. Read from ConfigMap (primary source of truth)
-	// 2. Detect by structure: managed routes have only canary backend ref, no stable
+	// The plugin's ConfigMap is the source of truth for which routes are managed.
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	managedRouteIndexes := make(map[int]bool)
@@ -53,25 +51,6 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 					managedRouteIndexes[idx] = true
 				}
 			}
-		}
-	}
-	// Fallback: detect managed routes by structure (only canary backend ref, no stable)
-	for i, rule := range httpRoute.Spec.Rules {
-		if managedRouteIndexes[i] {
-			continue
-		}
-		hasCanary := false
-		hasStable := false
-		for _, ref := range rule.BackendRefs {
-			if string(ref.Name) == canaryServiceName {
-				hasCanary = true
-			}
-			if string(ref.Name) == stableServiceName {
-				hasStable = true
-			}
-		}
-		if hasCanary && !hasStable && len(rule.Matches) > 0 {
-			managedRouteIndexes[i] = true
 		}
 	}
 	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)

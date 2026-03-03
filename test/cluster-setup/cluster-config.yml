@@ -7,6 +7,6 @@ nodes:
       argo-rollouts-controller: true
     extraMounts:
       - hostPath: ./dist/
-        containerPath: /argo-rollouts-gatewayapi-plugin/
+        containerPath: /Volumes/
   - role: worker
   - role: worker

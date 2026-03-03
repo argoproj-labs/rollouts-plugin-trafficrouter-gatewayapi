@@ -12,6 +12,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -558,6 +559,208 @@ func TestRunSuccessfully(t *testing.T) {
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 1, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
+	})
+	t.Run("SetHTTPRouteWeightSkipsManagedRoutes", func(t *testing.T) {
+		// Create an HTTPRoute with two rules:
+		// Rule 0: normal route with stable + canary backend refs
+		// Rule 1: managed header route with only canary backend ref
+		var stableWeight int32 = 100
+		var canaryWeight int32 = 0
+		testPort := gatewayv1.PortNumber(80)
+		pathMatchType := gatewayv1.PathMatchPathPrefix
+		pathMatchValue := "/"
+		httpRouteWithManagedRoute := &gatewayv1.HTTPRoute{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mocks.HTTPRouteName,
+				Namespace: mocks.RolloutNamespace,
+			},
+			Spec: gatewayv1.HTTPRouteSpec{
+				Rules: []gatewayv1.HTTPRouteRule{
+					{
+						BackendRefs: []gatewayv1.HTTPBackendRef{
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Name: mocks.StableServiceName,
+										Port: &testPort,
+									},
+									Weight: &stableWeight,
+								},
+							},
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Name: mocks.CanaryServiceName,
+										Port: &testPort,
+									},
+									Weight: &canaryWeight,
+								},
+							},
+						},
+						Matches: []gatewayv1.HTTPRouteMatch{
+							{
+								Path: &gatewayv1.HTTPPathMatch{
+									Type:  &pathMatchType,
+									Value: &pathMatchValue,
+								},
+							},
+						},
+					},
+					{
+						// Managed header route - only canary backend ref
+						BackendRefs: []gatewayv1.HTTPBackendRef{
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Name: mocks.CanaryServiceName,
+										Port: &testPort,
+									},
+								},
+							},
+						},
+						Matches: []gatewayv1.HTTPRouteMatch{
+							{
+								Headers: []gatewayv1.HTTPHeaderMatch{
+									{
+										Name:  "X-Test",
+										Value: "test",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		// Set up ConfigMap with managed route info pointing to rule index 1
+		managedRouteData := ManagedRouteMap{
+			mocks.ManagedRouteName: {
+				mocks.HTTPRouteName: 1,
+			},
+		}
+		managedRouteJSON, _ := json.Marshal(managedRouteData)
+		configMapWithManagedRoute := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mocks.ConfigMapName,
+				Namespace: mocks.RolloutNamespace,
+			},
+			Data: map[string]string{
+				HTTPConfigMapKey: string(managedRouteJSON),
+			},
+		}
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(httpRouteWithManagedRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		rpcPluginImp.TestClientset = fake.NewSimpleClientset(configMapWithManagedRoute).CoreV1().ConfigMaps(mocks.RolloutNamespace)
+
+		var desiredWeight int32 = 30
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		// Rule 0 (normal): weights should be updated
+		assert.Equal(t, 100-desiredWeight, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, desiredWeight, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+		// Rule 1 (managed): should remain unchanged (no weight set by setWeight)
+		assert.Nil(t, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].BackendRefs[0].Weight)
+	})
+	t.Run("SetGRPCRouteWeightSkipsManagedRoutes", func(t *testing.T) {
+		// Create a GRPCRoute with two rules:
+		// Rule 0: normal route with stable + canary backend refs
+		// Rule 1: managed header route with only canary backend ref
+		var stableWeight int32 = 100
+		var canaryWeight int32 = 0
+		testPort := gatewayv1.PortNumber(80)
+		grpcRouteWithManagedRoute := &gatewayv1.GRPCRoute{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mocks.GRPCRouteName,
+				Namespace: mocks.RolloutNamespace,
+			},
+			Spec: gatewayv1.GRPCRouteSpec{
+				Rules: []gatewayv1.GRPCRouteRule{
+					{
+						BackendRefs: []gatewayv1.GRPCBackendRef{
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Name: mocks.StableServiceName,
+										Port: &testPort,
+									},
+									Weight: &stableWeight,
+								},
+							},
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Name: mocks.CanaryServiceName,
+										Port: &testPort,
+									},
+									Weight: &canaryWeight,
+								},
+							},
+						},
+					},
+					{
+						// Managed header route - only canary backend ref
+						BackendRefs: []gatewayv1.GRPCBackendRef{
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Name: mocks.CanaryServiceName,
+										Port: &testPort,
+									},
+								},
+							},
+						},
+						Matches: []gatewayv1.GRPCRouteMatch{
+							{
+								Headers: []gatewayv1.GRPCHeaderMatch{
+									{
+										Name:  "X-Test",
+										Value: "test",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		// Set up ConfigMap with managed route info pointing to rule index 1
+		managedRouteData := ManagedRouteMap{
+			mocks.ManagedRouteName: {
+				mocks.GRPCRouteName: 1,
+			},
+		}
+		managedRouteJSON, _ := json.Marshal(managedRouteData)
+		configMapWithManagedRoute := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mocks.ConfigMapName,
+				Namespace: mocks.RolloutNamespace,
+			},
+			Data: map[string]string{
+				GRPCConfigMapKey: string(managedRouteJSON),
+			},
+		}
+		rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(grpcRouteWithManagedRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+		rpcPluginImp.TestClientset = fake.NewSimpleClientset(configMapWithManagedRoute).CoreV1().ConfigMaps(mocks.RolloutNamespace)
+
+		var desiredWeight int32 = 30
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+
+		assert.Empty(t, err.Error())
+		// Rule 0 (normal): weights should be updated
+		assert.Equal(t, 100-desiredWeight, *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, desiredWeight, *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+		// Rule 1 (managed): should remain unchanged (no weight set by setWeight)
+		assert.Nil(t, rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].BackendRefs[0].Weight)
 	})
 
 	// Canceling should cause an exit

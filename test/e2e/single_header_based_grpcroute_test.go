@@ -334,18 +334,9 @@ func getMatchHeaderBasedGRPCRouteFetcher(t *testing.T, targetWeight int32, targe
 		if len(rules) != FIRST_HEADER_BASED_RULES_LENGTH {
 			return false
 		}
-		// Check main route canary weight matches targetWeight
-		if *rules[ROLLOUT_ROUTE_RULE_INDEX].BackendRefs[CANARY_BACKEND_REF_INDEX].Weight != targetWeight {
-			return false
-		}
-		// Check header route value matches
 		headerBasedRouteValue := rules[HEADER_BASED_RULE_INDEX].Matches[HEADER_BASED_MATCH_INDEX].Headers[HEADER_BASED_HEADER_INDEX]
-		if !isHeaderBasedGRPCRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue) {
-			return false
-		}
-		// Header route weight should be nil (100% to canary) because setWeight skips managed routes
-		headerWeight := rules[HEADER_BASED_RULE_INDEX].BackendRefs[HEADER_BASED_BACKEND_REF_INDEX].Weight
-		return headerWeight == nil
+		weight := *rules[HEADER_BASED_RULE_INDEX].BackendRefs[HEADER_BASED_BACKEND_REF_INDEX].Weight
+		return weight == targetWeight && isHeaderBasedGRPCRouteValuesEqual(headerBasedRouteValue, targetHeaderBasedRouteValue)
 	}
 }
 

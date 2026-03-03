@@ -10,7 +10,7 @@ controller:
   volumes:
     - name: gatewayapi-plugin
       hostPath:
-        path: /argo-rollouts-gatewayapi-plugin/
+        path: /Volumes/
         type: Directory
 
   volumeMounts:
