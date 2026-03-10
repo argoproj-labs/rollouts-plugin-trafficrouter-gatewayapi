@@ -89,7 +89,7 @@ jobs:
         run: |
           make e2e-tests-flaky
   e2e-tests-chainsaw:
-    name: E2E tests running with Chainsaw
+    name: E2E tests 
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
