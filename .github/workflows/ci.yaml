@@ -88,7 +88,32 @@ jobs:
       - name: E2E tests running
         run: |
           make e2e-tests-flaky
+  e2e-tests-chainsaw:
+    name: E2E tests running with Chainsaw
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.14
+      - name: Check install
+        run: chainsaw version
+      - name: Set up Kind
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: "v0.23.0"
+          skipClusterCreation: true
 
+      - name: Checkout code
+        uses: actions/checkout@v3.1.0
+
+      - name: E2E tests
+        run: |
+          make chainsaw-tests
   build:
     name: Build creation
     runs-on: ubuntu-latest

@@ -1,0 +1,65 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: single-header-based-httproute
+spec:
+  # Tests header-based routing with a single HTTPRoute: plugin must add/remove
+  # a header-match rule during canary and clean up after rollout completes.
+  # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
+  namespace: default
+
+  steps:
+    - name: create-resources
+      try:
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-header-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    # The moment of truth: plugin must have added a header-match rule (X-Test: test)
+    # alongside the original weight-split rule.
+    - name: assert-header-routing-active
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-header-route.yaml
+
+    - name: assert-rollout-healthy
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml

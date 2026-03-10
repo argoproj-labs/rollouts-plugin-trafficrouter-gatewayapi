@@ -2,6 +2,7 @@ CURRENT_DIR=$(shell pwd)
 DIST_DIR=${CURRENT_DIR}/dist
 E2E_CLUSTER_NAME=gatewayapi-plugin-e2e
 IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
+CHAINSAW_VERSION=v0.2.12
 
 # Versions of components used in e2e tests
 GATEWAY_API_VERSION=v1.4.0
@@ -97,6 +98,16 @@ run-e2e-tests-flaky: sanity-check-e2e
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:
 	kind delete cluster --name ${E2E_CLUSTER_NAME}
+
+.PHONY: run-chainsaw-tests
+run-chainsaw-tests: sanity-check-e2e
+	chainsaw test ./test/e2e/chainsaw
+
+.PHONY: chainsaw-tests
+chainsaw-tests: setup-e2e-cluster run-chainsaw-tests
+ifeq (${CLUSTER_DELETE},true)
+	make clear-e2e-cluster
+endif
 
 # convenience target to run `mkdocs serve` using a docker container
 .PHONY: serve-docs
