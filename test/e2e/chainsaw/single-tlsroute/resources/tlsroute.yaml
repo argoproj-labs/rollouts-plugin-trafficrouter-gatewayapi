@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: tlsroute-basic
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      sectionName: tls
+      namespace: default
+      kind: Gateway
+  hostnames:
+    - "example.com"
+  rules:
+    - backendRefs:
+        - name: argo-rollouts-stable-service
+          port: 443
+        - name: argo-rollouts-canary-service
+          port: 443

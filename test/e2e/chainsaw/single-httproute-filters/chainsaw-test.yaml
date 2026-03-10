@@ -1,19 +1,19 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: single-header-based-httproute
+  name: single-httproute-filters
 spec:
   description: >
-    Verifies header-based routing with a single HTTPRoute. The plugin must inject
-    a header-match rule (X-Test: test) during a canary rollout and remove it once
-    the rollout completes.
+    Verifies that existing HTTPRoute filters (RequestHeaderModifier, ResponseHeaderModifier,
+    RequestMirror, URLRewrite) are preserved on both the original rule and the newly injected
+    header-match rule when header-based routing is active.
   # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
   namespace: default
   concurrent: false
 
   steps:
     - name: create-resources
-      description: Create the HTTPRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
+      description: Create the HTTPRoute with 4 filters and the Rollout. Uses pause:{duration:30s} for auto-promotion.
       try:
         - apply:
             file: resources/httproute.yaml
@@ -21,7 +21,7 @@ spec:
             file: resources/rollout.yaml
 
     - name: assert-initial-state
-      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+      description: Plugin initializes the HTTPRoute with canary weight 0; the 4 original filters are present.
       try:
         - assert:
             timeout: 30s
@@ -42,7 +42,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Rollout
               metadata:
-                name: httproute-header-rollout
+                name: httproute-filters-rollout
                 namespace: default
               spec:
                 template:
@@ -51,8 +51,8 @@ spec:
                       - name: rollouts-demo
                         image: argoproj/rollouts-demo:green
 
-    - name: assert-header-routing-active
-      description: Plugin must have added a header-match rule (X-Test:test) alongside the original weight-split rule.
+    - name: assert-filters-preserved-in-header-route
+      description: Both the original rule and the injected header-match rule must carry all 4 filters.
       try:
         - assert:
             timeout: 2m
@@ -66,7 +66,7 @@ spec:
             file: assertions/rollout-healthy.yaml
 
     - name: assert-cleanup
-      description: Plugin must remove the header-match rule and reset canary weight to 0 after rollout completes.
+      description: Plugin removes the header-match rule; original rule still has its 4 filters with canary weight 0.
       try:
         - assert:
             timeout: 60s

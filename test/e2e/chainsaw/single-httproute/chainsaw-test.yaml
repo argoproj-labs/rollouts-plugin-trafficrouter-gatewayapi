@@ -1,12 +1,12 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: single-header-based-httproute
+  name: single-httproute
 spec:
   description: >
-    Verifies header-based routing with a single HTTPRoute. The plugin must inject
-    a header-match rule (X-Test: test) during a canary rollout and remove it once
-    the rollout completes.
+    Verifies basic weight-based canary traffic splitting with a single HTTPRoute.
+    The plugin must set canary weight to 30 when a canary is active and reset it
+    to 0 once the rollout completes.
   # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
   namespace: default
   concurrent: false
@@ -21,7 +21,7 @@ spec:
             file: resources/rollout.yaml
 
     - name: assert-initial-state
-      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+      description: Plugin initializes the HTTPRoute with canary weight 0.
       try:
         - assert:
             timeout: 30s
@@ -35,14 +35,14 @@ spec:
             file: assertions/rollout-healthy.yaml
 
     - name: trigger-canary
-      description: Update the rollout image to start a canary (setWeight:30 -> setHeaderRoute -> pause:30s).
+      description: Update the rollout image to start a canary (setWeight:30 -> pause:30s).
       try:
         - patch:
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Rollout
               metadata:
-                name: httproute-header-rollout
+                name: httproute-rollout
                 namespace: default
               spec:
                 template:
@@ -51,12 +51,12 @@ spec:
                       - name: rollouts-demo
                         image: argoproj/rollouts-demo:green
 
-    - name: assert-header-routing-active
-      description: Plugin must have added a header-match rule (X-Test:test) alongside the original weight-split rule.
+    - name: assert-canary-weight-active
+      description: Plugin must have set canary weight to 30 and stable to 70.
       try:
         - assert:
             timeout: 2m
-            file: assertions/httproute-with-header-route.yaml
+            file: assertions/httproute-canary.yaml
 
     - name: assert-rollout-healthy
       description: Wait for the canary to complete (30s pause auto-expires).
@@ -66,7 +66,7 @@ spec:
             file: assertions/rollout-healthy.yaml
 
     - name: assert-cleanup
-      description: Plugin must remove the header-match rule and reset canary weight to 0 after rollout completes.
+      description: Plugin must reset canary weight to 0 after rollout completes.
       try:
         - assert:
             timeout: 60s

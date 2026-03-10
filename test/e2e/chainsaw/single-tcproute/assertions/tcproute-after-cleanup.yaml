@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: tcproute-basic
+  namespace: default
+spec:
+  (length(rules)): 1
+  rules:
+    - backendRefs:
+        - name: argo-rollouts-stable-service
+        - name: argo-rollouts-canary-service
+          (weight): 0

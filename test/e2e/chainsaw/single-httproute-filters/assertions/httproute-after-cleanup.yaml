@@ -1,0 +1,13 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-filters
+  namespace: default
+spec:
+  (length(rules)): 1
+  rules:
+    - (length(filters)): 4
+      backendRefs:
+        - name: argo-rollouts-stable-service
+        - name: argo-rollouts-canary-service
+          (weight): 0

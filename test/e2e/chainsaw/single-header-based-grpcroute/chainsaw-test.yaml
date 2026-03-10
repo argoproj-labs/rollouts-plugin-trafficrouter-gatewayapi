@@ -1,10 +1,10 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: single-header-based-httproute
+  name: single-header-based-grpcroute
 spec:
   description: >
-    Verifies header-based routing with a single HTTPRoute. The plugin must inject
+    Verifies header-based routing with a single GRPCRoute. The plugin must inject
     a header-match rule (X-Test: test) during a canary rollout and remove it once
     the rollout completes.
   # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
@@ -13,19 +13,19 @@ spec:
 
   steps:
     - name: create-resources
-      description: Create the HTTPRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
+      description: Create the GRPCRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
       try:
         - apply:
-            file: resources/httproute.yaml
+            file: resources/grpcroute.yaml
         - apply:
             file: resources/rollout.yaml
 
     - name: assert-initial-state
-      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+      description: Plugin initializes the GRPCRoute with 1 rule and canary weight 0.
       try:
         - assert:
             timeout: 30s
-            file: assertions/httproute-initial.yaml
+            file: assertions/grpcroute-initial.yaml
 
     - name: wait-for-initial-healthy
       description: Wait for the initial rollout to reach Healthy before triggering a canary.
@@ -42,7 +42,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Rollout
               metadata:
-                name: httproute-header-rollout
+                name: grpcroute-header-rollout
                 namespace: default
               spec:
                 template:
@@ -56,7 +56,7 @@ spec:
       try:
         - assert:
             timeout: 2m
-            file: assertions/httproute-with-header-route.yaml
+            file: assertions/grpcroute-with-header-route.yaml
 
     - name: assert-rollout-healthy
       description: Wait for the canary to complete (30s pause auto-expires).
@@ -70,4 +70,4 @@ spec:
       try:
         - assert:
             timeout: 60s
-            file: assertions/httproute-after-cleanup.yaml
+            file: assertions/grpcroute-after-cleanup.yaml

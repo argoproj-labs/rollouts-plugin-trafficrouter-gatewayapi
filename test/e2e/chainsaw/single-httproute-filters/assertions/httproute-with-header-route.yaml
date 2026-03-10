@@ -1,0 +1,23 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-filters
+  namespace: default
+spec:
+  (length(rules)): 2
+  rules:
+    - (length(filters)): 4
+      backendRefs:
+        - name: argo-rollouts-stable-service
+          (weight): 70
+        - name: argo-rollouts-canary-service
+          (weight): 30
+    - matches:
+        - headers:
+            - name: X-Filter-Test
+              type: Exact
+              value: preserve-filters
+      (length(filters)): 4
+      backendRefs:
+        - name: argo-rollouts-canary-service
+          (weight): 30

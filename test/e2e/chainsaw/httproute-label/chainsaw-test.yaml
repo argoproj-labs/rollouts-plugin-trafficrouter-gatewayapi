@@ -1,12 +1,12 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: single-header-based-httproute
+  name: httproute-label
 spec:
   description: >
-    Verifies header-based routing with a single HTTPRoute. The plugin must inject
-    a header-match rule (X-Test: test) during a canary rollout and remove it once
-    the rollout completes.
+    Verifies the in-progress label lifecycle on an HTTPRoute. The plugin adds
+    'rollouts.argoproj.io/gatewayapi-canary=in-progress' when a canary is active
+    and removes it once the rollout completes.
   # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
   namespace: default
   concurrent: false
@@ -20,12 +20,12 @@ spec:
         - apply:
             file: resources/rollout.yaml
 
-    - name: assert-initial-state
-      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+    - name: assert-label-absent-initially
+      description: Plugin must not apply the in-progress label when canary weight is 0.
       try:
         - assert:
             timeout: 30s
-            file: assertions/httproute-initial.yaml
+            file: assertions/httproute-no-label.yaml
 
     - name: wait-for-initial-healthy
       description: Wait for the initial rollout to reach Healthy before triggering a canary.
@@ -35,14 +35,14 @@ spec:
             file: assertions/rollout-healthy.yaml
 
     - name: trigger-canary
-      description: Update the rollout image to start a canary (setWeight:30 -> setHeaderRoute -> pause:30s).
+      description: Update the rollout image to start a canary (setWeight:30 -> pause:30s).
       try:
         - patch:
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Rollout
               metadata:
-                name: httproute-header-rollout
+                name: httproute-label
                 namespace: default
               spec:
                 template:
@@ -51,12 +51,12 @@ spec:
                       - name: rollouts-demo
                         image: argoproj/rollouts-demo:green
 
-    - name: assert-header-routing-active
-      description: Plugin must have added a header-match rule (X-Test:test) alongside the original weight-split rule.
+    - name: assert-label-present-during-canary
+      description: Plugin must apply the in-progress label once canary traffic is active.
       try:
         - assert:
             timeout: 2m
-            file: assertions/httproute-with-header-route.yaml
+            file: assertions/httproute-with-label.yaml
 
     - name: assert-rollout-healthy
       description: Wait for the canary to complete (30s pause auto-expires).
@@ -65,9 +65,9 @@ spec:
             timeout: 5m
             file: assertions/rollout-healthy.yaml
 
-    - name: assert-cleanup
-      description: Plugin must remove the header-match rule and reset canary weight to 0 after rollout completes.
+    - name: assert-label-removed-after-completion
+      description: Plugin must remove the in-progress label once the rollout completes.
       try:
         - assert:
             timeout: 60s
-            file: assertions/httproute-after-cleanup.yaml
+            file: assertions/httproute-no-label.yaml
