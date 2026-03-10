@@ -13,7 +13,8 @@ Install on your local workstation:
 * [golang](https://golang.org/)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 * [kustomize](https://github.com/kubernetes-sigs/kustomize/releases) >= 4.5.5
-* A local Kubernetes cluster. We recommend [k3d](https://k3d.io/) 
+* [chainsaw](https://kyverno.github.io/chainsaw/latest/) 
+* A local Kubernetes cluster. We recommend [k3d](https://k3d.io/)
 
 
 Checkout the code:
@@ -92,51 +93,40 @@ make unit-tests
 
 ## Running E2E tests
 
-The e2e tests need to run against a kubernetes cluster with the Argo Rollouts controller. To run e2e tests run in the repository root
+The e2e tests need a Kubernetes cluster with Argo Rollouts and Traefik installed. 
 
-```
-make e2e-tests
+First [install Chainsaw](https://kyverno.github.io/chainsaw/latest/quick-start/install/).
+
+Then run all Chainsaw tests (creates the cluster, runs tests, deletes the cluster):
+```bash
+make chainsaw-tests
 ```
 
-This command will
+This command will:
 
 1. Create a local cluster **gatewayapi-plugin-e2e** using tools [kind](https://kind.sigs.k8s.io/) and [docker](https://www.docker.com/). You need to install them.
-2. Set up the cluster using tools [helm](https://helm.sh/) and [kubectl](https://kubernetes.io/docs/reference/kubectl/). You need to install them.
-3. Run tests in the **/test/e2e** folder. 
-4. Delete all resources from the created cluster.
-5. Delete the created cluster.
+1. Set up the cluster using tools [helm](https://helm.sh/) and [kubectl](https://kubernetes.io/docs/reference/kubectl/). You need to install them.
+1. Run tests in the **/test/e2e** folder.
+1. Delete all resources from the created cluster.
+1. Delete the created cluster
 
-**Note:** Traefik is used in e2e tests.
-
-If you want to leave the working cluster with the needed setup at the end, you should run the following command
-```
-make CLUSTER_DELETE=false e2e-tests
+To keep the cluster running after the tests finish:
+```bash
+make CLUSTER_DELETE=false chainsaw-tests
 ```
 
-After this command, you may want to run all tests again. Although you can run the **make CLUSTER_DELETE=false e2e-tests** command again, it is recommended to use this command
+To re-run Chainsaw tests against an already running cluster:
+```bash
+make run-chainsaw-tests
 ```
-make run-e2e-tests
-```
-as you already have the cluster set up.
-
-If you want to run specific e2e tests, then you can use these commands
-```
-make RUN=<reg-exp> e2e-tests
-```
-or
-```
-make RUN=<reg-exp> run-e2e-tests
-```
-reg-exp - the value you would set for the **-run** flag of the **go test** command 
-
 
 ## Cleaning up after failed E2E tests
 
-If your E2E tests fail, then the kind cluster will stay behind. 
+If your E2E tests fail, the kind cluster will stay behind.
 
 If you want to delete it (after debugging it) run:
 
-```
+```bash
 make clear-e2e-cluster
 ```
 

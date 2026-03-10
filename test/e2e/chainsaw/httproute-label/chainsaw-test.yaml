@@ -1,0 +1,73 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-label
+spec:
+  description: >
+    Verifies the in-progress label lifecycle on an HTTPRoute. The plugin adds
+    'rollouts.argoproj.io/gatewayapi-canary=in-progress' when a canary is active
+    and removes it once the rollout completes.
+  # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      description: Create the HTTPRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
+      try:
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-label-absent-initially
+      description: Plugin must not apply the in-progress label when canary weight is 0.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-no-label.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start a canary (setWeight:30 -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-label
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-label-present-during-canary
+      description: Plugin must apply the in-progress label once canary traffic is active.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-label.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (30s pause auto-expires).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-label-removed-after-completion
+      description: Plugin must remove the in-progress label once the rollout completes.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-no-label.yaml

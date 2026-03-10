@@ -2,6 +2,7 @@ CURRENT_DIR=$(shell pwd)
 DIST_DIR=${CURRENT_DIR}/dist
 E2E_CLUSTER_NAME=gatewayapi-plugin-e2e
 IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
+CHAINSAW_VERSION=v0.2.12
 
 # Versions of components used in e2e tests
 GATEWAY_API_VERSION=v1.4.0
@@ -13,7 +14,6 @@ TRAEFIK_HELM_VERSION=37.4.0 # Contains Traefik proxy v3.6.2
 
 
 CLUSTER_DELETE ?= true
-RUN ?= ''
 
 define add_helm_repo
 	helm repo add traefik https://traefik.github.io/charts
@@ -69,34 +69,23 @@ ifeq (${IS_E2E_CLUSTER},)
 	$(call install_k8s_resources)
 endif
 
-.PHONY: e2e-tests
-e2e-tests: setup-e2e-cluster run-e2e-tests
-ifeq (${CLUSTER_DELETE},true)
-	make clear-e2e-cluster
-endif
-
 .PHONY: sanity-check-e2e
 sanity-check-e2e:
 	./test/cluster-setup/sanity-check.sh
 
-.PHONY: run-e2e-tests
-run-e2e-tests: sanity-check-e2e
-	go test -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
-
-# Flaky tests usually fail with GitHub actions. You should be able to run them locally though.
-.PHONY: e2e-tests-flaky
-e2e-tests-flaky: setup-e2e-cluster run-e2e-tests-flaky
-ifeq (${CLUSTER_DELETE},true)
-	make clear-e2e-cluster
-endif
-
-.PHONY: run-e2e-tests-flaky
-run-e2e-tests-flaky: sanity-check-e2e
-	go test -tags "flaky" -v -timeout 5m -count=1 -run ${RUN} ./test/e2e/...
-
 .PHONY: clear-e2e-cluster
 clear-e2e-cluster:
 	kind delete cluster --name ${E2E_CLUSTER_NAME}
+
+.PHONY: run-chainsaw-tests
+run-chainsaw-tests: sanity-check-e2e
+	chainsaw test --report-format JUNIT-TEST --report-name chainsaw-report --report-path . ./test/e2e/chainsaw
+
+.PHONY: chainsaw-tests
+chainsaw-tests: setup-e2e-cluster run-chainsaw-tests
+ifeq (${CLUSTER_DELETE},true)
+	make clear-e2e-cluster
+endif
 
 # convenience target to run `mkdocs serve` using a docker container
 .PHONY: serve-docs
