@@ -12,6 +12,16 @@ env:
   GOLANG_VERSION: '1.24'
 
 jobs:
+  event_file:
+    name: Event File
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Event File
+          path: ${{ github.event_path }}
+
   linting:
     name: Go code linting
     runs-on: ubuntu-latest
@@ -114,6 +124,14 @@ jobs:
       - name: E2E tests
         run: |
           make chainsaw-tests
+
+      - name: Upload Chainsaw Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chainsaw Test Results
+          path: chainsaw-report.xml
+
   build:
     name: Build creation
     runs-on: ubuntu-latest

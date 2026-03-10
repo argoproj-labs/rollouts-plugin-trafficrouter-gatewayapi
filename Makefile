@@ -101,7 +101,7 @@ clear-e2e-cluster:
 
 .PHONY: run-chainsaw-tests
 run-chainsaw-tests: sanity-check-e2e
-	chainsaw test ./test/e2e/chainsaw
+	chainsaw test --report-format JUNIT-TEST --report-name chainsaw-report --report-path . ./test/e2e/chainsaw
 
 .PHONY: chainsaw-tests
 chainsaw-tests: setup-e2e-cluster run-chainsaw-tests
