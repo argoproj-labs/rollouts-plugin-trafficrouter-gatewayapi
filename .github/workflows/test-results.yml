@@ -28,13 +28,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: artifacts
 
-      - name: Publish Chainsaw Test Results
+      - name: Publish E2E Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          check_name: Chainsaw E2E Test Results
+          check_name: E2E Test Results
           compare_to_earlier_commit: false
           fail_on: errors
           commit: ${{ github.event.workflow_run.head_sha }}
           event_file: artifacts/Event File/event.json
           event_name: ${{ github.event.workflow_run.event }}
-          files: artifacts/Chainsaw Test Results/chainsaw-report.xml
+          files: artifacts/E2E Test Results/chainsaw-report.xml

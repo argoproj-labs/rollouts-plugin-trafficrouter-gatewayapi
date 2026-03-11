@@ -97,9 +97,9 @@ The e2e tests need a Kubernetes cluster with Argo Rollouts and Traefik installed
 
 First [install Chainsaw](https://kyverno.github.io/chainsaw/latest/quick-start/install/).
 
-Then run all Chainsaw tests (creates the cluster, runs tests, deletes the cluster):
+Then run all e2e tests (creates the cluster, runs tests, deletes the cluster):
 ```bash
-make chainsaw-tests
+make e2e-tests
 ```
 
 This command will:
@@ -112,12 +112,12 @@ This command will:
 
 To keep the cluster running after the tests finish:
 ```bash
-make CLUSTER_DELETE=false chainsaw-tests
+make CLUSTER_DELETE=false e2e-tests
 ```
 
-To re-run Chainsaw tests against an already running cluster:
+To re-run e2e tests against an already running cluster:
 ```bash
-make run-chainsaw-tests
+make run-e2e-tests
 ```
 
 ## Cleaning up after failed E2E tests
