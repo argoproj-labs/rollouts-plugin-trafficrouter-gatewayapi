@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-mirror-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service
+      stableService: argo-rollouts-stable-service
+      trafficRouting:
+        managedRoutes:
+          - name: mirror-route
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-mirror
+            namespace: default
+      steps:
+        - setWeight: 30
+        - setMirrorRoute:
+            name: mirror-route
+            percentage: 100
+            match:
+              - method:
+                  exact: GET
+                path:
+                  prefix: /
+        - pause: {duration: 30s}   # auto-promotes — no promote command needed in tests
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollouts-demo
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

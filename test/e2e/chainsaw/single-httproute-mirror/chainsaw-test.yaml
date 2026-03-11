@@ -1,0 +1,81 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: single-httproute-mirror
+  labels:
+    route-type: http
+    test-scope: mirror
+spec:
+  description: >
+    Verifies mirror routing with a single HTTPRoute. The plugin must inject a
+    RequestMirror rule during a canary rollout, copying live traffic to the canary
+    service, and remove it once the rollout completes.
+  # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
+  # NOTE: requires argoproj/argo-rollouts#XXXX to be merged first — until then,
+  # setMirrorRoute steps are rejected by the controller when trafficRouting.Istio
+  # is absent (setHeaderRoute was already fixed in v1.8.3; setMirrorRoute was not).
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      description: Create the HTTPRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
+      try:
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+      try:
+        - assert:
+            timeout: 3m
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start a canary (setWeight:30 -> setMirrorRoute -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-mirror-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-mirror-routing-active
+      description: >
+        Plugin must have appended a mirror rule with a RequestMirror filter pointing
+        to the canary service alongside the original weight-split rule.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-mirror-route.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (30s pause auto-expires).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: Plugin must remove the mirror rule and reset canary weight to 0 after rollout completes.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml
