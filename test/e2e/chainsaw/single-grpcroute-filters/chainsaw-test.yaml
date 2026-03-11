@@ -2,6 +2,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: single-grpcroute-filters
+  labels:
+    route-type: grpc
+    test-scope: headers
 spec:
   description: >
     Verifies that existing GRPCRoute filters (RequestHeaderModifier, ResponseHeaderModifier,

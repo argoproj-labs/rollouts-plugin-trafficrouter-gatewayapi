@@ -2,6 +2,8 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: httproute-label
+  labels:
+    route-type: http
 spec:
   description: >
     Verifies the in-progress label lifecycle on an HTTPRoute. The plugin adds

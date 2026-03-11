@@ -2,6 +2,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: single-httproute-filters
+  labels:
+    route-type: http
+    test-scope: headers
 spec:
   description: >
     Verifies that existing HTTPRoute filters (RequestHeaderModifier, ResponseHeaderModifier,

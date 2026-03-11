@@ -55,7 +55,7 @@ jobs:
         run: |
           make unit-tests
 
-  e2e-tests-chainsaw:
+  e2e-tests:
     name: E2E tests 
     runs-on: ubuntu-latest
     steps:
@@ -80,13 +80,13 @@ jobs:
 
       - name: E2E tests
         run: |
-          make chainsaw-tests
+          make e2e-tests
 
-      - name: Upload Chainsaw Test Results
+      - name: Upload E2E Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Chainsaw Test Results
+          name: E2E Test Results
           path: chainsaw-report.xml
 
   build:

@@ -77,12 +77,12 @@ sanity-check-e2e:
 clear-e2e-cluster:
 	kind delete cluster --name ${E2E_CLUSTER_NAME}
 
-.PHONY: run-chainsaw-tests
-run-chainsaw-tests: sanity-check-e2e
+.PHONY: run-e2e-tests
+run-e2e-tests: sanity-check-e2e
 	chainsaw test --report-format JUNIT-TEST --report-name chainsaw-report --report-path . ./test/e2e/chainsaw
 
-.PHONY: chainsaw-tests
-chainsaw-tests: setup-e2e-cluster run-chainsaw-tests
+.PHONY: e2e-tests
+e2e-tests: setup-e2e-cluster run-e2e-tests
 ifeq (${CLUSTER_DELETE},true)
 	make clear-e2e-cluster
 endif
