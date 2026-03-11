@@ -2,6 +2,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: single-header-based-httproute
+  labels:
+    route-type: http
+    test-scope: headers
 spec:
   description: >
     Verifies header-based routing with a single HTTPRoute. The plugin must inject

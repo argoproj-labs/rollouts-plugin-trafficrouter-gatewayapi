@@ -2,6 +2,8 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: single-grpcroute
+  labels:
+    route-type: grpc
 spec:
   description: >
     Verifies basic weight-based canary traffic splitting with a single GRPCRoute.

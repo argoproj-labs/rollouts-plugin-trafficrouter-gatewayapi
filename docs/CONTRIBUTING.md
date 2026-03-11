@@ -120,6 +120,20 @@ To re-run e2e tests against an already running cluster:
 make run-e2e-tests
 ```
 
+### Running Specific Test Suites
+
+E2E tests are labeled with `route-type` (http, grpc, tcp, tls) and optionally `test-scope: headers` for header-based routing tests. You can use Chainsaw's label selectors to run specific test suites.
+
+For example, to run only HTTP route tests:
+```bash
+chainsaw test --selector route-type=http ./test/e2e/chainsaw
+```
+
+Or to run only header-based tests:
+```bash
+chainsaw test --selector test-scope=headers ./test/e2e/chainsaw
+```
+
 ## Cleaning up after failed E2E tests
 
 If your E2E tests fail, the kind cluster will stay behind.
