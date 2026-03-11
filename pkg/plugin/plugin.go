@@ -152,6 +152,25 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 }
 
 func (r *RpcPlugin) SetMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute) pluginTypes.RpcError {
+	gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	if gatewayAPIConfig.HTTPRoutes != nil {
+		gatewayAPIConfig.ConfigMapRWMutex.Lock()
+		r.LogCtx.Info(fmt.Sprintf("[SetMirrorRoute] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
+			gatewayAPIConfig.HTTPRoute = route.Name
+			return r.setHTTPMirrorRoute(rollout, setMirrorRoute, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+			return rpcError
+		}
+		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+	}
 	return pluginTypes.RpcError{}
 }
 
@@ -191,6 +210,19 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 			}
 			gatewayAPIConfig.GRPCRoute = route.Name
 			return r.removeGRPCManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+			return rpcError
+		}
+		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
+	}
+	if gatewayAPIConfig.HTTPRoutes != nil {
+		gatewayAPIConfig.ConfigMapRWMutex.Lock()
+		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q removing mirror routes from HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
+			gatewayAPIConfig.HTTPRoute = route.Name
+			return r.removeHTTPMirrorManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
 			gatewayAPIConfig.ConfigMapRWMutex.Unlock()

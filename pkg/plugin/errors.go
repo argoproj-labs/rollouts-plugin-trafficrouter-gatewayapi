@@ -12,4 +12,5 @@ const (
 	BackendRefListWasNotFoundInTCPRouteError = "backendRef list was not found in tcpRoute"
 	BackendRefListWasNotFoundInTLSRouteError = "backendRef list was not found in tlsRoute"
 	ManagedRouteMapEntryDeleteError          = "can't delete key %q from managedRouteMap. The key %q is not in the managedRouteMap"
+	InvalidMirrorMatchTypeError              = "invalid mirror match type"
 )

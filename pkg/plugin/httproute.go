@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	HTTPConfigMapKey = "httpManagedRoutes"
+	HTTPConfigMapKey       = "httpManagedRoutes"
+	HTTPMirrorConfigMapKey = "httpMirrorManagedRoutes"
 )
 
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
@@ -278,6 +279,14 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 }
 
 func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	return r.removeHTTPManagedRoutesWithKey(managedRouteNameList, gatewayAPIConfig, HTTPConfigMapKey)
+}
+
+func (r *RpcPlugin) removeHTTPMirrorManagedRoutes(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	return r.removeHTTPManagedRoutesWithKey(managedRouteNameList, gatewayAPIConfig, HTTPMirrorConfigMapKey)
+}
+
+func (r *RpcPlugin) removeHTTPManagedRoutesWithKey(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting, configMapKey string) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.HTTPRouteClient
 	clientset := r.TestClientset
@@ -297,7 +306,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			ErrorString: err.Error(),
 		}
 	}
-	err = utils.GetConfigMapData(configMap, HTTPConfigMapKey, &managedRouteMap)
+	err = utils.GetConfigMapData(configMap, configMapKey, &managedRouteMap)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -332,7 +341,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 	oldHTTPRuleList := httpRoute.Spec.Rules
 	httpRoute.Spec.Rules = httpRouteRuleList
 	oldConfigMapData := make(ManagedRouteMap)
-	err = utils.GetConfigMapData(configMap, HTTPConfigMapKey, &oldConfigMapData)
+	err = utils.GetConfigMapData(configMap, configMapKey, &oldConfigMapData)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -366,7 +375,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			Action: func() error {
 				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
-					ConfigMapKey: HTTPConfigMapKey,
+					ConfigMapKey: configMapKey,
 					Ctx:          ctx,
 				})
 				if err != nil {
@@ -377,7 +386,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(managedRouteNameList []v1alpha1.Mang
 			ReverseAction: func() error {
 				err = utils.UpdateConfigMapData(configMap, oldConfigMapData, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
-					ConfigMapKey: HTTPConfigMapKey,
+					ConfigMapKey: configMapKey,
 					Ctx:          ctx,
 				})
 				if err != nil {
@@ -428,6 +437,221 @@ func removeManagedHTTPRouteEntry(managedRouteMap ManagedRouteMap, routeRuleList 
 	}
 	routeRuleList = slices.Delete(routeRuleList, managedRouteIndex, managedRouteIndex+1)
 	return routeRuleList, nil
+}
+
+func (r *RpcPlugin) setHTTPMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	if setMirrorRoute.Match == nil {
+		managedRouteList := []v1alpha1.MangedRoutes{
+			{
+				Name: setMirrorRoute.Name,
+			},
+		}
+		return r.removeHTTPMirrorManagedRoutes(managedRouteList, gatewayAPIConfig)
+	}
+	ctx := context.TODO()
+	httpRouteClient := r.HTTPRouteClient
+	managedRouteMap := make(ManagedRouteMap)
+	httpRouteName := gatewayAPIConfig.HTTPRoute
+	clientset := r.TestClientset
+	if !r.IsTest {
+		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
+		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
+		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
+	}
+	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
+		Clientset: clientset,
+		Ctx:       ctx,
+	})
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	err = utils.GetConfigMapData(configMap, HTTPMirrorConfigMapKey, &managedRouteMap)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	httpRoute, err := httpRouteClient.Get(ctx, httpRouteName, metav1.GetOptions{})
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	canaryServiceKind := gatewayv1.Kind("Service")
+	canaryServiceGroup := gatewayv1.Group("")
+	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+	backendRefNameList := []string{string(canaryServiceName), stableServiceName}
+	httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	var canaryPort *gatewayv1.PortNumber
+	for i := 0; i < len(httpRouteRule.BackendRefs); i++ {
+		if canaryServiceName == httpRouteRule.BackendRefs[i].Name {
+			canaryPort = httpRouteRule.BackendRefs[i].Port
+			break
+		}
+	}
+	mirrorMatches, rpcError := getHTTPMirrorRouteMatches(setMirrorRoute.Match)
+	if rpcError.HasError() {
+		return rpcError
+	}
+	mirrorFilter := gatewayv1.HTTPRouteFilter{
+		Type: gatewayv1.HTTPRouteFilterRequestMirror,
+		RequestMirror: &gatewayv1.HTTPRequestMirrorFilter{
+			BackendRef: gatewayv1.BackendObjectReference{
+				Group: &canaryServiceGroup,
+				Kind:  &canaryServiceKind,
+				Name:  canaryServiceName,
+				Port:  canaryPort,
+			},
+			Percent: setMirrorRoute.Percentage,
+		},
+	}
+	backendRefs := make([]gatewayv1.HTTPBackendRef, len(httpRouteRule.BackendRefs))
+	copy(backendRefs, httpRouteRule.BackendRefs)
+	httpMirrorRouteRule := gatewayv1.HTTPRouteRule{
+		Matches:     mirrorMatches,
+		Filters:     []gatewayv1.HTTPRouteFilter{mirrorFilter},
+		BackendRefs: backendRefs,
+	}
+	httpRouteRuleList = append(httpRouteRuleList, httpMirrorRouteRule)
+	oldHTTPRuleList := httpRoute.Spec.Rules
+	httpRoute.Spec.Rules = httpRouteRuleList
+	oldConfigMapData := make(ManagedRouteMap)
+	err = utils.GetConfigMapData(configMap, HTTPMirrorConfigMapKey, &oldConfigMapData)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	taskList := []utils.Task{
+		{
+			Action: func() error {
+				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				if r.IsTest {
+					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+				}
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			ReverseAction: func() error {
+				httpRoute.Spec.Rules = oldHTTPRuleList
+				updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+				if r.IsTest {
+					r.UpdatedHTTPRouteMock = updatedHTTPRoute
+				}
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+		{
+			Action: func() error {
+				if managedRouteMap[setMirrorRoute.Name] == nil {
+					managedRouteMap[setMirrorRoute.Name] = make(map[string]int)
+				}
+				managedRouteMap[setMirrorRoute.Name][httpRouteName] = len(httpRouteRuleList) - 1
+				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
+					Clientset:    clientset,
+					ConfigMapKey: HTTPMirrorConfigMapKey,
+					Ctx:          ctx,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			ReverseAction: func() error {
+				err = utils.UpdateConfigMapData(configMap, oldConfigMapData, utils.UpdateConfigMapOptions{
+					Clientset:    clientset,
+					ConfigMapKey: HTTPMirrorConfigMapKey,
+					Ctx:          ctx,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+	}
+	err = utils.DoTransaction(r.LogCtx, taskList...)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	return pluginTypes.RpcError{}
+}
+
+func getHTTPMirrorRouteMatches(mirrorMatch []v1alpha1.RouteMatch) ([]gatewayv1.HTTPRouteMatch, pluginTypes.RpcError) {
+	var httpMirrorRouteMatches []gatewayv1.HTTPRouteMatch
+	for _, match := range mirrorMatch {
+		httpMatch := gatewayv1.HTTPRouteMatch{}
+		if match.Path != nil {
+			var pathMatchType gatewayv1.PathMatchType
+			var pathValue string
+			switch {
+			case match.Path.Exact != "":
+				pathMatchType = gatewayv1.PathMatchExact
+				pathValue = match.Path.Exact
+			case match.Path.Prefix != "":
+				pathMatchType = gatewayv1.PathMatchPathPrefix
+				pathValue = match.Path.Prefix
+			case match.Path.Regex != "":
+				pathMatchType = gatewayv1.PathMatchRegularExpression
+				pathValue = match.Path.Regex
+			default:
+				return nil, pluginTypes.RpcError{ErrorString: InvalidMirrorMatchTypeError}
+			}
+			httpMatch.Path = &gatewayv1.HTTPPathMatch{
+				Type:  &pathMatchType,
+				Value: &pathValue,
+			}
+		}
+		if match.Method != nil {
+			switch {
+			case match.Method.Exact != "":
+				method := gatewayv1.HTTPMethod(match.Method.Exact)
+				httpMatch.Method = &method
+			default:
+				return nil, pluginTypes.RpcError{ErrorString: InvalidMirrorMatchTypeError}
+			}
+		}
+		for headerName, headerMatch := range match.Headers {
+			headerMatchRule := gatewayv1.HTTPHeaderMatch{
+				Name: gatewayv1.HTTPHeaderName(headerName),
+			}
+			switch {
+			case headerMatch.Exact != "":
+				matchType := gatewayv1.HeaderMatchExact
+				headerMatchRule.Type = &matchType
+				headerMatchRule.Value = headerMatch.Exact
+			case headerMatch.Prefix != "":
+				matchType := gatewayv1.HeaderMatchRegularExpression
+				headerMatchRule.Type = &matchType
+				headerMatchRule.Value = headerMatch.Prefix + ".*"
+			case headerMatch.Regex != "":
+				matchType := gatewayv1.HeaderMatchRegularExpression
+				headerMatchRule.Type = &matchType
+				headerMatchRule.Value = headerMatch.Regex
+			default:
+				return nil, pluginTypes.RpcError{ErrorString: InvalidMirrorMatchTypeError}
+			}
+			httpMatch.Headers = append(httpMatch.Headers, headerMatchRule)
+		}
+		httpMirrorRouteMatches = append(httpMirrorRouteMatches, httpMatch)
+	}
+	return httpMirrorRouteMatches, pluginTypes.RpcError{}
 }
 
 func (r *HTTPRouteRule) Iterator() (GatewayAPIRouteRuleIterator[*HTTPBackendRef], bool) {

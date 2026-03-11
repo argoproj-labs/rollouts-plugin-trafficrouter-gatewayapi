@@ -22,7 +22,8 @@ nav:
 - Features: 
   - Advanced Deployments: features/advanced-deployments.md
   - Multiple Routes: features/multiple-routes.md
-  - Header Based Routing: features/header-based-routing.md    
+  - Header Based Routing: features/header-based-routing.md
+  - Mirror Routing: features/mirror-routing.md
   - TCP Routing: features/tcp.md
   - TLS Routing: features/tls.md
   - GRPC Routing: features/grpc.md  

@@ -21,7 +21,8 @@ const (
 	TLSRouteName      = "argo-rollouts-tls-route"
 	RolloutNamespace  = "default"
 	ConfigMapName     = "test-config"
-	ManagedRouteName  = "test-header-route"
+	ManagedRouteName       = "test-header-route"
+	MirrorManagedRouteName = "test-mirror-route"
 )
 
 var (

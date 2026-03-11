@@ -559,6 +559,81 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 1, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
 	})
+	t.Run("SetHTTPMirrorRoute", func(t *testing.T) {
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		var percentage int32 = 35
+		mirrorRoute := v1alpha1.SetMirrorRoute{
+			Name:       mocks.MirrorManagedRouteName,
+			Percentage: &percentage,
+			Match: []v1alpha1.RouteMatch{
+				{
+					Method: &v1alpha1.StringMatch{Exact: "GET"},
+					Path:   &v1alpha1.StringMatch{Prefix: "/"},
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetMirrorRoute(rollout, &mirrorRoute)
+
+		assert.Empty(t, err.Error())
+		rules := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules
+		assert.Equal(t, 2, len(rules))
+		mirrorRule := rules[1]
+		assert.Equal(t, 1, len(mirrorRule.Filters))
+		assert.Equal(t, gatewayv1.HTTPRouteFilterRequestMirror, mirrorRule.Filters[0].Type)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.CanaryServiceName), mirrorRule.Filters[0].RequestMirror.BackendRef.Name)
+		assert.Equal(t, &percentage, mirrorRule.Filters[0].RequestMirror.Percent)
+		// BackendRefs should be copied from the base rule
+		assert.Equal(t, 2, len(mirrorRule.BackendRefs))
+		// Method and path matches should be translated
+		assert.Equal(t, 1, len(mirrorRule.Matches))
+		assert.Equal(t, gatewayv1.HTTPMethod("GET"), *mirrorRule.Matches[0].Method)
+		assert.Equal(t, gatewayv1.PathMatchPathPrefix, *mirrorRule.Matches[0].Path.Type)
+		assert.Equal(t, "/", *mirrorRule.Matches[0].Path.Value)
+	})
+	t.Run("SetHTTPMirrorRouteWithNilPercentage", func(t *testing.T) {
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(&mocks.HTTPRouteObj).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		mirrorRoute := v1alpha1.SetMirrorRoute{
+			Name:       mocks.MirrorManagedRouteName,
+			Percentage: nil,
+			Match: []v1alpha1.RouteMatch{
+				{
+					Path: &v1alpha1.StringMatch{Exact: "/api"},
+				},
+			},
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetMirrorRoute(rollout, &mirrorRoute)
+
+		assert.Empty(t, err.Error())
+		mirrorFilter := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters[0]
+		assert.Nil(t, mirrorFilter.RequestMirror.Percent)
+	})
+	t.Run("RemoveHTTPMirrorManagedRoutes", func(t *testing.T) {
+		// SetMirrorRoute with nil Match removes the named mirror route
+		mirrorRoute := v1alpha1.SetMirrorRoute{
+			Name:  mocks.MirrorManagedRouteName,
+			Match: nil,
+		}
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+			ConfigMap: mocks.ConfigMapName,
+		})
+		err := pluginInstance.SetMirrorRoute(rollout, &mirrorRoute)
+
+		assert.Empty(t, err.Error())
+		// Mirror route removed; only the base rule remains
+		assert.Equal(t, 1, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
+	})
 
 	// Canceling should cause an exit
 	cancel()
