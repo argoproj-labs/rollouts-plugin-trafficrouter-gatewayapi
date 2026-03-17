@@ -3,12 +3,78 @@
 This guide will describe how to use kgateway Kubernetes Gateway as an implementation
 for the Gateway API in order to do split traffic with Argo Rollouts.
 
+Versions used in this guide::
+- Kubernetes Gateway API: v1.4.0
+- kgateway: v2.3.0
+- argo-rollouts: v1.8.4
+- rollouts-plugin-trafficrouter-gatewayapi: v0.8.0
+
 ## Step 1 - Enable Gateway Provider and create Gateway entrypoint
 
-Before enabling a Gateway Provider you also need to install kgateway Kubernetes Gateway. Follow the official [installation instructions](https://kgateway.dev/docs/envoy/main/install).
+### 1 - Install kgateway
+This installation creates a `kgateway` GatewayClass, which we will use later. You can follow the instructions below to install via Helm, or refer to the [installation instructions](https://kgateway.dev/docs/envoy/main/install/) for other methods.
 
-This installation will create an `kgateway` gateway class that we can use later on.
+#### 1. Install the custom resources of the Kubernetes Gateway API version 1.4.0.
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+```
 
+Example output:
+```shell
+customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io created
+```
+
+#### 2. Apply the kgateway CRDs for the upgrade version by using Helm.
+Deploy the kgateway CRDs by using Helm. This command creates the kgateway-system namespace and creates the kgateway CRDs in the cluster.
+```shell
+helm upgrade -i --create-namespace \
+  --namespace kgateway-system \
+  --version v2.3.0-main kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds 
+```
+
+#### 3. Install the kgateway Helm chart.
+```shell
+helm upgrade -i -n kgateway-system kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway \
+--version v2.3.0-main
+```
+
+Example output:
+```shell
+NAME: kgateway
+LAST DEPLOYED: Thu Feb 13 14:03:51 2025
+NAMESPACE: kgateway-system
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+```
+
+#### 4. Verify that the control plane is up and running.
+```shell
+kubectl get pods -n kgateway-system
+```
+
+Example output:
+```shell
+NAME                                  READY   STATUS    RESTARTS   AGE
+kgateway-78658959cd-cz6jt             1/1     Running   0          12s
+```
+
+#### 5. Verify that the kgateway GatewayClass is created.
+```shell
+kubectl get gatewayclass kgateway
+```
+
+Example output:
+```shell
+NAME         CONTROLLER               ACCEPTED   AGE   
+kgateway     kgateway.dev/kgateway    True       6m36s
+```
+
+### 2 - install Argo Rollouts
 Make sure you also install Argo Rollouts. This installation was used in this example: [kgateway install Argo Rollouts](https://kgateway.dev/docs/envoy/main/integrations/argo/#install-argo-rollouts)
 
 ## Step 2 - Create a Gateway resource and HTTPRoute that defines a traffic split
@@ -26,7 +92,7 @@ spec:
   listeners:
     - protocol: HTTP
       name: web
-      port: 80 # one of Gateway entrypoint that was created following the official installation instructions
+      port: 80
 ```
 
 Create HTTPRoute and connect to the created Gateway resource:
