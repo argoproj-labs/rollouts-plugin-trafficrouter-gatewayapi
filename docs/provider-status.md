@@ -25,6 +25,7 @@ For convenience we are including here a list of those actually tested with the p
 | [Linkerd](https://linkerd.io/)     | edge-25.9.4 |   1.2.1    | 0.8.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/linkerd-header-based)    |
 | [NGINX Gateway](https://github.com/nginxinc/nginx-gateway-fabric)     | Unknown | 0.8.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/nginx)    |
 | [Traefik](https://doc.traefik.io/traefik/providers/kubernetes-gateway/)     | 3.1.3 | 1.1      | 0.4.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/traefik)    |
+| [kgateway](https://kgateway.dev/)     | 2.3.0 | 1.4.0 | 0.8.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kgateway)    |
 
 Note that these examples are included just for completeness. You should be able
 to use any solution that implements the Gateway API. 
