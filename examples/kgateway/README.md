@@ -1,4 +1,4 @@
-# Using kgateway Kubernetes Gateway with Argo Rollouts
+# Using kgateway with Argo Rollouts
 
 This guide will describe how to use kgateway Kubernetes Gateway as an implementation
 for the Gateway API in order to do split traffic with Argo Rollouts.
