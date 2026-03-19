@@ -123,6 +123,7 @@ EOF
 
 1. Create a canary service.
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Service
 metadata:
@@ -136,10 +137,12 @@ spec:
       name: http
   selector:
     app: rollouts-demo
+EOF
 ```
 
 2. Create a stable service.
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Service
 metadata:
@@ -153,6 +156,7 @@ spec:
       name: http
   selector:
     app: rollouts-demo
+EOF
 ```
 
 ## Step 4 - Grant argo-rollouts permissions
@@ -178,6 +182,7 @@ rules:
 Create the argo-rollouts resources.
 
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -223,6 +228,7 @@ spec:
             requests:
               memory: 32Mi
               cpu: 5m
+EOF
 ```
 
 Apply all the yaml files to your cluster.
@@ -252,6 +258,7 @@ curl -v http://localhost:8080/
 
 1. Update the image under containers in rollout.yml to blue or a different color (such as `image: argoproj/rollouts-demo:blue`) and apply the `rollout.yaml` again.
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -297,6 +304,7 @@ spec:
             requests:
               memory: 32Mi
               cpu: 5m
+EOF
 ```      
 
 2. Check the weight difference between the stable and canary service.
