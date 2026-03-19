@@ -9,6 +9,9 @@ Versions used in this guide:
 - argo-rollouts: v1.8.4
 - rollouts-plugin-trafficrouter-gatewayapi: v0.8.0
 
+Dependency:
+- [argo rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) kubectl plugin
+
 ## Step 1 - Install kgateway and Argo Rollouts
 
 ### 1 - Install kgateway
@@ -306,6 +309,11 @@ EOF
 2. Check the weight difference between the stable and canary service.
 ```shell
 kubectl get httproute argo-rollouts-http-route -o yaml -n argo-rollouts
+```
+
+Or use the following command to watch the promotion progress in real time. Make sure you have installed the [argo-rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) extension for kubectl.
+```shell
+kubectl argo rollouts get rollout rollouts-demo -n argo-rollouts --watch
 ```
 
 3. Promote the rollout. Make sure you have installed the [argo-rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) extension for kubectl.
