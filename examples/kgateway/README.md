@@ -231,11 +231,6 @@ spec:
 EOF
 ```
 
-Apply all the yaml files to your cluster.
-```shell
-kubectl apply -f <filename>
-```
-
 ## Step 6 - Test Application
 
 1. Port-forward the Gateway service.
