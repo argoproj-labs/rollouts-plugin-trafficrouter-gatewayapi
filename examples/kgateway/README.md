@@ -32,13 +32,13 @@ customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.
 ```shell
 helm upgrade -i --create-namespace \
   --namespace kgateway-system \
-  --version v2.3.0-main kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds 
+  --version v2.2.2 kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds 
 ```
 
 3. Install the kgateway Helm chart.
 ```shell
 helm upgrade -i -n kgateway-system kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway \
---version v2.3.0-main
+--version v2.2.2
 ```
 
 Example output:
