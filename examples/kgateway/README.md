@@ -246,7 +246,8 @@ http://localhost:8080
 
 - Or via terminal:
 ```shell
-curl -v http://localhost:8080/
+curl http://localhost:8080/
+curl http://localhost:8080/color
 ```
 
 ## Step 6 - Test the promotion
@@ -325,5 +326,5 @@ http://localhost:8080
 
 - Or via terminal:
 ```shell
-curl -v http://localhost:8080/
+curl http://localhost:8080/color
 ```
