@@ -246,7 +246,7 @@ curl -v http://localhost:8080/
 
 ## Step 6 - Test the promotion
 
-1. Update the image under containers in rollout.yml to blue or a diffrent coloar (e.g. image: argoproj/rollouts-demo:blue) and apply the rollout.yaml again.
+1. Update the image under containers in rollout.yml to blue or a different color (such as `image: argoproj/rollouts-demo:blue`) and apply the `rollout.yaml` again.
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
