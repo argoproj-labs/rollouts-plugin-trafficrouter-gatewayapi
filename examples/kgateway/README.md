@@ -82,6 +82,7 @@ Create a dedicated gateway that splits traffic across your Argo Rollouts resourc
 
 1. Create a Gateway.
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
@@ -93,6 +94,7 @@ spec:
     - protocol: HTTP
       name: web
       port: 80
+EOF
 ```
 
 2. Create and attach an HTTPRoute to the Gateway.
