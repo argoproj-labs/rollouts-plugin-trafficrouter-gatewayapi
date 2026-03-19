@@ -305,7 +305,7 @@ kubectl get httproute argo-rollouts-http-route -o yaml -n argo-rollouts
 kubectl argo rollouts promote rollouts-demo -n argo-rollouts
 ```
 
-4. Check again the weight diffrence between the stable and canary service.
+4. Check again the weight difference between the stable and canary service.
 ```shell
 kubectl get httproute argo-rollouts-http-route -o yaml -n argo-rollouts
 ```
