@@ -164,7 +164,7 @@ EOF
 
 ## Step 4 - Grant argo-rollouts permissions
 
-Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions or use the RBAC example provided in the [kgateway documentation](https://kgateway.dev/docs/envoy/main/integrations/argo/#create-rbac-rules-for-argo):
+Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes and Configmaps as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions or use the RBAC example provided in the [kgateway documentation](https://kgateway.dev/docs/envoy/main/integrations/argo/#create-rbac-rules-for-argo):
 
 1. Create a ClusterRole.
 ```yaml
