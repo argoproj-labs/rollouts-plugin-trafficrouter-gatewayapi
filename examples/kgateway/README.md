@@ -99,6 +99,7 @@ EOF
 
 2. Create and attach an HTTPRoute to the Gateway.
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
@@ -115,6 +116,7 @@ spec:
           port: 80
         - name: argo-rollouts-canary-service
           port: 80
+EOF
 ```
 
 ## Step 3 - Create Services for your application
