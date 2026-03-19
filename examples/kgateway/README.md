@@ -255,7 +255,12 @@ curl http://localhost:8080/color
 
 ## Step 6 - Test the promotion
 
-1. Update the image under containers in rollout.yml to blue or a different color (such as `image: argoproj/rollouts-demo:blue`) and apply the `rollout.yaml` again.
+1. Update the Image of the rollout to blue or a different color.
+```shell
+kubectl argo rollouts set image rollouts-demo rollouts-demo=argoproj/rollouts-demo:blue -n argo-rollouts
+```
+
+Or update the image under containers in rollout.yml to blue or a different color (such as `image: argoproj/rollouts-demo:blue`) and apply the `rollout.yaml` again.
 ```yaml
 kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
