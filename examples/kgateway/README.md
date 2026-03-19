@@ -295,7 +295,7 @@ spec:
               cpu: 5m
 ```      
 
-2. Check the weight diffrence between the stable and canary service.
+2. Check the weight difference between the stable and canary service.
 ```shell
 kubectl get httproute argo-rollouts-http-route -o yaml -n argo-rollouts
 ```
