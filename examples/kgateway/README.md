@@ -166,18 +166,56 @@ EOF
 
 Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions or use the RBAC example provided in the [kgateway documentation](https://kgateway.dev/docs/envoy/main/integrations/argo/#create-rbac-rules-for-argo):
 
+1. Create a ClusterRole.
 ```yaml
+kubectl apply -f- <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gateway-controller-role
+  namespace: argo-rollouts
 rules:
-- apiGroups:
-  - gateway.networking.k8s.io
-  resources:
-  - httproutes
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-  - patch
+  - apiGroups:
+      - "gateway.networking.k8s.io"
+    resources:
+      - "httproutes"
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - "configmaps"
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+EOF
+```
+
+2. Create a ClusterRoleBinding.
+```yaml
+kubectl apply -f- <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gateway-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gateway-controller-role
+subjects:
+  - namespace: argo-rollouts
+    kind: ServiceAccount
+    name: argo-rollouts
+EOF
 ```
 
 ## Step 5 - Create argo-rollouts resources
