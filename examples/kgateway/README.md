@@ -7,7 +7,7 @@ Versions used in this guide:
 - Kubernetes Gateway API: v1.4.0
 - kgateway: v2.3.0
 - argo-rollouts: v1.8.4
-- rollouts-plugin-trafficrouter-gatewayapi: v0.8.0
+- rollouts-plugin-trafficrouter-gatewayapi: v0.11.0
 
 Dependency:
 - [argo rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) kubectl plugin
