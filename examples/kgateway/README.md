@@ -290,7 +290,7 @@ Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. 
    curl http://localhost:8080/color
    ```
 
-## Step 6 - Test the promotion
+## Step 7 - Test the promotion
 
 1. Update the Image of the rollout to blue or a different color.
    ```shell
