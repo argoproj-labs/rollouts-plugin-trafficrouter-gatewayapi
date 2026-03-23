@@ -5,7 +5,7 @@ for the Gateway API in order to do split traffic with Argo Rollouts.
 
 Versions used in this guide:
 - Kubernetes Gateway API: v1.4.0
-- kgateway: v2.3.0
+- kgateway: v2.2.2
 - argo-rollouts: v1.8.4
 - rollouts-plugin-trafficrouter-gatewayapi: v0.11.0
 
