@@ -177,7 +177,24 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			})
 		}
 	}
-	grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+	// If a managed route already exists at a valid index, update it in place rather than
+	// appending a new rule. This prevents duplicate rules from accumulating when
+	// setGRPCHeaderRoute is called multiple times for the same header route (e.g. during
+	// rapid consecutive deployments).
+	var managedRouteIndex int
+	if routeIndexMap, exists := managedRouteMap[headerRouting.Name]; exists {
+		if existingIndex, ok := routeIndexMap[grpcRouteName]; ok && existingIndex >= 0 && existingIndex < len(grpcRouteRuleList) {
+			managedRouteIndex = existingIndex
+			grpcRouteRuleList[existingIndex] = grpcHeaderRouteRule
+		} else {
+			// Stale or missing index — append a new rule
+			grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+			managedRouteIndex = len(grpcRouteRuleList) - 1
+		}
+	} else {
+		grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+		managedRouteIndex = len(grpcRouteRuleList) - 1
+	}
 	oldGRPCRuleList := grpcRoute.Spec.Rules
 	grpcRoute.Spec.Rules = grpcRouteRuleList
 	oldConfigMapData := make(ManagedRouteMap)
@@ -216,7 +233,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				if managedRouteMap[headerRouting.Name] == nil {
 					managedRouteMap[headerRouting.Name] = make(map[string]int)
 				}
-				managedRouteMap[headerRouting.Name][grpcRouteName] = len(grpcRouteRuleList) - 1
+				managedRouteMap[headerRouting.Name][grpcRouteName] = managedRouteIndex
 				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
 					ConfigMapKey: GRPCConfigMapKey,

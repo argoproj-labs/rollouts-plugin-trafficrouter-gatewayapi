@@ -176,7 +176,24 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		})
 	}
 
-	httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
+	// If a managed route already exists at a valid index, update it in place rather than
+	// appending a new rule. This prevents duplicate rules from accumulating when
+	// setHTTPHeaderRoute is called multiple times for the same header route (e.g. during
+	// rapid consecutive deployments).
+	var managedRouteIndex int
+	if routeIndexMap, exists := managedRouteMap[headerRouting.Name]; exists {
+		if existingIndex, ok := routeIndexMap[httpRouteName]; ok && existingIndex >= 0 && existingIndex < len(httpRouteRuleList) {
+			managedRouteIndex = existingIndex
+			httpRouteRuleList[existingIndex] = httpHeaderRouteRule
+		} else {
+			// Stale or missing index — append a new rule
+			httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
+			managedRouteIndex = len(httpRouteRuleList) - 1
+		}
+	} else {
+		httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
+		managedRouteIndex = len(httpRouteRuleList) - 1
+	}
 	oldHTTPRuleList := httpRoute.Spec.Rules
 	httpRoute.Spec.Rules = httpRouteRuleList
 	oldConfigMapData := make(ManagedRouteMap)
@@ -215,7 +232,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				if managedRouteMap[headerRouting.Name] == nil {
 					managedRouteMap[headerRouting.Name] = make(map[string]int)
 				}
-				managedRouteMap[headerRouting.Name][httpRouteName] = len(httpRouteRuleList) - 1
+				managedRouteMap[headerRouting.Name][httpRouteName] = managedRouteIndex
 				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
 					ConfigMapKey: HTTPConfigMapKey,
