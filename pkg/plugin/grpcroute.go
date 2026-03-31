@@ -177,23 +177,28 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			})
 		}
 	}
-	// If a managed route already exists at a valid index, update it in place rather than
-	// appending a new rule. This prevents duplicate rules from accumulating when
-	// setGRPCHeaderRoute is called multiple times for the same header route (e.g. during
-	// rapid consecutive deployments).
+	// Upsert the managed header rule. Blindly appending on every call would create
+	// duplicate rules; cleanup only removes the last-indexed copy, leaving orphaned
+	// rules that route traffic to a canary service that no longer exists.
+	routeIndexMap, exists := managedRouteMap[headerRouting.Name]
+
 	var managedRouteIndex int
-	if routeIndexMap, exists := managedRouteMap[headerRouting.Name]; exists {
-		if existingIndex, ok := routeIndexMap[grpcRouteName]; ok && existingIndex >= 0 && existingIndex < len(grpcRouteRuleList) {
+	if !exists {
+		grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+		managedRouteIndex = len(grpcRouteRuleList) - 1
+	} else {
+		existingIndex, ok := routeIndexMap[grpcRouteName]
+		isIndexValid := ok && existingIndex >= 0 && existingIndex < len(grpcRouteRuleList)
+
+		if isIndexValid {
+			// Update in-place so the stored index stays stable and no duplicate is created.
 			managedRouteIndex = existingIndex
 			grpcRouteRuleList[existingIndex] = grpcHeaderRouteRule
 		} else {
-			// Stale or missing index — append a new rule
+			// Stale or missing index — append as if this is the first call.
 			grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
 			managedRouteIndex = len(grpcRouteRuleList) - 1
 		}
-	} else {
-		grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
-		managedRouteIndex = len(grpcRouteRuleList) - 1
 	}
 	oldGRPCRuleList := grpcRoute.Spec.Rules
 	grpcRoute.Spec.Rules = grpcRouteRuleList

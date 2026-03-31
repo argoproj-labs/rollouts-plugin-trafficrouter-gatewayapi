@@ -176,23 +176,28 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		})
 	}
 
-	// If a managed route already exists at a valid index, update it in place rather than
-	// appending a new rule. This prevents duplicate rules from accumulating when
-	// setHTTPHeaderRoute is called multiple times for the same header route (e.g. during
-	// rapid consecutive deployments).
+	// Upsert the managed header rule. Blindly appending on every call would create
+	// duplicate rules; cleanup only removes the last-indexed copy, leaving orphaned
+	// rules that route traffic to a canary service that no longer exists.
+	routeIndexMap, exists := managedRouteMap[headerRouting.Name]
+
 	var managedRouteIndex int
-	if routeIndexMap, exists := managedRouteMap[headerRouting.Name]; exists {
-		if existingIndex, ok := routeIndexMap[httpRouteName]; ok && existingIndex >= 0 && existingIndex < len(httpRouteRuleList) {
+	if !exists {
+		httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
+		managedRouteIndex = len(httpRouteRuleList) - 1
+	} else {
+		existingIndex, ok := routeIndexMap[httpRouteName]
+		isIndexValid := ok && existingIndex >= 0 && existingIndex < len(httpRouteRuleList)
+
+		if isIndexValid {
+			// Update in-place so the stored index stays stable and no duplicate is created.
 			managedRouteIndex = existingIndex
 			httpRouteRuleList[existingIndex] = httpHeaderRouteRule
 		} else {
-			// Stale or missing index — append a new rule
+			// Stale or missing index — append as if this is the first call.
 			httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
 			managedRouteIndex = len(httpRouteRuleList) - 1
 		}
-	} else {
-		httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
-		managedRouteIndex = len(httpRouteRuleList) - 1
 	}
 	oldHTTPRuleList := httpRoute.Spec.Rules
 	httpRoute.Spec.Rules = httpRouteRuleList
