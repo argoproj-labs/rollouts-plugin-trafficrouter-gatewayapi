@@ -1,0 +1,20 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shared-httproute
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: default
+  rules:
+    - backendRefs:
+        - name: argo-rollouts-stable-service
+          port: 80
+        - name: argo-rollouts-canary-service
+          port: 80
+    - backendRefs:
+        - name: argo-rollouts-stable-service-b
+          port: 80
+        - name: argo-rollouts-canary-service-b
+          port: 80

@@ -1,0 +1,108 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: shared-httproute
+  labels:
+    route-type: http
+spec:
+  description: >
+    Verifies reference-counted in-progress label and active-rollouts annotation
+    when two rollouts share the same HTTPRoute. The label must remain present
+    while any rollout is active and only be removed after the last one completes.
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      description: Create extra services, shared HTTPRoute, and both Rollouts.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout-a.yaml
+        - apply:
+            file: resources/rollout-b.yaml
+
+    - name: assert-no-label-initially
+      description: No in-progress label before any canary is triggered.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-none-active.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for both rollouts to reach Healthy before triggering canaries.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy-a.yaml
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy-b.yaml
+
+    - name: trigger-both-canaries
+      description: Patch both rollout images simultaneously to start canaries.
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: shared-httproute-a
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: shared-httproute-b
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-both-rollouts-active
+      description: Both rollouts should be tracked in the annotation and the label present.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-both-active.yaml
+
+    - name: wait-for-rollout-a-healthy
+      description: Rollout A finishes first (30s pause). Label must remain because B is still active.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy-a.yaml
+
+    - name: assert-one-rollout-active
+      description: Only rollout B should remain in the annotation; label still present.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-one-active.yaml
+
+    - name: wait-for-rollout-b-healthy
+      description: Rollout B finishes (60s pause). Now both are done.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy-b.yaml
+
+    - name: assert-all-cleaned-up
+      description: Label and annotation must be fully removed after the last rollout completes.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-none-active.yaml
