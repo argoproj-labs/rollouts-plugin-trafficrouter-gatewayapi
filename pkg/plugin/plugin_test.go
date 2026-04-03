@@ -1463,3 +1463,189 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 		t.Fatal("Managed route should have at least one match")
 	}
 }
+
+// TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall verifies that calling SetHeaderRoute multiple
+// times for the same managed route name does not create duplicate rules in the HTTPRoute.
+// This covers the bug reported in issue #151 where rapid consecutive deployments caused
+// orphaned duplicate header-based routing rules.
+func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	headerMatch := v1alpha1.StringMatch{Exact: "true"}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  "X-Canary",
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// First call — should add one managed rule (total: 2 rules)
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "first call should add exactly one managed rule")
+
+	// Simulate the state the fake client has after the first update
+	rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+
+	// Second call with the same header route name — should update in place, not append
+	err = rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "second call must not add a duplicate managed rule")
+}
+
+// TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall verifies that calling SetHeaderRoute multiple
+// times for the same managed route name does not create duplicate rules in the GRPCRoute.
+func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
+	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
+	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
+		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	headerMatch := v1alpha1.StringMatch{Exact: "true"}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  "X-Canary",
+				HeaderValue: &headerMatch,
+			},
+		},
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	// First call — should add one managed rule (total: 2 rules)
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "first call should add exactly one managed rule")
+
+	// Simulate the state the fake client has after the first update
+	rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedGRPCRouteMock).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+
+	// Second call with the same header route name — should update in place, not append
+	err = rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "second call must not add a duplicate managed rule")
+}
+
+// TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth verifies that adding two managed header
+// routes with different names results in both being appended (3 rules total: 1 base + 2 managed).
+func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	firstMatch := v1alpha1.StringMatch{Exact: "true"}
+	firstHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "header-route-one",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Canary", HeaderValue: &firstMatch},
+		},
+	}
+
+	secondMatch := v1alpha1.StringMatch{Exact: "beta"}
+	secondHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "header-route-two",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Version", HeaderValue: &secondMatch},
+		},
+	}
+
+	// Add the first managed route
+	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "first call should add one managed rule")
+
+	// Reflect the updated route in the fake client before the second call
+	rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+
+	// Add a second managed route with a different name — must be appended, not replace the first
+	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 3, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "second distinct header route must be appended")
+}
+
+// TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth verifies that adding two managed header
+// routes with different names results in both being appended (3 rules total: 1 base + 2 managed).
+func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
+	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
+	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
+		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
+	}
+
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+		ConfigMap: mocks.ConfigMapName,
+	})
+
+	firstMatch := v1alpha1.StringMatch{Exact: "true"}
+	firstHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "header-route-one",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Canary", HeaderValue: &firstMatch},
+		},
+	}
+
+	secondMatch := v1alpha1.StringMatch{Exact: "beta"}
+	secondHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "header-route-two",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Version", HeaderValue: &secondMatch},
+		},
+	}
+
+	// Add the first managed route
+	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "first call should add one managed rule")
+
+	// Reflect the updated route in the fake client before the second call
+	rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedGRPCRouteMock).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+
+	// Add a second managed route with a different name — must be appended, not replace the first
+	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
+	assert.Empty(t, err.Error())
+	assert.Equal(t, 3, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "second distinct header route must be appended")
+}

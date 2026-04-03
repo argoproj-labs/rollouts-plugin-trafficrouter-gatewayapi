@@ -177,7 +177,29 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			})
 		}
 	}
-	grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+	// Upsert the managed header rule. Blindly appending on every call would create
+	// duplicate rules; cleanup only removes the last-indexed copy, leaving orphaned
+	// rules that route traffic to a canary service that no longer exists.
+	routeIndexMap, exists := managedRouteMap[headerRouting.Name]
+
+	var managedRouteIndex int
+	if !exists {
+		grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+		managedRouteIndex = len(grpcRouteRuleList) - 1
+	} else {
+		existingIndex, ok := routeIndexMap[grpcRouteName]
+		isIndexValid := ok && existingIndex >= 0 && existingIndex < len(grpcRouteRuleList)
+
+		if isIndexValid {
+			// Update in-place so the stored index stays stable and no duplicate is created.
+			managedRouteIndex = existingIndex
+			grpcRouteRuleList[existingIndex] = grpcHeaderRouteRule
+		} else {
+			// Stale or missing index — append as if this is the first call.
+			grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+			managedRouteIndex = len(grpcRouteRuleList) - 1
+		}
+	}
 	oldGRPCRuleList := grpcRoute.Spec.Rules
 	grpcRoute.Spec.Rules = grpcRouteRuleList
 	oldConfigMapData := make(ManagedRouteMap)
@@ -216,7 +238,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				if managedRouteMap[headerRouting.Name] == nil {
 					managedRouteMap[headerRouting.Name] = make(map[string]int)
 				}
-				managedRouteMap[headerRouting.Name][grpcRouteName] = len(grpcRouteRuleList) - 1
+				managedRouteMap[headerRouting.Name][grpcRouteName] = managedRouteIndex
 				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
 					Clientset:    clientset,
 					ConfigMapKey: GRPCConfigMapKey,
