@@ -1,0 +1,73 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-header-before-weight
+  labels:
+    route-type: http
+    test-scope: headers
+spec:
+  description: >
+    Verifies that setHeaderRoute before setWeight works correctly (issues #158, #169).
+    When setHeaderRoute fires first (initial weight is 0), the subsequent setWeight(0)
+    call must NOT overwrite the header-route rule's canary backend weight to 0.
+    The header-route rule must deliver traffic to the canary regardless of weight percentage.
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      try:
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Steps are setHeaderRoute -> setWeight:30 -> pause:30s.
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-hbw-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-active
+      description: >
+        Weight-split rule has 70/30; header-route rule has canary only with no explicit
+        weight (not 0). This proves setWeight did not clobber the header rule.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-header-route.yaml
+
+    - name: assert-rollout-healthy
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml

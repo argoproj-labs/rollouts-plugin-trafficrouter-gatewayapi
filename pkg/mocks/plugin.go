@@ -310,4 +310,3 @@ var TLSRouteObj = v1alpha2.TLSRoute{
 		},
 	},
 }
-

@@ -1,7 +1,7 @@
 apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
+kind: GRPCRoute
 metadata:
-  name: httproute-header
+  name: grpcroute-wbh
   namespace: default
 spec:
   (length(rules)): 2
@@ -13,8 +13,8 @@ spec:
           (weight): 30
     - matches:
         - headers:
-            - name: X-Test
+            - name: X-Canary
               type: Exact
-              value: test
+              value: "true"
       backendRefs:
         - name: argo-rollouts-canary-service

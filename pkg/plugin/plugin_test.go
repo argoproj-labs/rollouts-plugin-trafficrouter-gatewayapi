@@ -549,6 +549,76 @@ func TestRunSuccessfully(t *testing.T) {
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 1, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
 	})
+	t.Run("SetWeightDoesNotClobberHTTPHeaderRouteWeight", func(t *testing.T) {
+		// Reproduces issues #158 and #169: SetWeight(0) must not touch the canary
+		// BackendRef weight in a plugin-injected header-routing rule.
+		httpRoute := mocks.HTTPRouteObj
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(&httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		})
+
+		// Create the header route rule first (as happens when setHeaderRoute runs before setWeight)
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  "X-Canary",
+					HeaderValue: &v1alpha1.StringMatch{Exact: "true"},
+				},
+			},
+		}
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
+
+		// Now call SetWeight(0) — the header rule's canary weight must remain nil
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Weight-splitting rule (index 0): stable=100, canary=0
+		assert.Equal(t, int32(100), *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, int32(0), *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+		// Header-route rule (index 1): canary BackendRef weight must be untouched (nil)
+		assert.Nil(t, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].BackendRefs[0].Weight)
+	})
+	t.Run("SetWeightDoesNotClobberGRPCHeaderRouteWeight", func(t *testing.T) {
+		// Reproduces issues #158 and #169 for GRPCRoute: SetWeight(0) must not touch
+		// the canary BackendRef weight in a plugin-injected header-routing rule.
+		grpcRoute := mocks.GRPCRouteObj
+		rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(&grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+		})
+
+		// Create the header route rule first
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  "X-Canary",
+					HeaderValue: &v1alpha1.StringMatch{Exact: "true"},
+				},
+			},
+		}
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
+
+		// Now call SetWeight(0) — the header rule's canary weight must remain nil
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Weight-splitting rule (index 0): stable=100, canary=0
+		assert.Equal(t, int32(100), *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, int32(0), *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+		// Header-route rule (index 1): canary BackendRef weight must be untouched (nil)
+		assert.Nil(t, rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].BackendRefs[0].Weight)
+	})
 
 	// Canceling should cause an exit
 	cancel()

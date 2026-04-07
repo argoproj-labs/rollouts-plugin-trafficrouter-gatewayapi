@@ -25,25 +25,30 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	}
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+	canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
 	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
+	canaryFound, stableFound := false, false
+	for i := range grpcRoute.Spec.Rules {
+		// Skip plugin-injected header-routing rules — they have a single canary-only
+		// BackendRef and their weight must not be overwritten by setWeight.
+		if isGRPCManagedRule(grpcRoute.Spec.Rules[i], canaryServiceObjName, nil) {
+			continue
+		}
+		for j := range grpcRoute.Spec.Rules[i].BackendRefs {
+			switch string(grpcRoute.Spec.Rules[i].BackendRefs[j].Name) {
+			case canaryServiceName:
+				grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &desiredWeight
+				canaryFound = true
+			case stableServiceName:
+				grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &restWeight
+				stableFound = true
+			}
+		}
+	}
+	if !canaryFound || !stableFound {
+		return pluginTypes.RpcError{
+			ErrorString: BackendRefWasNotFoundInGRPCRouteError,
+		}
 	}
 	ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
 	updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})

@@ -18,4 +18,3 @@ spec:
               value: test
       backendRefs:
         - name: argo-rollouts-canary-service
-          (weight): 30

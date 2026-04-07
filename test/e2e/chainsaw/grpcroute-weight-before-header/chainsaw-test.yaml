@@ -1,0 +1,70 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: grpcroute-weight-before-header
+  labels:
+    route-type: grpc
+    test-scope: headers
+spec:
+  description: >
+    Verifies that setWeight followed by setHeaderRoute works correctly for GRPCRoute
+    (issues #158, #169). The weight-splitting rule must be updated by setWeight, and
+    the subsequently injected header-route rule must not have its canary weight overwritten.
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      try:
+        - apply:
+            file: resources/grpcroute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/grpcroute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Steps are setWeight:30 -> setHeaderRoute -> pause:30s.
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: grpcroute-wbh-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-active
+      description: Weight-split rule has 70/30; header-route rule has canary only with no explicit weight.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/grpcroute-with-header-route.yaml
+
+    - name: assert-rollout-healthy
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/grpcroute-after-cleanup.yaml

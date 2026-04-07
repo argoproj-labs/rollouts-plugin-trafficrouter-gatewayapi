@@ -25,25 +25,30 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	}
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+	canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
 	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
+	canaryFound, stableFound := false, false
+	for i := range httpRoute.Spec.Rules {
+		// Skip plugin-injected header-routing rules — they have a single canary-only
+		// BackendRef and their weight must not be overwritten by setWeight.
+		if isHTTPManagedRule(httpRoute.Spec.Rules[i], canaryServiceObjName, nil) {
+			continue
+		}
+		for j := range httpRoute.Spec.Rules[i].BackendRefs {
+			switch string(httpRoute.Spec.Rules[i].BackendRefs[j].Name) {
+			case canaryServiceName:
+				httpRoute.Spec.Rules[i].BackendRefs[j].Weight = &desiredWeight
+				canaryFound = true
+			case stableServiceName:
+				httpRoute.Spec.Rules[i].BackendRefs[j].Weight = &restWeight
+				stableFound = true
+			}
+		}
+	}
+	if !canaryFound || !stableFound {
+		return pluginTypes.RpcError{
+			ErrorString: BackendRefWasNotFoundInHTTPRouteError,
+		}
 	}
 	err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
 	if err != nil {

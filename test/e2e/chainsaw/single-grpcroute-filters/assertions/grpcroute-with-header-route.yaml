@@ -20,4 +20,3 @@ spec:
       (length(filters)): 3
       backendRefs:
         - name: argo-rollouts-canary-service
-          (weight): 30
