@@ -1,12 +1,9 @@
 package plugin
 
 import (
-	"sync"
-
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
@@ -25,7 +22,6 @@ type RpcPlugin struct {
 	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
 	GRPCRouteClient      gatewayApiClientv1.GRPCRouteInterface
 	TLSRouteClient       gatewayApiClientv1alpha2.TLSRouteInterface
-	TestClientset        v1.ConfigMapInterface
 	GatewayAPIClientset  *gatewayAPIClientset.Clientset
 	Clientset            *kubernetes.Clientset
 	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
@@ -51,8 +47,6 @@ type GatewayAPITrafficRouting struct {
 	TLSRoute string `json:"tlsRoute,omitempty"`
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace,omitempty"`
-	// ConfigMap refers to the config map where plugin stores data about managed routes
-	ConfigMap string `json:"configMap,omitempty"`
 	// HTTPRoutes refer to names of HTTPRoute resources used to route traffic to the
 	// service
 	HTTPRoutes []HTTPRoute `json:"httpRoutes,omitempty"`
@@ -79,9 +73,6 @@ type GatewayAPITrafficRouting struct {
 	InProgressLabelKey string `json:"inProgressLabelKey,omitempty"`
 	// InProgressLabelValue overrides the label value used while a canary is running
 	InProgressLabelValue string `json:"inProgressLabelValue,omitempty"`
-	// ConfigMapRWMutex refers to the RWMutex that we use to enter to the critical section
-	// critical section is config map
-	ConfigMapRWMutex sync.RWMutex
 }
 
 type HTTPRoute struct {
@@ -115,8 +106,6 @@ type TLSRoute struct {
 	// during setHeaderRoute step
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
 }
-
-type ManagedRouteMap map[string]map[string]int
 
 type HTTPRouteRule gatewayv1.HTTPRouteRule
 

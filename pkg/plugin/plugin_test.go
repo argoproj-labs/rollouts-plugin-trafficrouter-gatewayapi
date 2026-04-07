@@ -13,7 +13,6 @@ import (
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -38,7 +37,6 @@ func TestRunSuccessfully(t *testing.T) {
 		GRPCRouteClient: gwFake.NewSimpleClientset(&mocks.GRPCRouteObj).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
 		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
 		TLSRouteClient:  gwFake.NewSimpleClientset(&mocks.TLSRouteObj).GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -285,7 +283,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
@@ -314,7 +311,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
@@ -371,7 +367,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
@@ -417,7 +412,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
@@ -478,7 +472,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
@@ -524,7 +517,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
@@ -541,7 +533,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.RemoveManagedRoutes(rollout)
 
@@ -552,7 +543,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.RemoveManagedRoutes(rollout)
 
@@ -831,7 +821,6 @@ func TestSetHTTPHeaderRouteWithExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -852,7 +841,6 @@ func TestSetHTTPHeaderRouteWithExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -900,7 +888,6 @@ func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -921,7 +908,6 @@ func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -966,7 +952,6 @@ func TestSetHTTPHeaderRouteWithExistingQueryParams(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -987,7 +972,6 @@ func TestSetHTTPHeaderRouteWithExistingQueryParams(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -1039,7 +1023,6 @@ func TestSetHTTPHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1060,7 +1043,6 @@ func TestSetHTTPHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -1136,7 +1118,6 @@ func TestSetHTTPHeaderRouteWithCombinedMatches(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1157,7 +1138,6 @@ func TestSetHTTPHeaderRouteWithCombinedMatches(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -1222,7 +1202,6 @@ func TestSetGRPCHeaderRouteWithExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1243,7 +1222,6 @@ func TestSetGRPCHeaderRouteWithExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -1304,7 +1282,6 @@ func TestSetGRPCHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1325,7 +1302,6 @@ func TestSetGRPCHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -1393,7 +1369,6 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1414,7 +1389,6 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
@@ -1470,13 +1444,11 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 // orphaned duplicate header-based routing rules.
 func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	headerMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1492,7 +1464,6 @@ func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// First call — should add one managed rule (total: 2 rules)
@@ -1513,13 +1484,11 @@ func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 // times for the same managed route name does not create duplicate rules in the GRPCRoute.
 func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	headerMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1535,7 +1504,6 @@ func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// First call — should add one managed rule (total: 2 rules)
@@ -1556,19 +1524,16 @@ func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 // routes with different names results in both being appended (3 rules total: 1 base + 2 managed).
 func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	firstMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1605,19 +1570,16 @@ func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 // routes with different names results in both being appended (3 rules total: 1 base + 2 managed).
 func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	firstMatch := v1alpha1.StringMatch{Exact: "true"}
