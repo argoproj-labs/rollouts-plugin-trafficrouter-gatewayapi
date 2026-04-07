@@ -38,7 +38,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           args: --verbose --timeout 6m
-          version: v2.11
+          version: v2.11.4
 
   unit-tests:
     name: Unit tests running
