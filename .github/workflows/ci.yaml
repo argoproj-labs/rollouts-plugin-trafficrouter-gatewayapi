@@ -35,9 +35,10 @@ jobs:
         uses: actions/checkout@v3.1.0
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v9
         with:
           args: --verbose --timeout 6m
+          version: v2.11
 
   unit-tests:
     name: Unit tests running
