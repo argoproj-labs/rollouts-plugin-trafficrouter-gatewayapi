@@ -1,7 +1,8 @@
 package defaults
 
 const (
-	ConfigMap            = "argo-gatewayapi-configmap"
-	InProgressLabelKey   = "rollouts.argoproj.io/gatewayapi-canary"
-	InProgressLabelValue = "in-progress"
+	ConfigMap                   = "argo-gatewayapi-configmap"
+	InProgressLabelKey          = "rollouts.argoproj.io/gatewayapi-canary"
+	InProgressLabelValue        = "in-progress"
+	ActiveRolloutsAnnotationKey = "rollouts.argoproj.io/gatewayapi-active-rollouts"
 )

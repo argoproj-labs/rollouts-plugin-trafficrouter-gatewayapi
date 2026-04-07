@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: shared-httproute-b
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: argo-rollouts-canary-service-b
+      stableService: argo-rollouts-stable-service-b
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: shared-httproute
+            namespace: default
+      steps:
+        - setWeight: 40
+        - pause: {duration: 60s}
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: rollouts-demo-b
+  template:
+    metadata:
+      labels:
+        app: rollouts-demo-b
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

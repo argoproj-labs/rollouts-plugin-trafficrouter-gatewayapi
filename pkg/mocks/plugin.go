@@ -36,13 +36,18 @@ var (
 )
 
 func CreateHTTPRouteWithLabels(name string, labels map[string]string) *gatewayv1.HTTPRoute {
+	return CreateHTTPRouteWithLabelsAndAnnotations(name, labels, nil)
+}
+
+func CreateHTTPRouteWithLabelsAndAnnotations(name string, labels map[string]string, annotations map[string]string) *gatewayv1.HTTPRoute {
 	stableWeight := int32(100)
 	canaryWeight := int32(0)
 	return &gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: RolloutNamespace,
-			Labels:    labels,
+			Name:        name,
+			Namespace:   RolloutNamespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: gatewayv1.HTTPRouteSpec{
 			Rules: []gatewayv1.HTTPRouteRule{

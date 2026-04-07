@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,8 +13,12 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	k8sTesting "k8s.io/client-go/testing"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -133,6 +138,62 @@ func TestRunSuccessfully(t *testing.T) {
 		labels = rpcPluginImp.UpdatedHTTPRouteMock.Labels
 		_, exists := labels[defaults.InProgressLabelKey]
 		assert.False(t, exists)
+	})
+	t.Run("SetHTTPRouteWeightMultiRolloutReferenceCountingKeepsLabelWhenOneFinishes", func(t *testing.T) {
+		// Start with a fresh route
+		httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		config := &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		}
+
+		// Rollout A starts
+		rolloutA := newRolloutWithName("rollout-a", mocks.StableServiceName, mocks.CanaryServiceName, config)
+		err := pluginInstance.SetWeight(rolloutA, 30, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Verify label and annotation are set
+		labels := rpcPluginImp.UpdatedHTTPRouteMock.Labels
+		annotations := rpcPluginImp.UpdatedHTTPRouteMock.Annotations
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey])
+		assert.Equal(t, "default/rollout-a", annotations[defaults.ActiveRolloutsAnnotationKey])
+
+		// Rollout B starts (using the same route state)
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		rolloutB := newRolloutWithName("rollout-b", mocks.StableServiceName, mocks.CanaryServiceName, config)
+		err = pluginInstance.SetWeight(rolloutB, 50, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Verify both rollouts are tracked
+		labels = rpcPluginImp.UpdatedHTTPRouteMock.Labels
+		annotations = rpcPluginImp.UpdatedHTTPRouteMock.Annotations
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey])
+		assert.Equal(t, "default/rollout-a,default/rollout-b", annotations[defaults.ActiveRolloutsAnnotationKey])
+
+		// Rollout A finishes (weight=0)
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		err = pluginInstance.SetWeight(rolloutA, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Label should still be present because rollout-b is still active
+		labels = rpcPluginImp.UpdatedHTTPRouteMock.Labels
+		annotations = rpcPluginImp.UpdatedHTTPRouteMock.Annotations
+		assert.Equal(t, defaults.InProgressLabelValue, labels[defaults.InProgressLabelKey], "Label should remain while rollout-b is active")
+		assert.Equal(t, "default/rollout-b", annotations[defaults.ActiveRolloutsAnnotationKey], "Only rollout-b should remain in annotation")
+
+		// Rollout B finishes (weight=0)
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+		err = pluginInstance.SetWeight(rolloutB, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Now both label and annotation should be removed
+		labels = rpcPluginImp.UpdatedHTTPRouteMock.Labels
+		annotations = rpcPluginImp.UpdatedHTTPRouteMock.Annotations
+		_, labelExists := labels[defaults.InProgressLabelKey]
+		_, annotationExists := annotations[defaults.ActiveRolloutsAnnotationKey]
+		assert.False(t, labelExists, "Label should be removed when all rollouts finish")
+		assert.False(t, annotationExists, "Annotation should be removed when all rollouts finish")
 	})
 	t.Run("SetGRPCRouteWeight", func(t *testing.T) {
 		var desiredWeight int32 = 30
@@ -625,7 +686,7 @@ func TestNamespaceDefaulting(t *testing.T) {
 			HTTPRoute: mocks.HTTPRouteName,
 		}
 		rolloutNamespace := "my-namespace"
-		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
+		rollout := newRolloutWithOptions(mocks.StableServiceName, mocks.CanaryServiceName, config, "rollout", rolloutNamespace)
 
 		// Parse the config - this is where namespace defaulting should happen
 		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
@@ -643,7 +704,7 @@ func TestNamespaceDefaulting(t *testing.T) {
 			HTTPRoute: mocks.HTTPRouteName,
 		}
 		rolloutNamespace := "rollout-namespace"
-		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
+		rollout := newRolloutWithOptions(mocks.StableServiceName, mocks.CanaryServiceName, config, "rollout", rolloutNamespace)
 
 		// Parse the config
 		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
@@ -660,7 +721,7 @@ func TestNamespaceDefaulting(t *testing.T) {
 			GRPCRoute: mocks.GRPCRouteName,
 		}
 		rolloutNamespace := "another-namespace"
-		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
+		rollout := newRolloutWithOptions(mocks.StableServiceName, mocks.CanaryServiceName, config, "rollout", rolloutNamespace)
 
 		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
 
@@ -669,19 +730,62 @@ func TestNamespaceDefaulting(t *testing.T) {
 	})
 }
 
-func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting, namespace ...string) *v1alpha1.Rollout {
-	ns := mocks.RolloutNamespace
-	if len(namespace) > 0 {
-		ns = namespace[0]
+func TestHTTPRouteConflictRetry(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+	fakeClientset := gwFake.NewSimpleClientset(httpRoute)
+
+	updateCount := 0
+	fakeClientset.PrependReactor("update", "httproutes", func(action k8sTesting.Action) (bool, runtime.Object, error) {
+		updateCount++
+		if updateCount == 1 {
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Group: "gateway.networking.k8s.io", Resource: "httproutes"},
+				mocks.HTTPRouteName,
+				fmt.Errorf("the object has been modified"),
+			)
+		}
+		return false, nil, nil
+	})
+
+	rpcPlugin := &RpcPlugin{
+		LogCtx:          utils.SetupLog(),
+		IsTest:          true,
+		HTTPRouteClient: fakeClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
 	}
+
+	config := &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config)
+	var desiredWeight int32 = 30
+
+	rpcError := rpcPlugin.setHTTPRouteWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{}, config)
+
+	assert.Empty(t, rpcError.ErrorString)
+	assert.Equal(t, 2, updateCount, "Update should have been called twice (first conflict, then success)")
+	assert.NotNil(t, rpcPlugin.UpdatedHTTPRouteMock)
+	assert.Equal(t, desiredWeight, *rpcPlugin.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+	assert.Equal(t, 100-desiredWeight, *rpcPlugin.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+}
+
+func newRollout(stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
+	return newRolloutWithOptions(stableSvc, canarySvc, config, "rollout", mocks.RolloutNamespace)
+}
+
+func newRolloutWithName(name, stableSvc, canarySvc string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
+	return newRolloutWithOptions(stableSvc, canarySvc, config, name, mocks.RolloutNamespace)
+}
+
+func newRolloutWithOptions(stableSvc, canarySvc string, config *GatewayAPITrafficRouting, name, namespace string) *v1alpha1.Rollout {
 	encodedConfig, err := json.Marshal(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return &v1alpha1.Rollout{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rollout",
-			Namespace: ns,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: v1alpha1.RolloutSpec{
 			Strategy: v1alpha1.RolloutStrategy{

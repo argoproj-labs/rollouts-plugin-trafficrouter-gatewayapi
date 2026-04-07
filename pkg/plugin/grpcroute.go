@@ -10,6 +10,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -24,39 +25,37 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
 		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
 	}
-	grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
-	}
-	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+		canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+		stableServiceName := rollout.Spec.Strategy.Canary.StableService
+		routeRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
+		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+		if err != nil {
+			return err
 		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+		for _, ref := range canaryBackendRefs {
+			ref.Weight = &desiredWeight
 		}
-	}
-	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
-	ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
-	updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
-	if r.IsTest {
-		r.UpdatedGRPCRouteMock = updatedGRPCRoute
-	}
+		stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+		if err != nil {
+			return err
+		}
+		restWeight := 100 - desiredWeight
+		for _, ref := range stableBackendRefs {
+			ref.Weight = &restWeight
+		}
+		rolloutInfo := &RolloutInfo{Namespace: rollout.Namespace, Name: rollout.Name}
+		ensureInProgressMetadata(grpcRoute, desiredWeight, gatewayAPIConfig, rolloutInfo)
+		updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		if r.IsTest {
+			r.UpdatedGRPCRouteMock = updatedGRPCRoute
+		}
+		return err
+	})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

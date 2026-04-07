@@ -1,0 +1,7 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: shared-httproute-b
+  namespace: default
+status:
+  (phase == 'Healthy'): true

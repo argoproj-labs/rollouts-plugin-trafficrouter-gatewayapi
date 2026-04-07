@@ -10,6 +10,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -24,43 +25,41 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
 		httpRouteClient = gatewayClientV1.HTTPRoutes(gatewayAPIConfig.Namespace)
 	}
-	httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
-	}
-	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+		canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+		stableServiceName := rollout.Spec.Strategy.Canary.StableService
+		routeRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+		if err != nil {
+			return err
 		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+		for _, ref := range canaryBackendRefs {
+			ref.Weight = &desiredWeight
 		}
-	}
-	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
-	err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
-	if err != nil {
-		r.LogCtx.Error(err, "Failed to handle experiment services")
-	}
-	ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)
-	updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
-	if r.IsTest {
-		r.UpdatedHTTPRouteMock = updatedHTTPRoute
-	}
+		stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+		if err != nil {
+			return err
+		}
+		restWeight := 100 - desiredWeight
+		for _, ref := range stableBackendRefs {
+			ref.Weight = &restWeight
+		}
+		err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
+		if err != nil {
+			r.LogCtx.Error(err, "Failed to handle experiment services")
+		}
+		rolloutInfo := &RolloutInfo{Namespace: rollout.Namespace, Name: rollout.Name}
+		ensureInProgressMetadata(httpRoute, desiredWeight, gatewayAPIConfig, rolloutInfo)
+		updatedHTTPRoute, err := httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		if r.IsTest {
+			r.UpdatedHTTPRouteMock = updatedHTTPRoute
+		}
+		return err
+	})
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
