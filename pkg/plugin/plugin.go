@@ -389,7 +389,9 @@ func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gatewa
 				break
 			}
 		}
-		return routeRule, nil
+		if isFound {
+			return routeRule, nil
+		}
 	}
 	return nil, routeRuleList.Error()
 }

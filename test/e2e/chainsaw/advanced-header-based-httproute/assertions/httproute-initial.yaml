@@ -1,7 +1,7 @@
 apiVersion: gateway.networking.k8s.io/v1
-kind: GRPCRoute
+kind: HTTPRoute
 metadata:
-  name: grpcroute-wbh
+  name: httproute-header-advanced
   namespace: default
 spec:
   (length(rules)): 1

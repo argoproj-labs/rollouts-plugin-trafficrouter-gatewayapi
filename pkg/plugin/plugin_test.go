@@ -1707,3 +1707,143 @@ func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	assert.Equal(t, "header-route-one", string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 	assert.Equal(t, "header-route-two", string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[2].Name))
 }
+
+// TestGetRouteRuleOnlyReturnsRuleWithAllBackends verifies that getRouteRule only returns
+// a route rule when ALL requested backends are present. This is a regression test for the
+// bug where getRouteRule would return the first rule with any matching backend, even if
+// not all backends were found.
+//
+// Bug scenario: When searching for a rule with both "canary" and "stable" backends,
+// getRouteRule would incorrectly return a header route (which only has "canary" backend)
+// if it appeared first in the rules list.
+func TestGetRouteRuleOnlyReturnsRuleWithAllBackends(t *testing.T) {
+	// Create a route with two rules:
+	// 1. Header route with only canary backend (managed route)
+	// 2. Main route with both canary and stable backends
+	canaryName := gatewayv1.SectionName("header-route")
+	weight30 := int32(30)
+	weight70 := int32(70)
+
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-route",
+			Namespace: "default",
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				// Header route: only canary backend (this should NOT be returned)
+				{
+					Name: &canaryName,
+					Matches: []gatewayv1.HTTPRouteMatch{
+						{
+							Headers: []gatewayv1.HTTPHeaderMatch{
+								{
+									Name:  "X-Canary",
+									Value: "true",
+								},
+							},
+						},
+					},
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-canary-service",
+								},
+							},
+						},
+					},
+				},
+				// Main route: both canary and stable backends (this SHOULD be returned)
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-stable-service",
+								},
+								Weight: &weight70,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-canary-service",
+								},
+								Weight: &weight30,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+
+	// Test: Search for rule with both backends
+	backendRefNameList := []string{"argo-rollouts-canary-service", "argo-rollouts-stable-service"}
+	httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+
+	// Assert: Should find the main route (second rule), not the header route (first rule)
+	assert.NoError(t, err, "Should find a route with both backends")
+	assert.NotNil(t, httpRouteRule, "Route rule should not be nil")
+	assert.Equal(t, 2, len(httpRouteRule.BackendRefs), "Should return rule with 2 backends")
+	assert.Nil(t, httpRouteRule.Name, "Main route should not have a name (header routes have names)")
+
+	// Verify it's the correct rule by checking backend weights
+	var foundStable, foundCanary bool
+	for _, ref := range httpRouteRule.BackendRefs {
+		if ref.Name == "argo-rollouts-stable-service" {
+			foundStable = true
+			assert.Equal(t, int32(70), *ref.Weight)
+		}
+		if ref.Name == "argo-rollouts-canary-service" {
+			foundCanary = true
+			assert.Equal(t, int32(30), *ref.Weight)
+		}
+	}
+	assert.True(t, foundStable, "Should have stable backend")
+	assert.True(t, foundCanary, "Should have canary backend")
+}
+
+// TestGetRouteRuleReturnsErrorWhenBackendNotFound verifies that getRouteRule returns
+// an error when no rule contains all requested backends.
+func TestGetRouteRuleReturnsErrorWhenBackendNotFound(t *testing.T) {
+	// Create a route with only header routes (single backend each)
+	canaryName := gatewayv1.SectionName("header-route")
+
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-route",
+			Namespace: "default",
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					Name: &canaryName,
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-canary-service",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+
+	// Test: Search for rule with both backends (only canary exists)
+	backendRefNameList := []string{"argo-rollouts-canary-service", "argo-rollouts-stable-service"}
+	httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+
+	// Assert: Should return error because no rule has both backends
+	assert.Error(t, err, "Should return error when backend not found")
+	assert.Nil(t, httpRouteRule, "Route rule should be nil on error")
+	assert.Equal(t, BackendRefWasNotFoundInHTTPRouteError, err.Error())
+}

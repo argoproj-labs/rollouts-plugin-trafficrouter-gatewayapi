@@ -1,7 +1,0 @@
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-metadata:
-  name: grpcroute-hbw-rollout
-  namespace: default
-status:
-  (phase == 'Healthy'): true

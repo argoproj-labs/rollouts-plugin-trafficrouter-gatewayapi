@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: httproute-hbw-rollout
+  name: httproute-header-advanced-rollout
   namespace: default
 spec:
   replicas: 2
@@ -12,20 +12,31 @@ spec:
       trafficRouting:
         managedRoutes:
           - name: canary-route1
+          - name: canary-route2
         plugins:
           argoproj-labs/gatewayAPI:
             httpRoutes:
-              - name: httproute-hbw
+              - name: httproute-header-advanced
                 useHeaderRoutes: true
             namespace: default
       steps:
+        - setWeight: 30
         - setHeaderRoute:
             name: canary-route1
             match:
-              - headerName: X-Canary
+              - headerName: X-Test
                 headerValue:
-                  exact: "true"
-        - setWeight: 30
+                  exact: test
+        - pause: {duration: 30s}
+        - setWeight: 60
+        - setHeaderRoute:
+            name: canary-route2
+            match:
+              - headerName: X-Version
+                headerValue:
+                  exact: v2
+        - pause: {duration: 30s}
+        - setWeight: 90
         - pause: {duration: 30s}
   revisionHistoryLimit: 2
   selector:

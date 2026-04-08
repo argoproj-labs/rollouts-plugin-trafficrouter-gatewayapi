@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: httproute-hbw-rollout
+  name: httproute-header-advanced-rollout
   namespace: default
 status:
-  (phase == 'Healthy'): true
+  (phase): Healthy
