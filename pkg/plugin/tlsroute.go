@@ -7,6 +7,8 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
@@ -16,36 +18,40 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		gatewayClientV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
 		tlsRouteClient = gatewayClientV1alpha2.TLSRoutes(gatewayAPIConfig.Namespace)
 	}
-	tlsRoute, err := tlsRouteClient.Get(ctx, gatewayAPIConfig.TLSRoute, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := TLSRouteRuleList(tlsRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
 	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
-	ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
-	updatedTLSRoute, err := tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
+
+	var updatedTLSRoute *v1alpha2.TLSRoute
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		tlsRoute, err := tlsRouteClient.Get(ctx, gatewayAPIConfig.TLSRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		routeRuleList := TLSRouteRuleList(tlsRoute.Spec.Rules)
+		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+		if err != nil {
+			return err
+		}
+		for _, ref := range canaryBackendRefs {
+			ref.Weight = &desiredWeight
+		}
+		stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+		if err != nil {
+			return err
+		}
+		for _, ref := range stableBackendRefs {
+			ref.Weight = &restWeight
+		}
+
+		ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
+
+		updatedTLSRoute, err = tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
+		return err
+	})
+
 	if r.IsTest {
 		r.UpdatedTLSRouteMock = updatedTLSRoute
 	}

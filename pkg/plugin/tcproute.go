@@ -7,6 +7,8 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
@@ -16,36 +18,40 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		gatewayClientV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
 		tcpRouteClient = gatewayClientV1alpha2.TCPRoutes(gatewayAPIConfig.Namespace)
 	}
-	tcpRoute, err := tcpRouteClient.Get(ctx, gatewayAPIConfig.TCPRoute, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
 	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
-	ensureInProgressLabel(tcpRoute, desiredWeight, gatewayAPIConfig)
-	updatedTCPRoute, err := tcpRouteClient.Update(ctx, tcpRoute, metav1.UpdateOptions{})
+
+	var updatedTCPRoute *v1alpha2.TCPRoute
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		tcpRoute, err := tcpRouteClient.Get(ctx, gatewayAPIConfig.TCPRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
+		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+		if err != nil {
+			return err
+		}
+		for _, ref := range canaryBackendRefs {
+			ref.Weight = &desiredWeight
+		}
+		stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+		if err != nil {
+			return err
+		}
+		for _, ref := range stableBackendRefs {
+			ref.Weight = &restWeight
+		}
+
+		ensureInProgressLabel(tcpRoute, desiredWeight, gatewayAPIConfig)
+
+		updatedTCPRoute, err = tcpRouteClient.Update(ctx, tcpRoute, metav1.UpdateOptions{})
+		return err
+	})
+
 	if r.IsTest {
 		r.UpdatedTCPRouteMock = updatedTCPRoute
 	}
