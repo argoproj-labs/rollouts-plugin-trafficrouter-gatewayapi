@@ -12,7 +12,7 @@ spec:
     regardless of subsequent setWeight calls. This test creates two header routes at different
     weight stages (30% and 60%) and verifies they remain unchanged when weight increases to 90%.
   namespace: default
-  concurrent: false
+  concurrent: true
 
   steps:
     - name: create-resources
