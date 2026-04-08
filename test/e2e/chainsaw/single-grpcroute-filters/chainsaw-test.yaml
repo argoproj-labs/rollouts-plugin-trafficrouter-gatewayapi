@@ -19,6 +19,8 @@ spec:
       description: Create the GRPCRoute with 3 filters and the Rollout. Uses pause:{duration:30s} for auto-promotion.
       try:
         - apply:
+            file: resources/services.yaml
+        - apply:
             file: resources/grpcroute.yaml
         - apply:
             file: resources/rollout.yaml

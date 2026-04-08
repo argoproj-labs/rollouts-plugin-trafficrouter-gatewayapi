@@ -19,6 +19,8 @@ spec:
       description: Create the GRPCRoute and Rollout with multiple setWeight and setHeaderRoute steps.
       try:
         - apply:
+            file: resources/services.yaml
+        - apply:
             file: resources/grpcroute.yaml
         - apply:
             file: resources/rollout.yaml

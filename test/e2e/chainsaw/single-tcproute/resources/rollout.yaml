@@ -7,8 +7,8 @@ spec:
   replicas: 2
   strategy:
     canary:
-      canaryService: argo-rollouts-canary-service
-      stableService: argo-rollouts-stable-service
+      canaryService: single-tcproute-canary-service
+      stableService: single-tcproute-stable-service
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:

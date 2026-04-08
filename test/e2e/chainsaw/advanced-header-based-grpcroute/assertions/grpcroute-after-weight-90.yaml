@@ -7,9 +7,9 @@ spec:
   (length(rules)): 3
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: advanced-header-based-grpcroute-stable-service
           (weight): 10
-        - name: argo-rollouts-canary-service
+        - name: advanced-header-based-grpcroute-canary-service
           (weight): 90
     # Issue #158: Header-based routes should NOT have their weights updated
     # They should maintain a single canary backendRef (weight stays at 1, not updated to match setWeight)
@@ -20,7 +20,7 @@ spec:
               type: Exact
               value: test
       backendRefs:
-        - name: argo-rollouts-canary-service
+        - name: advanced-header-based-grpcroute-canary-service
           (weight): 1
     - name: canary-route2
       matches:
@@ -29,5 +29,5 @@ spec:
               type: Exact
               value: v2
       backendRefs:
-        - name: argo-rollouts-canary-service
+        - name: advanced-header-based-grpcroute-canary-service
           (weight): 1

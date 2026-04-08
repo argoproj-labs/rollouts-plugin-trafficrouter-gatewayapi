@@ -7,9 +7,9 @@ spec:
   (length(rules)): 3
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: advanced-header-based-httproute-stable-service
           (weight): 40
-        - name: argo-rollouts-canary-service
+        - name: advanced-header-based-httproute-canary-service
           (weight): 60
     - name: canary-route1
       matches:
@@ -18,7 +18,7 @@ spec:
               type: Exact
               value: test
       backendRefs:
-        - name: argo-rollouts-canary-service
+        - name: advanced-header-based-httproute-canary-service
     - name: canary-route2
       matches:
         - headers:
@@ -26,4 +26,4 @@ spec:
               type: Exact
               value: v2
       backendRefs:
-        - name: argo-rollouts-canary-service
+        - name: advanced-header-based-httproute-canary-service

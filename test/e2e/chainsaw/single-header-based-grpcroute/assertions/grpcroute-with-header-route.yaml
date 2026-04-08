@@ -7,9 +7,9 @@ spec:
   (length(rules)): 2
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-header-based-grpcroute-stable-service
           (weight): 70
-        - name: argo-rollouts-canary-service
+        - name: single-header-based-grpcroute-canary-service
           (weight): 30
     - name: canary-route1
       matches:
@@ -18,4 +18,4 @@ spec:
               type: Exact
               value: test
       backendRefs:
-        - name: argo-rollouts-canary-service
+        - name: single-header-based-grpcroute-canary-service

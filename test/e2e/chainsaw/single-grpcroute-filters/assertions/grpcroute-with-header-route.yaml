@@ -8,9 +8,9 @@ spec:
   rules:
     - (length(filters)): 3
       backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-grpcroute-filters-stable-service
           (weight): 70
-        - name: argo-rollouts-canary-service
+        - name: single-grpcroute-filters-canary-service
           (weight): 30
     - name: grpc-filter-preservation-route
       matches:
@@ -20,4 +20,4 @@ spec:
               value: preserve-grpc-filters
       (length(filters)): 3
       backendRefs:
-        - name: argo-rollouts-canary-service
+        - name: single-grpcroute-filters-canary-service

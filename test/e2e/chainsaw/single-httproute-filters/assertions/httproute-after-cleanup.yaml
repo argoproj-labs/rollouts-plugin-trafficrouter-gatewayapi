@@ -8,6 +8,6 @@ spec:
   rules:
     - (length(filters)): 4
       backendRefs:
-        - name: argo-rollouts-stable-service
-        - name: argo-rollouts-canary-service
+        - name: single-httproute-filters-stable-service
+        - name: single-httproute-filters-canary-service
           (weight): 0

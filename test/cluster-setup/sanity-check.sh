@@ -22,11 +22,5 @@ done
 echo "Checking e2egateway traefik-gateway with programmed condition=true ..."
 kubectl get gateway traefik-gateway -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' | grep -q "True"
 
-echo "Checking e2e canary service..."
-kubectl get svc argo-rollouts-canary-service > /dev/null
-
-echo "Checking e2e stable service..."
-kubectl get svc argo-rollouts-stable-service > /dev/null
-
 echo ">>> Sanity checks finished. Your cluster is now ready for e2e tests. <<<"
 

@@ -13,7 +13,7 @@ spec:
     - "example.com"
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-tlsroute-stable-service
           port: 443
-        - name: argo-rollouts-canary-service
+        - name: single-tlsroute-canary-service
           port: 443

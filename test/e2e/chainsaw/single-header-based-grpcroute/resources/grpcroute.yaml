@@ -8,7 +8,7 @@ spec:
     - name: traefik-gateway
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-header-based-grpcroute-stable-service
           port: 80
-        - name: argo-rollouts-canary-service
+        - name: single-header-based-grpcroute-canary-service
           port: 80

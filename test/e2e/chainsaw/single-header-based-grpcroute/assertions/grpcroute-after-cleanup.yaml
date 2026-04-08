@@ -7,6 +7,6 @@ spec:
   (length(rules)): 1
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
-        - name: argo-rollouts-canary-service
+        - name: single-header-based-grpcroute-stable-service
+        - name: single-header-based-grpcroute-canary-service
           (weight): 0

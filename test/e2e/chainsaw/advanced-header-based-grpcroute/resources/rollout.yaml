@@ -7,8 +7,8 @@ spec:
   replicas: 2
   strategy:
     canary:
-      canaryService: argo-rollouts-canary-service
-      stableService: argo-rollouts-stable-service
+      canaryService: advanced-header-based-grpcroute-canary-service
+      stableService: advanced-header-based-grpcroute-stable-service
       trafficRouting:
         managedRoutes:
           - name: canary-route1
