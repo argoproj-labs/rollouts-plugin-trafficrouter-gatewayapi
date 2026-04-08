@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpcroute-header-advanced
+  namespace: default
+spec:
+  (length(rules)): 1
+  rules:
+    - backendRefs:
+        - name: advanced-header-based-grpcroute-stable-service
+        - name: advanced-header-based-grpcroute-canary-service
+          (weight): 0

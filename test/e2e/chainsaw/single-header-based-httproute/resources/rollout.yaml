@@ -7,8 +7,8 @@ spec:
   replicas: 2
   strategy:
     canary:
-      canaryService: argo-rollouts-canary-service
-      stableService: argo-rollouts-stable-service
+      canaryService: single-header-based-httproute-canary-service
+      stableService: single-header-based-httproute-stable-service
       trafficRouting:
         managedRoutes:
           - name: canary-route1
@@ -30,11 +30,11 @@ spec:
   revisionHistoryLimit: 2
   selector:
     matchLabels:
-      app: rollouts-demo
+      app: single-header-based-httproute
   template:
     metadata:
       labels:
-        app: rollouts-demo
+        app: single-header-based-httproute
     spec:
       containers:
         - name: rollouts-demo

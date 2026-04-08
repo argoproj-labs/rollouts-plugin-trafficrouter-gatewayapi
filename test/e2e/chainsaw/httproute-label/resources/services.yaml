@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-label-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-label
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-label-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-label

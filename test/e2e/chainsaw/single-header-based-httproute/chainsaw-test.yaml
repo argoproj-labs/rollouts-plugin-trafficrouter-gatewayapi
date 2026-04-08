@@ -19,6 +19,8 @@ spec:
       description: Create the HTTPRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
       try:
         - apply:
+            file: resources/services.yaml
+        - apply:
             file: resources/httproute.yaml
         - apply:
             file: resources/rollout.yaml

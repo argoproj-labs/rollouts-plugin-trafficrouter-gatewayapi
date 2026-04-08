@@ -1,0 +1,95 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: advanced-header-based-httproute
+  labels:
+    route-type: http
+    test-scope: headers
+spec:
+  description: >
+    Verifies that header-based routes are not affected by setWeight operations (issue #158).
+    The plugin must maintain header-match rules with a single canary backendRef (no weight)
+    regardless of subsequent setWeight calls. This test creates two header routes at different
+    weight stages (30% and 60%) and verifies they remain unchanged when weight increases to 90%.
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      description: Create the HTTPRoute and Rollout with multiple setWeight and setHeaderRoute steps.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start a canary (setWeight:30 -> setHeaderRoute -> pause).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-header-advanced-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-first-header-routing-active
+      description: After setWeight:30 and first header route, verify 1 weight rule + 1 header rule.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-after-first-header.yaml
+
+    - name: assert-second-header-routing-active
+      description: After setWeight:60 and second header route, verify 1 weight rule + 2 header rules.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-after-second-header.yaml
+
+    - name: assert-weight-90-header-routes-unchanged
+      description: >
+        After setWeight:90, verify that header routes are NOT updated.
+        This is the key assertion for issue #158 - header routes should maintain
+        their single canary backendRef with no weight, regardless of setWeight calls.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-after-weight-90.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (all pauses auto-expire).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: Plugin must remove all header-match rules and reset canary weight to 0 after rollout completes.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml

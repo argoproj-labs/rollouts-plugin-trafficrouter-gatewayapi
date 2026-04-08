@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-header-advanced
+  namespace: default
+spec:
+  (length(rules)): 1
+  rules:
+    - backendRefs:
+        - name: advanced-header-based-httproute-stable-service
+        - name: advanced-header-based-httproute-canary-service
+          (weight): 0

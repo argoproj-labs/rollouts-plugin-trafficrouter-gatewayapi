@@ -106,9 +106,6 @@ metadata:
 rules:
   # Core API resources
   - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "create", "update"]
-  - apiGroups: [""]
     resources: ["services"]
     verbs: ["get"]
 
@@ -134,9 +131,6 @@ metadata:
 rules:
   # Core API resources
   - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "create", "update"]
-  - apiGroups: [""]
     resources: ["services"]
     verbs: ["get"]
 
@@ -157,12 +151,12 @@ The plugin does NOT need permissions for:
 - **Gateways** - The plugin does not modify Gateway resources
 - **GatewayClasses** - The plugin does not interact with GatewayClasses
 - **Pods, Deployments, ReplicaSets** - The plugin does not manage workload resources
+- **ConfigMaps** - The plugin no longer uses a ConfigMap for state storage
 - **Delete permissions** - The plugin only adds/modifies/removes rules within routes, never deletes entire resources
 
 If you want to further fine-tune permissions:
 
 - [Label selector discovery](features/multiple-routes.md#automatic-route-discovery-with-label-selectors) requires `list` permissions; using explicit route names only requires `get`
-- If not using [header-based routing](features/header-based-routing.md), ConfigMap permissions can be omitted
 
 ## Configuration 
 

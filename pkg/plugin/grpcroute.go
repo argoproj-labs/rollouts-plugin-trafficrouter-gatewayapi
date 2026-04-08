@@ -3,18 +3,12 @@ package plugin
 import (
 	"context"
 	"errors"
-	"fmt"
-	"slices"
 
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-)
-
-const (
-	GRPCConfigMapKey = "grpcManagedRoutes"
 )
 
 func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
@@ -24,36 +18,51 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
 		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
 	}
-	grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	routeRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
-	canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	for _, ref := range canaryBackendRefs {
-		ref.Weight = &desiredWeight
-	}
-	stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
+	canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
 	restWeight := 100 - desiredWeight
-	for _, ref := range stableBackendRefs {
-		ref.Weight = &restWeight
-	}
-	ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
-	updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+	managedNames := managedRouteNamesSet(rollout)
+
+	var updatedGRPCRoute *gatewayv1.GRPCRoute
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		canaryFound, stableFound := false, false
+		for i := range grpcRoute.Spec.Rules {
+			// Skip plugin-injected header-routing rules.
+			// Primary: rule carries a Name matching a known managed route.
+			// Fallback: structural check (single canary-only BackendRef) for rules injected
+			// by older plugin versions that did not set the Name field.
+			rule := grpcRoute.Spec.Rules[i]
+			if (rule.Name != nil && managedNames[string(*rule.Name)]) || isGRPCManagedRule(rule, canaryServiceObjName, nil) {
+				continue
+			}
+			for j := range grpcRoute.Spec.Rules[i].BackendRefs {
+				switch string(grpcRoute.Spec.Rules[i].BackendRefs[j].Name) {
+				case canaryServiceName:
+					grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &desiredWeight
+					canaryFound = true
+				case stableServiceName:
+					grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &restWeight
+					stableFound = true
+				}
+			}
+		}
+		if !canaryFound || !stableFound {
+			return errors.New(BackendRefWasNotFoundInGRPCRouteError)
+		}
+
+		ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
+
+		updatedGRPCRoute, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		return err
+	})
+
 	if r.IsTest {
 		r.UpdatedGRPCRouteMock = updatedGRPCRoute
 	}
@@ -67,208 +76,164 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 
 func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	if headerRouting.Match == nil {
-		managedRouteList := []v1alpha1.MangedRoutes{
-			{
-				Name: headerRouting.Name,
-			},
-		}
-		return r.removeGRPCManagedRoutes(managedRouteList, gatewayAPIConfig)
+		return r.removeGRPCManagedRoutes(rollout, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
 	grpcRouteClient := r.GRPCRouteClient
-	managedRouteMap := make(ManagedRouteMap)
-	grpcRouteName := gatewayAPIConfig.GRPCRoute
-	clientset := r.TestClientset
 	if !r.IsTest {
 		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
 		grpcRouteClient = gatewayClientV1.GRPCRoutes(gatewayAPIConfig.Namespace)
-		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
-	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
-		Clientset: clientset,
-		Ctx:       ctx,
-	})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	err = utils.GetConfigMapData(configMap, GRPCConfigMapKey, &managedRouteMap)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	grpcRoute, err := grpcRouteClient.Get(ctx, grpcRouteName, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	canaryServiceKind := gatewayv1.Kind("Service")
-	canaryServiceGroup := gatewayv1.Group("")
 	grpcHeaderRouteRuleList, rpcError := getGRPCHeaderRouteRuleList(headerRouting)
 	if rpcError.HasError() {
 		return rpcError
 	}
-	grpcRouteRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
-	backendRefNameList := []string{string(canaryServiceName), stableServiceName}
-	grpcRouteRule, err := getRouteRule(grpcRouteRuleList, backendRefNameList...)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+
+	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	managedName := gatewayv1.SectionName(headerRouting.Name)
+
+	var updatedGRPCRoute *gatewayv1.GRPCRoute
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
-	}
-	var canaryBackendRef *GRPCBackendRef
-	for i := 0; i < len(grpcRouteRule.BackendRefs); i++ {
-		backendRef := grpcRouteRule.BackendRefs[i]
-		if canaryServiceName == backendRef.Name {
-			canaryBackendRef = (*GRPCBackendRef)(&backendRef)
-			break
+
+		canaryServiceKind := gatewayv1.Kind("Service")
+		canaryServiceGroup := gatewayv1.Group("")
+		grpcRouteRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
+		backendRefNameList := []string{string(canaryServiceName), stableServiceName}
+		grpcRouteRule, err := getRouteRule(grpcRouteRuleList, backendRefNameList...)
+		if err != nil {
+			return err
 		}
-	}
-	grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
-		Matches: []gatewayv1.GRPCRouteMatch{},
-		Filters: []gatewayv1.GRPCRouteFilter{},
-		BackendRefs: []gatewayv1.GRPCBackendRef{
-			{
-				BackendRef: gatewayv1.BackendRef{
-					BackendObjectReference: gatewayv1.BackendObjectReference{
-						Group: &canaryServiceGroup,
-						Kind:  &canaryServiceKind,
-						Name:  canaryServiceName,
-						Port:  canaryBackendRef.Port,
+		var canaryBackendRef *GRPCBackendRef
+		for i := 0; i < len(grpcRouteRule.BackendRefs); i++ {
+			backendRef := grpcRouteRule.BackendRefs[i]
+			if canaryServiceName == backendRef.Name {
+				canaryBackendRef = (*GRPCBackendRef)(&backendRef)
+				break
+			}
+		}
+		grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
+			Name:    &managedName,
+			Matches: []gatewayv1.GRPCRouteMatch{},
+			Filters: []gatewayv1.GRPCRouteFilter{},
+			BackendRefs: []gatewayv1.GRPCBackendRef{
+				{
+					BackendRef: gatewayv1.BackendRef{
+						BackendObjectReference: gatewayv1.BackendObjectReference{
+							Group: &canaryServiceGroup,
+							Kind:  &canaryServiceKind,
+							Name:  canaryServiceName,
+							Port:  canaryBackendRef.Port,
+						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	// Copy filters from original route
-	if grpcRouteRule.Filters != nil {
-		for i := 0; i < len(grpcRouteRule.Filters); i++ {
-			grpcHeaderRouteRule.Filters = append(grpcHeaderRouteRule.Filters, *grpcRouteRule.Filters[i].DeepCopy())
-		}
-	}
-	matchLength := len(grpcRouteRule.Matches)
-	if matchLength == 0 {
-		grpcHeaderRouteRule.Matches = []gatewayv1.GRPCRouteMatch{
-			{
-				Headers: grpcHeaderRouteRuleList,
-			},
-		}
-	} else {
-		// Copy matches from original route and merge headers
-		for i := 0; i < matchLength; i++ {
-			// Merge existing headers with new canary headers
-			mergedHeaders := make([]gatewayv1.GRPCHeaderMatch, 0)
-			// First, add existing headers from the original match
-			if grpcRouteRule.Matches[i].Headers != nil {
-				mergedHeaders = append(mergedHeaders, grpcRouteRule.Matches[i].Headers...)
+		// Copy filters from original route
+		if grpcRouteRule.Filters != nil {
+			for i := 0; i < len(grpcRouteRule.Filters); i++ {
+				grpcHeaderRouteRule.Filters = append(grpcHeaderRouteRule.Filters, *grpcRouteRule.Filters[i].DeepCopy())
 			}
-			// Then, add the new canary headers
-			mergedHeaders = append(mergedHeaders, grpcHeaderRouteRuleList...)
-
-			grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, gatewayv1.GRPCRouteMatch{
-				Method:  grpcRouteRule.Matches[i].Method,
-				Headers: mergedHeaders,
-			})
 		}
-	}
-	// Upsert the managed header rule. Blindly appending on every call would create
-	// duplicate rules; cleanup only removes the last-indexed copy, leaving orphaned
-	// rules that route traffic to a canary service that no longer exists.
-	routeIndexMap, exists := managedRouteMap[headerRouting.Name]
-
-	var managedRouteIndex int
-	if !exists {
-		grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
-		managedRouteIndex = len(grpcRouteRuleList) - 1
-	} else {
-		existingIndex, ok := routeIndexMap[grpcRouteName]
-		isIndexValid := ok && existingIndex >= 0 && existingIndex < len(grpcRouteRuleList)
-
-		if isIndexValid {
-			// Update in-place so the stored index stays stable and no duplicate is created.
-			managedRouteIndex = existingIndex
-			grpcRouteRuleList[existingIndex] = grpcHeaderRouteRule
+		matchLength := len(grpcRouteRule.Matches)
+		if matchLength == 0 {
+			grpcHeaderRouteRule.Matches = []gatewayv1.GRPCRouteMatch{
+				{
+					Headers: grpcHeaderRouteRuleList,
+				},
+			}
 		} else {
-			// Stale or missing index — append as if this is the first call.
+			// Copy matches from original route and merge headers
+			for i := 0; i < matchLength; i++ {
+				// Merge existing headers with new canary headers
+				mergedHeaders := make([]gatewayv1.GRPCHeaderMatch, 0)
+				// First, add existing headers from the original match
+				if grpcRouteRule.Matches[i].Headers != nil {
+					mergedHeaders = append(mergedHeaders, grpcRouteRule.Matches[i].Headers...)
+				}
+				// Then, add the new canary headers
+				mergedHeaders = append(mergedHeaders, grpcHeaderRouteRuleList...)
+
+				grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, gatewayv1.GRPCRouteMatch{
+					Method:  grpcRouteRule.Matches[i].Method,
+					Headers: mergedHeaders,
+				})
+			}
+		}
+
+		// Upsert: find an existing managed rule to replace in-place.
+		// Primary: match by rule Name (set by this plugin on injection).
+		// Fallback: structural check for rules injected by older plugin versions without a Name.
+		foundIndex := -1
+		for i, rule := range grpcRouteRuleList {
+			if (rule.Name != nil && *rule.Name == managedName) || isGRPCManagedRule(rule, canaryServiceName, grpcHeaderRouteRuleList) {
+				foundIndex = i
+				break
+			}
+		}
+		if foundIndex >= 0 {
+			grpcRouteRuleList[foundIndex] = grpcHeaderRouteRule
+		} else {
 			grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
-			managedRouteIndex = len(grpcRouteRuleList) - 1
 		}
+		grpcRoute.Spec.Rules = grpcRouteRuleList
+
+		updatedGRPCRoute, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		return err
+	})
+
+	if r.IsTest {
+		r.UpdatedGRPCRouteMock = updatedGRPCRoute
 	}
-	oldGRPCRuleList := grpcRoute.Spec.Rules
-	grpcRoute.Spec.Rules = grpcRouteRuleList
-	oldConfigMapData := make(ManagedRouteMap)
-	err = utils.GetConfigMapData(configMap, GRPCConfigMapKey, &oldConfigMapData)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	taskList := []utils.Task{
-		{
-			Action: func() error {
-				updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
-				if r.IsTest {
-					r.UpdatedGRPCRouteMock = updatedGRPCRoute
-				}
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			ReverseAction: func() error {
-				grpcRoute.Spec.Rules = oldGRPCRuleList
-				updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
-				if r.IsTest {
-					r.UpdatedGRPCRouteMock = updatedGRPCRoute
-				}
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		{
-			Action: func() error {
-				if managedRouteMap[headerRouting.Name] == nil {
-					managedRouteMap[headerRouting.Name] = make(map[string]int)
-				}
-				managedRouteMap[headerRouting.Name][grpcRouteName] = managedRouteIndex
-				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
-					Clientset:    clientset,
-					ConfigMapKey: GRPCConfigMapKey,
-					Ctx:          ctx,
-				})
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			ReverseAction: func() error {
-				err = utils.UpdateConfigMapData(configMap, oldConfigMapData, utils.UpdateConfigMapOptions{
-					Clientset:    clientset,
-					ConfigMapKey: GRPCConfigMapKey,
-					Ctx:          ctx,
-				})
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-	}
-	err = utils.DoTransaction(r.LogCtx, taskList...)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	return pluginTypes.RpcError{}
+}
+
+// isGRPCManagedRule reports whether the given rule was injected by this plugin.
+// A plugin-injected rule always has exactly one BackendRef pointing to the canary service.
+// If canaryHeaders is non-nil, the rule must also have at least one match whose header list
+// contains all of the specified canary header names — this distinguishes between multiple
+// managed routes that each inject rules with different header sets.
+func isGRPCManagedRule(rule gatewayv1.GRPCRouteRule, canaryService gatewayv1.ObjectName, canaryHeaders []gatewayv1.GRPCHeaderMatch) bool {
+	if len(rule.BackendRefs) != 1 || rule.BackendRefs[0].Name != canaryService {
+		return false
+	}
+	if canaryHeaders == nil {
+		return true
+	}
+	for _, match := range rule.Matches {
+		if grpcMatchContainsAllCanaryHeaders(match.Headers, canaryHeaders) {
+			return true
+		}
+	}
+	return false
+}
+
+// grpcMatchContainsAllCanaryHeaders returns true if matchHeaders contains a header entry
+// for every name present in canaryHeaders.
+func grpcMatchContainsAllCanaryHeaders(matchHeaders []gatewayv1.GRPCHeaderMatch, canaryHeaders []gatewayv1.GRPCHeaderMatch) bool {
+	for _, canary := range canaryHeaders {
+		found := false
+		for _, h := range matchHeaders {
+			if h.Name == canary.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatewayv1.GRPCHeaderMatch, pluginTypes.RpcError) {
@@ -300,157 +265,52 @@ func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 	return grpcHeaderRouteRuleList, pluginTypes.RpcError{}
 }
 
-func (r *RpcPlugin) removeGRPCManagedRoutes(managedRouteNameList []v1alpha1.MangedRoutes, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	grpcRouteClient := r.GRPCRouteClient
-	clientset := r.TestClientset
-	grpcRouteName := gatewayAPIConfig.GRPCRoute
-	managedRouteMap := make(ManagedRouteMap)
 	if !r.IsTest {
 		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
 		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
-		clientset = r.Clientset.CoreV1().ConfigMaps(gatewayAPIConfig.Namespace)
 	}
-	configMap, err := utils.GetOrCreateConfigMap(gatewayAPIConfig.ConfigMap, utils.CreateConfigMapOptions{
-		Clientset: clientset,
-		Ctx:       ctx,
-	})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	err = utils.GetConfigMapData(configMap, GRPCConfigMapKey, &managedRouteMap)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	grpcRoute, err := grpcRouteClient.Get(ctx, grpcRouteName, metav1.GetOptions{})
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
-		}
-	}
-	grpcRouteRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
-	isGRPCRouteRuleListChanged := false
-	for _, managedRoute := range managedRouteNameList {
-		managedRouteName := managedRoute.Name
-		_, isOk := managedRouteMap[managedRouteName]
-		if !isOk {
-			r.LogCtx.Logger.Infof("%s is not in grpcHeaderManagedRouteMap", managedRouteName)
-			continue
-		}
-		isGRPCRouteRuleListChanged = true
-		grpcRouteRuleList, err = removeManagedGRPCRouteEntry(managedRouteMap, grpcRouteRuleList, managedRouteName, grpcRouteName)
+
+	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+	managedNames := managedRouteNamesSet(rollout)
+
+	var updatedGRPCRoute *gatewayv1.GRPCRoute
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
 		if err != nil {
-			return pluginTypes.RpcError{
-				ErrorString: err.Error(),
+			return err
+		}
+
+		newRules := make([]gatewayv1.GRPCRouteRule, 0, len(grpcRoute.Spec.Rules))
+		changed := false
+		for _, rule := range grpcRoute.Spec.Rules {
+			// Primary: remove by Name. Fallback: structural check for unnamed legacy rules.
+			if (rule.Name != nil && managedNames[string(*rule.Name)]) || isGRPCManagedRule(rule, canaryServiceName, nil) {
+				changed = true
+				continue
 			}
+			newRules = append(newRules, rule)
 		}
-	}
-	if !isGRPCRouteRuleListChanged {
-		return pluginTypes.RpcError{}
-	}
-	oldGRPCRuleList := grpcRoute.Spec.Rules
-	grpcRoute.Spec.Rules = grpcRouteRuleList
-	oldConfigMapData := make(ManagedRouteMap)
-	err = utils.GetConfigMapData(configMap, GRPCConfigMapKey, &oldConfigMapData)
-	if err != nil {
-		return pluginTypes.RpcError{
-			ErrorString: err.Error(),
+		if !changed {
+			return nil
 		}
+		grpcRoute.Spec.Rules = newRules
+
+		updatedGRPCRoute, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		return err
+	})
+
+	if r.IsTest {
+		r.UpdatedGRPCRouteMock = updatedGRPCRoute
 	}
-	taskList := []utils.Task{
-		{
-			Action: func() error {
-				updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
-				if r.IsTest {
-					r.UpdatedGRPCRouteMock = updatedGRPCRoute
-				}
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			ReverseAction: func() error {
-				grpcRoute.Spec.Rules = oldGRPCRuleList
-				updatedGRPCRoute, err := grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
-				if r.IsTest {
-					r.UpdatedGRPCRouteMock = updatedGRPCRoute
-				}
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		{
-			Action: func() error {
-				err = utils.UpdateConfigMapData(configMap, managedRouteMap, utils.UpdateConfigMapOptions{
-					Clientset:    clientset,
-					ConfigMapKey: GRPCConfigMapKey,
-					Ctx:          ctx,
-				})
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			ReverseAction: func() error {
-				err = utils.UpdateConfigMapData(configMap, oldConfigMapData, utils.UpdateConfigMapOptions{
-					Clientset:    clientset,
-					ConfigMapKey: GRPCConfigMapKey,
-					Ctx:          ctx,
-				})
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-	}
-	err = utils.DoTransaction(r.LogCtx, taskList...)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
 		}
 	}
 	return pluginTypes.RpcError{}
-}
-
-func removeManagedGRPCRouteEntry(managedRouteMap ManagedRouteMap, routeRuleList GRPCRouteRuleList, managedRouteName string, grpcRouteName string) (GRPCRouteRuleList, error) {
-	routeManagedRouteMap, isOk := managedRouteMap[managedRouteName]
-	if !isOk {
-		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteName, managedRouteName)
-	}
-	managedRouteIndex, isOk := routeManagedRouteMap[grpcRouteName]
-	if !isOk {
-		managedRouteMapKey := managedRouteName + "." + grpcRouteName
-		return nil, fmt.Errorf(ManagedRouteMapEntryDeleteError, managedRouteMapKey, managedRouteMapKey)
-	}
-	if managedRouteIndex < 0 || managedRouteIndex >= len(routeRuleList) {
-		// stale or corrupted managed route index; clean references for this route and continue gracefully
-		for name, managedMap := range managedRouteMap {
-			delete(managedMap, grpcRouteName)
-			if len(managedMap) == 0 {
-				delete(managedRouteMap, name)
-			}
-		}
-		return routeRuleList, nil
-	}
-	delete(routeManagedRouteMap, grpcRouteName)
-	if len(managedRouteMap[managedRouteName]) == 0 {
-		delete(managedRouteMap, managedRouteName)
-	}
-	for _, currentRouteManagedRouteMap := range managedRouteMap {
-		value := currentRouteManagedRouteMap[grpcRouteName]
-		if value > managedRouteIndex {
-			currentRouteManagedRouteMap[grpcRouteName]--
-		}
-	}
-	routeRuleList = slices.Delete(routeRuleList, managedRouteIndex, managedRouteIndex+1)
-	return routeRuleList, nil
 }
 
 func (r *GRPCRouteRule) Iterator() (GatewayAPIRouteRuleIterator[*GRPCBackendRef], bool) {

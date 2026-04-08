@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: advanced-header-based-grpcroute-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: advanced-header-based-grpcroute
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: advanced-header-based-grpcroute-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: advanced-header-based-grpcroute

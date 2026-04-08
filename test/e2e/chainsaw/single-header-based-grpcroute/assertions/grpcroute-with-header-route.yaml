@@ -7,15 +7,15 @@ spec:
   (length(rules)): 2
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-header-based-grpcroute-stable-service
           (weight): 70
-        - name: argo-rollouts-canary-service
+        - name: single-header-based-grpcroute-canary-service
           (weight): 30
-    - matches:
+    - name: canary-route1
+      matches:
         - headers:
             - name: X-Test
               type: Exact
               value: test
       backendRefs:
-        - name: argo-rollouts-canary-service
-          (weight): 30
+        - name: single-header-based-grpcroute-canary-service

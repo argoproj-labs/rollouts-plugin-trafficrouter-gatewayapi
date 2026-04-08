@@ -7,7 +7,7 @@ spec:
   (length(rules)): 1
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-tcproute-stable-service
           (weight): 70
-        - name: argo-rollouts-canary-service
+        - name: single-tcproute-canary-service
           (weight): 30

@@ -1,0 +1,7 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: grpcroute-header-advanced-rollout
+  namespace: default
+status:
+  (phase): Healthy

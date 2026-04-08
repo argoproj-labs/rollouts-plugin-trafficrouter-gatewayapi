@@ -9,7 +9,7 @@ spec:
       namespace: default
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-header-based-httproute-stable-service
           port: 80
-        - name: argo-rollouts-canary-service
+        - name: single-header-based-httproute-canary-service
           port: 80

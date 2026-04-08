@@ -7,6 +7,6 @@ spec:
   (length(rules)): 1
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
-        - name: argo-rollouts-canary-service
+        - name: single-httproute-stable-service
+        - name: single-httproute-canary-service
           (weight): 0

@@ -26,11 +26,6 @@ define setup_cluster
 	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/experimental-install.yaml --server-side=true --force-conflicts
 endef
 
-define install_k8s_resources
-	kubectl apply -f ./examples/traefik/stable.yml
-	kubectl apply -f ./examples/traefik/canary.yml
-endef
-
 .PHONY: install-dependencies
 install-dependencies:
 	go mod download
@@ -66,7 +61,6 @@ ifeq (${IS_E2E_CLUSTER},)
 	kind create cluster --name ${E2E_CLUSTER_NAME} --config ./test/cluster-setup/cluster-config.yml
 	$(call add_helm_repo)
 	$(call setup_cluster)
-	$(call install_k8s_resources)
 endif
 
 .PHONY: sanity-check-e2e

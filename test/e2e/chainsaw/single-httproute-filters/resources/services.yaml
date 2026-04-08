@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: single-httproute-filters-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: single-httproute-filters
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: single-httproute-filters-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: single-httproute-filters

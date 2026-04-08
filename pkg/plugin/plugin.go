@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
-	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
 	"github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
 )
 
@@ -117,7 +116,6 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 		}
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		gatewayAPIConfig.ConfigMapRWMutex.Lock()
 		r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
@@ -127,13 +125,10 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 			return r.setHTTPHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
-			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 			return rpcError
 		}
-		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
 	if gatewayAPIConfig.GRPCRoutes != nil {
-		gatewayAPIConfig.ConfigMapRWMutex.Lock()
 		r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
@@ -143,10 +138,8 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 			return r.setGRPCHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
-			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 			return rpcError
 		}
-		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
 	return pluginTypes.RpcError{}
 }
@@ -167,36 +160,30 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 		}
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		gatewayAPIConfig.ConfigMapRWMutex.Lock()
 		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
 			}
 			gatewayAPIConfig.HTTPRoute = route.Name
-			return r.removeHTTPManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, gatewayAPIConfig)
+			return r.removeHTTPManagedRoutes(rollout, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
-			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 			return rpcError
 		}
-		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
 	if gatewayAPIConfig.GRPCRoutes != nil {
-		gatewayAPIConfig.ConfigMapRWMutex.Lock()
 		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
 			}
 			gatewayAPIConfig.GRPCRoute = route.Name
-			return r.removeGRPCManagedRoutes(rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes, gatewayAPIConfig)
+			return r.removeGRPCManagedRoutes(rollout, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
-			gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 			return rpcError
 		}
-		gatewayAPIConfig.ConfigMapRWMutex.Unlock()
 	}
 	return pluginTypes.RpcError{}
 }
@@ -225,9 +212,7 @@ func (r *RpcPlugin) getGatewayAPIConfigWithDiscovery(rollout *v1alpha1.Rollout) 
 
 func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
-	gatewayAPIConfig := &GatewayAPITrafficRouting{
-		ConfigMap: defaults.ConfigMap,
-	}
+	gatewayAPIConfig := &GatewayAPITrafficRouting{}
 	err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &gatewayAPIConfig)
 	if err != nil {
 		return gatewayAPIConfig, err
@@ -404,7 +389,9 @@ func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gatewa
 				break
 			}
 		}
-		return routeRule, nil
+		if isFound {
+			return routeRule, nil
+		}
 	}
 	return nil, routeRuleList.Error()
 }
@@ -440,6 +427,16 @@ func forEachGatewayAPIRoute[T1 GatewayAPIRoute](routeList []T1, fn func(route T1
 		}
 	}
 	return pluginTypes.RpcError{}
+}
+
+// managedRouteNamesSet returns a set of managed route names declared in the Rollout spec.
+// Used as the primary key for identifying plugin-injected rules by their Name field.
+func managedRouteNamesSet(rollout *v1alpha1.Rollout) map[string]bool {
+	names := make(map[string]bool)
+	for _, mr := range rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes {
+		names[mr.Name] = true
+	}
+	return names
 }
 
 func getGatewayAPIRouteNameList[T1 GatewayAPIRoute](gatewayAPIRouteList []T1) []string {

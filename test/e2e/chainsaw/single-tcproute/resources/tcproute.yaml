@@ -11,7 +11,7 @@ spec:
       kind: Gateway
   rules:
     - backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-tcproute-stable-service
           port: 80
-        - name: argo-rollouts-canary-service
+        - name: single-tcproute-canary-service
           port: 80

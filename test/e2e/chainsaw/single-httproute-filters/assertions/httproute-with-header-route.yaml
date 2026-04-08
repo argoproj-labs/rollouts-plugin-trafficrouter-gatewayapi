@@ -8,16 +8,16 @@ spec:
   rules:
     - (length(filters)): 4
       backendRefs:
-        - name: argo-rollouts-stable-service
+        - name: single-httproute-filters-stable-service
           (weight): 70
-        - name: argo-rollouts-canary-service
+        - name: single-httproute-filters-canary-service
           (weight): 30
-    - matches:
+    - name: filter-preservation-route
+      matches:
         - headers:
             - name: X-Filter-Test
               type: Exact
               value: preserve-filters
       (length(filters)): 4
       backendRefs:
-        - name: argo-rollouts-canary-service
-          (weight): 30
+        - name: single-httproute-filters-canary-service

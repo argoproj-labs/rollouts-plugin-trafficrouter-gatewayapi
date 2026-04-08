@@ -18,6 +18,8 @@ spec:
       description: Create the TLSRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
       try:
         - apply:
+            file: resources/services.yaml
+        - apply:
             file: resources/tlsroute.yaml
         - apply:
             file: resources/rollout.yaml

@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -20,7 +19,6 @@ const (
 	TCPRouteName      = "argo-rollouts-tcp-route"
 	TLSRouteName      = "argo-rollouts-tls-route"
 	RolloutNamespace  = "default"
-	ConfigMapName     = "test-config"
 	ManagedRouteName  = "test-header-route"
 )
 
@@ -310,12 +308,5 @@ var TLSRouteObj = v1alpha2.TLSRoute{
 				},
 			},
 		},
-	},
-}
-
-var ConfigMapObj = v1.ConfigMap{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      ConfigMapName,
-		Namespace: RolloutNamespace,
 	},
 }

@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpcroute-header-advanced
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: default
+  rules:
+    - backendRefs:
+        - name: advanced-header-based-grpcroute-stable-service
+          port: 80
+        - name: advanced-header-based-grpcroute-canary-service
+          port: 80

@@ -13,7 +13,6 @@ import (
 	rolloutsPlugin "github.com/argoproj/argo-rollouts/rollout/trafficrouting/plugin/rpc"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -38,7 +37,6 @@ func TestRunSuccessfully(t *testing.T) {
 		GRPCRouteClient: gwFake.NewSimpleClientset(&mocks.GRPCRouteObj).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
 		TCPRouteClient:  gwFake.NewSimpleClientset(&mocks.TCPPRouteObj).GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace),
 		TLSRouteClient:  gwFake.NewSimpleClientset(&mocks.TLSRouteObj).GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// pluginMap is the map of plugins we can dispense.
@@ -285,11 +283,11 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
 		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
 		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
@@ -314,11 +312,11 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 		assert.Equal(t, headerName, string(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Name))
 		assert.Equal(t, prefixedHeaderValue, rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Value)
 		assert.Equal(t, headerValueType, *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches[0].Headers[0].Type)
@@ -371,11 +369,11 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 		// Verify that the new header route rule (index 1) has the same filters as the original route rule (index 0)
 		originalFilters := grpcRouteWithFilters.Spec.Rules[0].Filters
 		newRouteFilters := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Filters
@@ -417,11 +415,11 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 		// Verify that the new header route rule (index 1) has no filters, same as the original route rule (index 0)
 		originalFilters := grpcRouteWithoutFilters.Spec.Rules[0].Filters
 		newRouteFilters := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Filters
@@ -478,11 +476,11 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 		// Verify that the new header route rule (index 1) has the same filters as the original route rule (index 0)
 		originalFilters := httpRouteWithFilters.Spec.Rules[0].Filters
 		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters
@@ -524,11 +522,11 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
 
 		assert.Empty(t, err.Error())
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 		// Verify that the new header route rule (index 1) has no filters, same as the original route rule (index 0)
 		originalFilters := httpRouteWithoutFilters.Spec.Rules[0].Filters
 		newRouteFilters := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Filters
@@ -541,7 +539,6 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			HTTPRoute: mocks.HTTPRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.RemoveManagedRoutes(rollout)
 
@@ -552,12 +549,83 @@ func TestRunSuccessfully(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 			Namespace: mocks.RolloutNamespace,
 			GRPCRoute: mocks.GRPCRouteName,
-			ConfigMap: mocks.ConfigMapName,
 		})
 		err := pluginInstance.RemoveManagedRoutes(rollout)
 
 		assert.Empty(t, err.Error())
 		assert.Equal(t, 1, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
+	})
+	t.Run("SetWeightDoesNotClobberHTTPHeaderRouteWeight", func(t *testing.T) {
+		// Reproduces issues #158 and #169: SetWeight(0) must not touch the canary
+		// BackendRef weight in a plugin-injected header-routing rule.
+		httpRoute := mocks.HTTPRouteObj
+		rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(&httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
+
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		})
+
+		// Create the header route rule first (as happens when setHeaderRoute runs before setWeight)
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  "X-Canary",
+					HeaderValue: &v1alpha1.StringMatch{Exact: "true"},
+				},
+			},
+		}
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules))
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
+
+		// Now call SetWeight(0) — the header rule's canary weight must remain nil
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Weight-splitting rule (index 0): stable=100, canary=0
+		assert.Equal(t, int32(100), *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, int32(0), *rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+		// Header-route rule (index 1): canary BackendRef weight must be untouched (nil)
+		assert.Nil(t, rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].BackendRefs[0].Weight)
+	})
+	t.Run("SetWeightDoesNotClobberGRPCHeaderRouteWeight", func(t *testing.T) {
+		// Reproduces issues #158 and #169 for GRPCRoute: SetWeight(0) must not touch
+		// the canary BackendRef weight in a plugin-injected header-routing rule.
+		grpcRoute := mocks.GRPCRouteObj
+		rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(&grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
+
+		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+		})
+
+		// Create the header route rule first
+		headerRouting := v1alpha1.SetHeaderRoute{
+			Name: mocks.ManagedRouteName,
+			Match: []v1alpha1.HeaderRoutingMatch{
+				{
+					HeaderName:  "X-Canary",
+					HeaderValue: &v1alpha1.StringMatch{Exact: "true"},
+				},
+			},
+		}
+		err := pluginInstance.SetHeaderRoute(rollout, &headerRouting)
+		assert.Empty(t, err.Error())
+		assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules))
+		assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
+
+		// Now call SetWeight(0) — the header rule's canary weight must remain nil
+		err = pluginInstance.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+		assert.Empty(t, err.Error())
+
+		// Weight-splitting rule (index 0): stable=100, canary=0
+		assert.Equal(t, int32(100), *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, int32(0), *rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[0].BackendRefs[1].Weight)
+		// Header-route rule (index 1): canary BackendRef weight must be untouched (nil)
+		assert.Nil(t, rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].BackendRefs[0].Weight)
 	})
 
 	// Canceling should cause an exit
@@ -831,7 +899,6 @@ func TestSetHTTPHeaderRouteWithExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -852,12 +919,12 @@ func TestSetHTTPHeaderRouteWithExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes BOTH original header AND canary header
 	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
@@ -900,7 +967,6 @@ func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -921,12 +987,12 @@ func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes BOTH method AND canary header
 	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
@@ -966,7 +1032,6 @@ func TestSetHTTPHeaderRouteWithExistingQueryParams(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -987,12 +1052,12 @@ func TestSetHTTPHeaderRouteWithExistingQueryParams(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes BOTH query params AND canary header
 	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
@@ -1039,7 +1104,6 @@ func TestSetHTTPHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1060,12 +1124,12 @@ func TestSetHTTPHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes ALL original headers plus canary header
 	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
@@ -1136,7 +1200,6 @@ func TestSetHTTPHeaderRouteWithCombinedMatches(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1157,12 +1220,12 @@ func TestSetHTTPHeaderRouteWithCombinedMatches(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes ALL original match criteria plus canary header
 	managedRouteMatches := rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Matches
@@ -1222,7 +1285,6 @@ func TestSetGRPCHeaderRouteWithExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1243,12 +1305,12 @@ func TestSetGRPCHeaderRouteWithExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes BOTH original header AND canary header
 	managedRouteMatches := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches
@@ -1304,7 +1366,6 @@ func TestSetGRPCHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1325,12 +1386,12 @@ func TestSetGRPCHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes ALL original headers plus canary header
 	managedRouteMatches := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches
@@ -1393,7 +1454,6 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   fake.NewSimpleClientset(&mocks.ConfigMapObj).CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	// Setup canary header
@@ -1414,12 +1474,12 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// Call SetHeaderRoute
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 
 	// Verify that managed route (index 1) includes method AND all headers (original + canary)
 	managedRouteMatches := rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Matches
@@ -1470,13 +1530,11 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 // orphaned duplicate header-based routing rules.
 func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	headerMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1492,13 +1550,13 @@ func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// First call — should add one managed rule (total: 2 rules)
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "first call should add exactly one managed rule")
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Simulate the state the fake client has after the first update
 	rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
@@ -1507,19 +1565,18 @@ func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	err = rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "second call must not add a duplicate managed rule")
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 }
 
 // TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall verifies that calling SetHeaderRoute multiple
 // times for the same managed route name does not create duplicate rules in the GRPCRoute.
 func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	headerMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1535,13 +1592,13 @@ func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	// First call — should add one managed rule (total: 2 rules)
 	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "first call should add exactly one managed rule")
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 
 	// Simulate the state the fake client has after the first update
 	rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedGRPCRouteMock).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
@@ -1550,25 +1607,23 @@ func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	err = rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "second call must not add a duplicate managed rule")
+	assert.Equal(t, mocks.ManagedRouteName, string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 }
 
 // TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth verifies that adding two managed header
 // routes with different names results in both being appended (3 rules total: 1 base + 2 managed).
 func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		HTTPRouteClient: gwFake.NewSimpleClientset(httpRoute).GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		HTTPRoute: mocks.HTTPRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	firstMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1591,6 +1646,7 @@ func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 2, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "first call should add one managed rule")
+	assert.Equal(t, "header-route-one", string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
 
 	// Reflect the updated route in the fake client before the second call
 	rpcPluginImp.HTTPRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedHTTPRouteMock).GatewayV1().HTTPRoutes(mocks.RolloutNamespace)
@@ -1599,25 +1655,24 @@ func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 3, len(rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules), "second distinct header route must be appended")
+	assert.Equal(t, "header-route-one", string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[1].Name))
+	assert.Equal(t, "header-route-two", string(*rpcPluginImp.UpdatedHTTPRouteMock.Spec.Rules[2].Name))
 }
 
 // TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth verifies that adding two managed header
 // routes with different names results in both being appended (3 rules total: 1 base + 2 managed).
 func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
-	configMapClientset := fake.NewSimpleClientset(&mocks.ConfigMapObj)
 
 	rpcPluginImp := &RpcPlugin{
 		LogCtx:          utils.SetupLog(),
 		IsTest:          true,
 		GRPCRouteClient: gwFake.NewSimpleClientset(grpcRoute).GatewayV1().GRPCRoutes(mocks.RolloutNamespace),
-		TestClientset:   configMapClientset.CoreV1().ConfigMaps(mocks.RolloutNamespace),
 	}
 
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
 		Namespace: mocks.RolloutNamespace,
 		GRPCRoute: mocks.GRPCRouteName,
-		ConfigMap: mocks.ConfigMapName,
 	})
 
 	firstMatch := v1alpha1.StringMatch{Exact: "true"}
@@ -1640,6 +1695,7 @@ func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 2, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "first call should add one managed rule")
+	assert.Equal(t, "header-route-one", string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
 
 	// Reflect the updated route in the fake client before the second call
 	rpcPluginImp.GRPCRouteClient = gwFake.NewSimpleClientset(rpcPluginImp.UpdatedGRPCRouteMock).GatewayV1().GRPCRoutes(mocks.RolloutNamespace)
@@ -1648,4 +1704,146 @@ func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
 	assert.Empty(t, err.Error())
 	assert.Equal(t, 3, len(rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules), "second distinct header route must be appended")
+	assert.Equal(t, "header-route-one", string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[1].Name))
+	assert.Equal(t, "header-route-two", string(*rpcPluginImp.UpdatedGRPCRouteMock.Spec.Rules[2].Name))
+}
+
+// TestGetRouteRuleOnlyReturnsRuleWithAllBackends verifies that getRouteRule only returns
+// a route rule when ALL requested backends are present. This is a regression test for the
+// bug where getRouteRule would return the first rule with any matching backend, even if
+// not all backends were found.
+//
+// Bug scenario: When searching for a rule with both "canary" and "stable" backends,
+// getRouteRule would incorrectly return a header route (which only has "canary" backend)
+// if it appeared first in the rules list.
+func TestGetRouteRuleOnlyReturnsRuleWithAllBackends(t *testing.T) {
+	// Create a route with two rules:
+	// 1. Header route with only canary backend (managed route)
+	// 2. Main route with both canary and stable backends
+	canaryName := gatewayv1.SectionName("header-route")
+	weight30 := int32(30)
+	weight70 := int32(70)
+
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-route",
+			Namespace: "default",
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				// Header route: only canary backend (this should NOT be returned)
+				{
+					Name: &canaryName,
+					Matches: []gatewayv1.HTTPRouteMatch{
+						{
+							Headers: []gatewayv1.HTTPHeaderMatch{
+								{
+									Name:  "X-Canary",
+									Value: "true",
+								},
+							},
+						},
+					},
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-canary-service",
+								},
+							},
+						},
+					},
+				},
+				// Main route: both canary and stable backends (this SHOULD be returned)
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-stable-service",
+								},
+								Weight: &weight70,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-canary-service",
+								},
+								Weight: &weight30,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+
+	// Test: Search for rule with both backends
+	backendRefNameList := []string{"argo-rollouts-canary-service", "argo-rollouts-stable-service"}
+	httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+
+	// Assert: Should find the main route (second rule), not the header route (first rule)
+	assert.NoError(t, err, "Should find a route with both backends")
+	assert.NotNil(t, httpRouteRule, "Route rule should not be nil")
+	assert.Equal(t, 2, len(httpRouteRule.BackendRefs), "Should return rule with 2 backends")
+	assert.Nil(t, httpRouteRule.Name, "Main route should not have a name (header routes have names)")
+
+	// Verify it's the correct rule by checking backend weights
+	var foundStable, foundCanary bool
+	for _, ref := range httpRouteRule.BackendRefs {
+		if ref.Name == "argo-rollouts-stable-service" {
+			foundStable = true
+			assert.Equal(t, int32(70), *ref.Weight)
+		}
+		if ref.Name == "argo-rollouts-canary-service" {
+			foundCanary = true
+			assert.Equal(t, int32(30), *ref.Weight)
+		}
+	}
+	assert.True(t, foundStable, "Should have stable backend")
+	assert.True(t, foundCanary, "Should have canary backend")
+}
+
+// TestGetRouteRuleReturnsErrorWhenBackendNotFound verifies that getRouteRule returns
+// an error when no rule contains all requested backends.
+func TestGetRouteRuleReturnsErrorWhenBackendNotFound(t *testing.T) {
+	// Create a route with only header routes (single backend each)
+	canaryName := gatewayv1.SectionName("header-route")
+
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-route",
+			Namespace: "default",
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					Name: &canaryName,
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: "argo-rollouts-canary-service",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+
+	// Test: Search for rule with both backends (only canary exists)
+	backendRefNameList := []string{"argo-rollouts-canary-service", "argo-rollouts-stable-service"}
+	httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+
+	// Assert: Should return error because no rule has both backends
+	assert.Error(t, err, "Should return error when backend not found")
+	assert.Nil(t, httpRouteRule, "Route rule should be nil on error")
+	assert.Equal(t, BackendRefWasNotFoundInHTTPRouteError, err.Error())
 }
