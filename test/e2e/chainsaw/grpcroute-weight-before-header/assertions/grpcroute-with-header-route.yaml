@@ -11,7 +11,8 @@ spec:
           (weight): 70
         - name: argo-rollouts-canary-service
           (weight): 30
-    - matches:
+    - name: canary-route1
+      matches:
         - headers:
             - name: X-Canary
               type: Exact

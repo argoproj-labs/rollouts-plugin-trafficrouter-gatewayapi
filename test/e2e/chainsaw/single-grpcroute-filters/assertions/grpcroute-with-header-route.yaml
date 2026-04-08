@@ -12,7 +12,8 @@ spec:
           (weight): 70
         - name: argo-rollouts-canary-service
           (weight): 30
-    - matches:
+    - name: grpc-filter-preservation-route
+      matches:
         - headers:
             - name: X-GRPC-Filter-Test
               type: Exact

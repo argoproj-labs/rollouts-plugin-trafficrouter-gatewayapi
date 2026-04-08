@@ -427,6 +427,16 @@ func forEachGatewayAPIRoute[T1 GatewayAPIRoute](routeList []T1, fn func(route T1
 	return pluginTypes.RpcError{}
 }
 
+// managedRouteNamesSet returns a set of managed route names declared in the Rollout spec.
+// Used as the primary key for identifying plugin-injected rules by their Name field.
+func managedRouteNamesSet(rollout *v1alpha1.Rollout) map[string]bool {
+	names := make(map[string]bool)
+	for _, mr := range rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes {
+		names[mr.Name] = true
+	}
+	return names
+}
+
 func getGatewayAPIRouteNameList[T1 GatewayAPIRoute](gatewayAPIRouteList []T1) []string {
 	gatewayAPIRouteNameList := make([]string, len(gatewayAPIRouteList))
 	for index, value := range gatewayAPIRouteList {
