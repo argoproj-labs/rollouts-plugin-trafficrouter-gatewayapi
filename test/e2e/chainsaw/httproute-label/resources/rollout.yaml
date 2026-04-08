@@ -20,11 +20,11 @@ spec:
   revisionHistoryLimit: 1
   selector:
     matchLabels:
-      app: rollouts-demo
+      app: httproute-label
   template:
     metadata:
       labels:
-        app: rollouts-demo
+        app: httproute-label
     spec:
       containers:
         - name: rollouts-demo

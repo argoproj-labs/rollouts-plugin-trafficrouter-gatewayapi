@@ -107,19 +107,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 
 		canaryServiceKind := gatewayv1.Kind("Service")
 		canaryServiceGroup := gatewayv1.Group("")
-
-		// Filter to only unmanaged rules (rules without a Name, or with a Name not in managedRoutes)
-		// This ensures getRouteRule only searches through weight-splitting rules, not header routes
-		managedNames := managedRouteNamesSet(rollout)
-		unmanagedRules := []gatewayv1.HTTPRouteRule{}
-		for _, rule := range httpRoute.Spec.Rules {
-			// Keep rules that have no name OR have a name that's not managed
-			if rule.Name == nil || !managedNames[string(*rule.Name)] {
-				unmanagedRules = append(unmanagedRules, rule)
-			}
-		}
-
-		httpRouteRuleList := HTTPRouteRuleList(unmanagedRules)
+		httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
 		backendRefNameList := []string{string(canaryServiceName), stableServiceName}
 		httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
 		if err != nil {

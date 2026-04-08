@@ -20,11 +20,11 @@ spec:
   revisionHistoryLimit: 1
   selector:
     matchLabels:
-      app: rollouts-demo
+      app: single-grpcroute
   template:
     metadata:
       labels:
-        app: rollouts-demo
+        app: single-grpcroute
     spec:
       containers:
         - name: rollouts-demo

@@ -9,7 +9,7 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: rollouts-demo
+    app: advanced-header-based-httproute
 ---
 apiVersion: v1
 kind: Service
@@ -22,4 +22,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: rollouts-demo
+    app: advanced-header-based-httproute

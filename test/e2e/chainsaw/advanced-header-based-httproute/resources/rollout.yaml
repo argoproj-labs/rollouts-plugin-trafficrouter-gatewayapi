@@ -41,11 +41,11 @@ spec:
   revisionHistoryLimit: 2
   selector:
     matchLabels:
-      app: rollouts-demo
+      app: advanced-header-based-httproute
   template:
     metadata:
       labels:
-        app: rollouts-demo
+        app: advanced-header-based-httproute
     spec:
       containers:
         - name: rollouts-demo
