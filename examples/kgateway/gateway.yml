@@ -7,5 +7,5 @@ spec:
   gatewayClassName: kgateway
   listeners:
     - protocol: HTTP
-      name: web
+      name: http
       port: 80

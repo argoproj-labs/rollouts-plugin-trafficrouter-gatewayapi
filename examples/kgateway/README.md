@@ -95,7 +95,7 @@ Create a dedicated gateway that splits traffic across your Argo Rollouts resourc
      gatewayClassName: kgateway
      listeners:
        - protocol: HTTP
-         name: web
+         name: http
          port: 80
    EOF
    ```

@@ -7,5 +7,5 @@ spec:
   gatewayClassName: agentgateway
   listeners:
     - protocol: HTTP
-      name: web
+      name: http
       port: 80
