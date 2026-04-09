@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpcroute-hbw
+  namespace: default
+spec:
+  (length(rules)): 2
+  rules:
+    - backendRefs:
+        - name: grpcroute-header-before-weight-stable-service
+          (weight): 70
+        - name: grpcroute-header-before-weight-canary-service
+          (weight): 30
+    - name: canary-route1
+      matches:
+        - headers:
+            - name: X-Canary
+              type: Exact
+              value: "true"
+      backendRefs:
+        - name: grpcroute-header-before-weight-canary-service

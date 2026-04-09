@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-hbw-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: httproute-header-before-weight-canary-service
+      stableService: httproute-header-before-weight-stable-service
+      trafficRouting:
+        managedRoutes:
+          - name: canary-route1
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-hbw
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+        - setHeaderRoute:
+            name: canary-route1
+            match:
+              - headerName: X-Canary
+                headerValue:
+                  exact: "true"
+        - setWeight: 30
+        - pause: {duration: 30s}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: httproute-header-before-weight
+  template:
+    metadata:
+      labels:
+        app: httproute-header-before-weight
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
