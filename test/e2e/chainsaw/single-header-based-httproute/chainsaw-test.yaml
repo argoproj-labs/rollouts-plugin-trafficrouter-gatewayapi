@@ -12,7 +12,7 @@ spec:
     the rollout completes.
   # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
   namespace: default
-  concurrent: false
+  concurrent: true
 
   steps:
     - name: create-resources

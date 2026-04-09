@@ -12,7 +12,7 @@ spec:
       trafficRouting:
         plugins:
           argoproj-labs/gatewayAPI:
-            httpRoute: httproute-basic
+            httpRoute: httproute-label-basic
             namespace: default
       steps:
         - setWeight: 30
