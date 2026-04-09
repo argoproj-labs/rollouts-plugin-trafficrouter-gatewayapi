@@ -358,7 +358,7 @@ Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. 
    kubectl argo rollouts get rollout rollouts-demo -n argo-rollouts --watch
    ```
 
-3. Promote the rollout. Make sure you have installed the [argo-rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) extension for kubectl.
+3. Promote the rollout. Make sure you have installed the [argo-rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) extension for kubectl. Blue and red dots reflect the traffic split in the GUI, run the promotion multiple times until only blue dots remain.
    ```shell
    kubectl argo rollouts promote rollouts-demo -n argo-rollouts
    ```
