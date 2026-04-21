@@ -57,7 +57,6 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 	return pluginTypes.RpcError{}
 }
 
-
 func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash string, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
 	return pluginTypes.RpcError{}
 }
