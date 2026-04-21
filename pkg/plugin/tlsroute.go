@@ -8,22 +8,16 @@ import (
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	tlsRouteClient := r.TLSRouteClient
-	if !r.IsTest {
-		gatewayClientV1alpha2 := r.GatewayAPIClientset.GatewayV1alpha2()
-		tlsRouteClient = gatewayClientV1alpha2.TLSRoutes(gatewayAPIConfig.Namespace)
-	}
+	tlsRouteClient := r.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(gatewayAPIConfig.Namespace)
 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	restWeight := 100 - desiredWeight
 
-	var updatedTLSRoute *v1alpha2.TLSRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		tlsRoute, err := tlsRouteClient.Get(ctx, gatewayAPIConfig.TLSRoute, metav1.GetOptions{})
 		if err != nil {
@@ -48,13 +42,10 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 
 		ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
 
-		updatedTLSRoute, err = tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
+		_, err = tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedTLSRouteMock = updatedTLSRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

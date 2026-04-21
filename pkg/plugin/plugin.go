@@ -23,9 +23,6 @@ const (
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 	log := utils.SetupLog()
 
-	if r.IsTest {
-		return pluginTypes.RpcError{}
-	}
 	kubeConfig, err := utils.GetKubeConfig()
 	if err != nil {
 		return pluginTypes.RpcError{

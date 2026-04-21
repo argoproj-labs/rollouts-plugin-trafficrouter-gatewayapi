@@ -13,11 +13,7 @@ import (
 
 func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	grpcRouteClient := r.GRPCRouteClient
-	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
-	}
+	grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
@@ -25,7 +21,6 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	restWeight := 100 - desiredWeight
 	managedNames := managedRouteNamesSet(rollout)
 
-	var updatedGRPCRoute *gatewayv1.GRPCRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
 		if err != nil {
@@ -59,13 +54,10 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 
 		ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
 
-		updatedGRPCRoute, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		_, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedGRPCRouteMock = updatedGRPCRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -79,11 +71,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		return r.removeGRPCManagedRoutes(rollout, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
-	grpcRouteClient := r.GRPCRouteClient
-	if !r.IsTest {
-		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
-		grpcRouteClient = gatewayClientV1.GRPCRoutes(gatewayAPIConfig.Namespace)
-	}
+	grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
 	grpcHeaderRouteRuleList, rpcError := getGRPCHeaderRouteRuleList(headerRouting)
 	if rpcError.HasError() {
 		return rpcError
@@ -93,7 +81,6 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	managedName := gatewayv1.SectionName(headerRouting.Name)
 
-	var updatedGRPCRoute *gatewayv1.GRPCRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
 		if err != nil {
@@ -183,13 +170,10 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 		grpcRoute.Spec.Rules = grpcRouteRuleList
 
-		updatedGRPCRoute, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		_, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedGRPCRouteMock = updatedGRPCRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -267,16 +251,11 @@ func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 
 func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	grpcRouteClient := r.GRPCRouteClient
-	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		grpcRouteClient = gatewayClientv1.GRPCRoutes(gatewayAPIConfig.Namespace)
-	}
+	grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
 
 	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
 	managedNames := managedRouteNamesSet(rollout)
 
-	var updatedGRPCRoute *gatewayv1.GRPCRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
 		if err != nil {
@@ -298,13 +277,10 @@ func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 		}
 		grpcRoute.Spec.Rules = newRules
 
-		updatedGRPCRoute, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+		_, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedGRPCRouteMock = updatedGRPCRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

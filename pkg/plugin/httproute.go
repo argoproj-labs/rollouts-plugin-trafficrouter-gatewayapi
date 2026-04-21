@@ -13,11 +13,7 @@ import (
 
 func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	httpRouteClient := r.HTTPRouteClient
-	if !r.IsTest {
-		gatewayClientV1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientV1.HTTPRoutes(gatewayAPIConfig.Namespace)
-	}
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
@@ -25,7 +21,6 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	restWeight := 100 - desiredWeight
 	managedNames := managedRouteNamesSet(rollout)
 
-	var updatedHTTPRoute *gatewayv1.HTTPRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 		if err != nil {
@@ -64,13 +59,10 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 
 		ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)
 
-		updatedHTTPRoute, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedHTTPRouteMock = updatedHTTPRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -84,11 +76,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		return r.removeHTTPManagedRoutes(rollout, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
-	httpRouteClient := r.HTTPRouteClient
-	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
-	}
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
 	httpHeaderRouteRuleList, rpcError := getHTTPHeaderRouteRuleList(headerRouting)
 	if rpcError.HasError() {
 		return rpcError
@@ -98,7 +86,6 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	managedName := gatewayv1.SectionName(headerRouting.Name)
 
-	var updatedHTTPRoute *gatewayv1.HTTPRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 		if err != nil {
@@ -192,13 +179,10 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 		httpRoute.Spec.Rules = httpRouteRuleList
 
-		updatedHTTPRoute, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedHTTPRouteMock = updatedHTTPRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
@@ -276,16 +260,11 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 
 func (r *RpcPlugin) removeHTTPManagedRoutes(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	httpRouteClient := r.HTTPRouteClient
-	if !r.IsTest {
-		gatewayClientv1 := r.GatewayAPIClientset.GatewayV1()
-		httpRouteClient = gatewayClientv1.HTTPRoutes(gatewayAPIConfig.Namespace)
-	}
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
 
 	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
 	managedNames := managedRouteNamesSet(rollout)
 
-	var updatedHTTPRoute *gatewayv1.HTTPRoute
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
 		if err != nil {
@@ -307,13 +286,10 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 		}
 		httpRoute.Spec.Rules = newRules
 
-		updatedHTTPRoute, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 		return err
 	})
 
-	if r.IsTest {
-		r.UpdatedHTTPRouteMock = updatedHTTPRoute
-	}
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),
