@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-two-headers-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: httproute-two-headers-canary-service
+      stableService: httproute-two-headers-stable-service
+      trafficRouting:
+        managedRoutes:
+          - name: canary-route1
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-two-headers
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+        - setWeight: 50
+        - setHeaderRoute:
+            name: canary-route1
+            match:
+              - headerName: X-QA
+                headerValue:
+                  exact: "true"
+        - pause: {duration: 30s}   # auto-promotes — no promote command needed in tests
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: httproute-two-headers
+  template:
+    metadata:
+      labels:
+        app: httproute-two-headers
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

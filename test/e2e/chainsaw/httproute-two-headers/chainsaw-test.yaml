@@ -1,0 +1,84 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-two-headers
+  labels:
+    route-type: http
+    test-scope: headers
+spec:
+  description: >
+    Verifies header-based routing when the static HTTPRoute already contains a header match
+    (X-Security) and the Rollout's setHeaderRoute uses a different header (X-QA) — the scenario
+    from issue #151. The plugin must merge static-rule headers into the managed rule so that the
+    managed rule has both headers (X-Security + X-QA), giving it higher specificity than the
+    1-header static rule. After the rollout completes the managed rule must be fully removed.
+  namespace: default
+  concurrent: false
+
+  steps:
+    - name: create-resources
+      description: Create the HTTPRoute (with existing X-Security header match) and Rollout.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: Plugin initializes the HTTPRoute with 1 rule (X-Security match) and canary weight 0.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start a canary (setWeight:50 -> setHeaderRoute:X-QA -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-two-headers-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-header-routing-active
+      description: >
+        Plugin must merge static-route headers into the managed rule. The managed rule must have
+        exactly 2 headers (X-Security inherited from the static rule + X-QA from setHeaderRoute),
+        ensuring it takes precedence over the 1-header static rule. Key assertion for issue #151.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-header-route.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (30s pause auto-expires).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: >
+        Plugin must remove the managed X-QA rule after rollout completes. Only the original
+        X-Security rule must remain, with canary weight reset to 0. No orphaned routes.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml
