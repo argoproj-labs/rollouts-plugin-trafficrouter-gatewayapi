@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-two-headers-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-two-headers
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-two-headers-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-two-headers
