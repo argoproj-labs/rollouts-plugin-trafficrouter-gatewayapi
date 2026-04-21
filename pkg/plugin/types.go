@@ -7,8 +7,6 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
-	gatewayApiClientv1 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1"
-	gatewayApiClientv1alpha2 "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1alpha2"
 )
 
 type CommandLineOpts struct {
@@ -17,19 +15,10 @@ type CommandLineOpts struct {
 }
 
 type RpcPlugin struct {
-	CommandLineOpts      CommandLineOpts
-	HTTPRouteClient      gatewayApiClientv1.HTTPRouteInterface
-	TCPRouteClient       gatewayApiClientv1alpha2.TCPRouteInterface
-	GRPCRouteClient      gatewayApiClientv1.GRPCRouteInterface
-	TLSRouteClient       gatewayApiClientv1alpha2.TLSRouteInterface
-	GatewayAPIClientset  *gatewayAPIClientset.Clientset
-	Clientset            *kubernetes.Clientset
-	UpdatedHTTPRouteMock *gatewayv1.HTTPRoute
-	UpdatedTCPRouteMock  *v1alpha2.TCPRoute
-	UpdatedGRPCRouteMock *gatewayv1.GRPCRoute
-	UpdatedTLSRouteMock  *v1alpha2.TLSRoute
-	LogCtx               *logrus.Entry
-	IsTest               bool
+	CommandLineOpts     CommandLineOpts
+	GatewayAPIClientset gatewayAPIClientset.Interface
+	Clientset           *kubernetes.Clientset
+	LogCtx              *logrus.Entry
 }
 
 type GatewayAPITrafficRouting struct {

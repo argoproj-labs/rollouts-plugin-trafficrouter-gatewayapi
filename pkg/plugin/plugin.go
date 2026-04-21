@@ -23,9 +23,6 @@ const (
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 	log := utils.SetupLog()
 
-	if r.IsTest {
-		return pluginTypes.RpcError{}
-	}
 	kubeConfig, err := utils.GetKubeConfig()
 	if err != nil {
 		return pluginTypes.RpcError{
@@ -59,6 +56,7 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 	r.Clientset = clientset
 	return pluginTypes.RpcError{}
 }
+
 
 func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash string, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError {
 	return pluginTypes.RpcError{}

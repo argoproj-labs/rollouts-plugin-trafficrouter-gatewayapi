@@ -12,7 +12,7 @@ import (
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
-func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient *gatewayApiClientset.Clientset, logger *logrus.Entry, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute, additionalDestinations []v1alpha1.WeightDestination) error {
+func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient gatewayApiClientset.Interface, logger *logrus.Entry, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute, additionalDestinations []v1alpha1.WeightDestination) error {
 	ruleIdx := -1
 	stableService := rollout.Spec.Strategy.Canary.StableService
 	canaryService := rollout.Spec.Strategy.Canary.CanaryService
