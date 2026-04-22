@@ -1,25 +1,25 @@
-# Using kgateway with Argo Rollouts
+# Using agentgateway with Argo Rollouts
 
-This guide will describe how to use kgateway Kubernetes Gateway as an implementation
+This guide will describe how to use agentgateway Kubernetes Gateway as an implementation
 for the Gateway API in order to do split traffic with Argo Rollouts.
 
 Versions used in this guide:
-- Kubernetes Gateway API: v1.4.0
-- kgateway: v2.2.2
+- Kubernetes Gateway API: v1.5.0
+- agentgateway: v1.0.1
 - argo-rollouts: v1.8.4
 - rollouts-plugin-trafficrouter-gatewayapi: v0.11.0
 
 Dependency:
 - [argo rollouts](https://argo-rollouts.readthedocs.io/en/stable/installation/#kubectl-plugin-installation) kubectl plugin
 
-## Step 1 - Install kgateway and Argo Rollouts
+## Step 1 - Install agentgateway and Argo Rollouts
 
-### 1 - Install kgateway
-This installation creates a `kgateway` GatewayClass, which you will use later. You can follow the instructions below to install via Helm, or refer to the [installation instructions](https://kgateway.dev/docs/envoy/main/install/) for other methods.
+### 1 - Install agentgateway
+This installation creates a `agentgateway` GatewayClass, which you will use later. You can follow the instructions below to install via Helm, or refer to the [installation instructions](https://agentgateway.dev/docs/kubernetes/main/install/) for other methods.
 
-1. Install the custom resources of the Kubernetes Gateway API version 1.4.0.
+1. Install the custom resources of the Kubernetes Gateway API version 1.5.0.
    ```shell
-   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
    ```
 
    Example output:
@@ -31,24 +31,24 @@ This installation creates a `kgateway` GatewayClass, which you will use later. Y
    customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io created
    ```
 
-2. Deploy the kgateway CRDs by using Helm. This command creates the kgateway-system namespace and creates the kgateway CRDs in the cluster.
+2. Deploy the agentgateway CRDs by using Helm. This command creates the agentgateway-system namespace and creates the agentgateway CRDs in the cluster.
    ```shell
    helm upgrade -i --create-namespace \
-     --namespace kgateway-system \
-     --version v2.2.2 kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds 
+     --namespace agentgateway-system \
+     --version v1.0.1 agentgateway-crds oci://cr.agentgateway.dev/charts/agentgateway-crds
    ```
 
-3. Install the kgateway Helm chart.
+3. Install the agentgateway Helm chart.
    ```shell
-   helm upgrade -i -n kgateway-system kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway \
-   --version v2.2.2
+   helm upgrade -i -n agentgateway-system agentgateway oci://cr.agentgateway.dev/charts/agentgateway \
+   --version v1.0.1
    ```
 
    Example output:
    ```shell
-   NAME: kgateway
+   NAME: agentgateway
    LAST DEPLOYED: Thu Feb 13 14:03:51 2025
-   NAMESPACE: kgateway-system
+   NAMESPACE: agentgateway-system
    STATUS: deployed
    REVISION: 1
    TEST SUITE: None
@@ -56,28 +56,28 @@ This installation creates a `kgateway` GatewayClass, which you will use later. Y
 
 4. Verify that the control plane is up and running.
    ```shell
-   kubectl get pods -n kgateway-system
+   kubectl get pods -n agentgateway-system
    ```
    
    Example output:
    ```shell
    NAME                                  READY   STATUS    RESTARTS   AGE
-   kgateway-78658959cd-cz6jt             1/1     Running   0          12s
+   agentgateway-78658959cd-cz6jt         1/1     Running   0          12s
    ```
 
-5. Verify that the kgateway GatewayClass is created.
+5. Verify that the agentgateway GatewayClass is created.
    ```shell
-   kubectl get gatewayclass kgateway
+   kubectl get gatewayclass agentgateway
    ```
    
    Example output:
    ```shell
-   NAME         CONTROLLER               ACCEPTED   AGE   
-   kgateway     kgateway.dev/kgateway    True       6m36s
+   NAME             CONTROLLER                        ACCEPTED   AGE   
+   agentgateway     agentgateway.dev/agentgateway     True       6m36s
    ```
 
 ### 2 - Install Argo Rollouts
-Make sure you also install Argo Rollouts. Follow the [kgateway Argo Rollouts integration guide](https://kgateway.dev/docs/envoy/main/integrations/argo/#install-argo-rollouts) to install Argo Rollouts.
+Make sure you also install Argo Rollouts. Follow the [agentgateway Argo Rollouts integration guide](https://agentgateway.dev/docs/kubernetes/main/integrations/argo/#install-argo-rollouts) to install Argo Rollouts.
 
 ## Step 2 - Split traffic with Gateway resources
 
@@ -92,7 +92,7 @@ Create a dedicated gateway that splits traffic across your Argo Rollouts resourc
      name: argo-rollouts-gateway
      namespace: argo-rollouts
    spec:
-     gatewayClassName: kgateway
+     gatewayClassName: agentgateway
      listeners:
        - protocol: HTTP
          name: http
@@ -164,7 +164,7 @@ Create a dedicated gateway that splits traffic across your Argo Rollouts resourc
 
 ## Step 4 - Grant argo-rollouts permissions
 
-Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes and Configmaps as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions or use the RBAC example provided in the [kgateway documentation](https://kgateway.dev/docs/envoy/main/integrations/argo/#create-rbac-rules-for-argo):
+Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources. The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes and Configmaps as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions or use the RBAC example provided in the [agentgateway documentation](https://agentgateway.dev/docs/kubernetes/main/integrations/argo/#create-rbac-rules-for-argo):
 
 1. Create a ClusterRole.
    ```yaml
