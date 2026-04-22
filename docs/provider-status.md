@@ -15,6 +15,7 @@ For convenience we are including here a list of those actually tested with the p
 
 | Provider   |    Version | API Version | Plugin   | Code     |
 |------------|------------|-------------| ---------| ---------|
+| [agentgateway](https://agentgateway.dev/)     | 1.0.1 | 1.5.0 | 0.11.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/agentgateway)    |
 | [Amazon VPC Lattice](https://www.gateway-api-controller.eks.aws.dev/latest//)     | 1.1.2 |   1.3.0    | 0.6.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/aws-gateway-api-controller-lattice )    |
 | [Cilium](https://cilium.io/)     | 1.18.2 | 1.2.0 | 0.8.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/cilium-header-based)    |
 | [Envoy Gateway](https://gateway.envoyproxy.io/)     | 0.5.0  |   Unknown  | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/envoygateway)    |
