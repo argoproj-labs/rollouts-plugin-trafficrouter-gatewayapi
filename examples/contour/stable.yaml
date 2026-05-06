@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-rollouts-stable-service
+  namespace: default
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollouts-demo
