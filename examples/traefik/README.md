@@ -1,67 +1,62 @@
 # Using Traefik Gateway API with Argo Rollouts
 
-This guide will describe how to use Traefik proxy an an implementation
+This guide will describe how to use [Traefik Proxy](https://traefik.io/) as an implementation
 for the Gateway API in order to do split traffic with Argo Rollouts.
 
-Versions used
+Versions used:
 
-* Argo Rollouts [1.7.2](https://github.com/argoproj/argo-rollouts/releases)
-* Argo Rollouts Gateway API plugin [0.4.0](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases)
-* [Traefik 3.1.4](https://doc.traefik.io/traefik/getting-started/install-traefik/)
-* GatewayAPI 1.1 (Part of the [Traefik Helm chart](https://github.com/traefik/traefik-helm-chart))
+* Argo Rollouts [1.9.0](https://github.com/argoproj/argo-rollouts/releases)
+* Argo Rollouts Gateway API plugin [0.13.0](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases)
+* Traefik [3.7.0](https://github.com/traefik/traefik/releases/tag/v3.7.0) (Helm chart 40.0.0)
+* Gateway API [1.5.1](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.5.1)
 
-Note that Argo Rollouts also [supports Traefik natively](https://argoproj.github.io/argo-rollouts/features/traffic-management/traefik/).
+## Prerequisites
 
-## Step 1 - Enable Gateway Provider and create Gateway entrypoint
+A Kubernetes cluster.
 
-First let's install Traefik as a Gateway provider. Follow the official [installation instructions](https://doc.traefik.io/traefik/getting-started/install-traefik/).
+__Note:__ Refer to the [Traefik compatibility documentation](https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/) for supported Kubernetes versions.
 
-You should also read the documentation on how [Traefik implements the Gateway API](https://doc.traefik.io/traefik/providers/kubernetes-gateway/).
+The Traefik Helm chart currently bundles the Gateway API CRDs, but this will change in a future version. Install them explicitly before installing Traefik:
 
-Install Traefik with Gateway support
-
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
 ```
+
+## Step 1 - Install Traefik with Gateway API support
+
+Install Traefik with the Kubernetes Gateway provider enabled:
+
+```shell
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
-helm install traefik traefik/traefik --set experimental.kubernetesGateway.enabled=true --set providers.kubernetesGateway.enabled=true --set ingressRoute.dashboard.enabled=true --version v32.0.0 --namespace=traefik --create-namespace
+helm install traefik traefik/traefik \
+  --set providers.kubernetesGateway.enabled=true \
+  --version 40.0.0 \
+  --namespace traefik \
+  --create-namespace
 ```
 
-Note that using Helm automatically installs the Kubernetes Gateway API CRDs
-as well as the appropriate RBAC resources so that Traefik can manage
-HTTP routes inside your cluster.
+The Helm chart automatically installs the required RBAC resources and creates a GatewayClass named `traefik`.
 
-Enabling the Traefik dashboard is optional, but helpful when debugging
-routes.
+Wait for Traefik to become available:
 
-After initial installation you can expose the dashboard with
-
-```
-kubectl port-forward -n traefik $(kubectl -n traefik get pods --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+```shell
+kubectl wait --timeout=5m -n traefik deployment/traefik --for=condition=Available
 ```
 
-And then visit `http://127.0.0.1:9000/dashboard/` (or whatever is the IP
-of your Loadbalancer)
+Verify the GatewayClass was created:
 
-Also notice that the Helm chart creates a Loadbalancer service by default.
-If your cluster has already a Loadbalancer or you want to customize Traefik installation you need to pass your own [options](https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml).
-
-## Step 2 - Create GatewayClass and Gateway resources
-
-After installing Traefik with need a GatewayClass and an actual Gateway.
-
-The Helm chart already created a GatewayClass for you.
-
-You can verify it with
-
-```
+```shell
 kubectl get gatewayclass
 ```
 
-Make sure that the value returned is "True" in the "Accepted" column.
+Make sure the `ACCEPTED` column shows `True`.
 
-Now let's create a Gateway
+## Step 2 - Create a Gateway resource
 
-```yaml
+The Helm chart creates an auto-managed Gateway in the `traefik` namespace that only accepts routes from the same namespace. For our application in the `default` namespace we create our own Gateway:
+
+```yaml title="gateway.yml"
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -71,19 +66,24 @@ spec:
   listeners:
     - protocol: HTTP
       name: web
-      port: 8000 # Default endpoint for Helm chart
+      port: 8000
 ```
 
-Apply the file it with
+Apply the file with `kubectl`:
 
-```
+```shell
+cd examples/traefik
 kubectl apply -f gateway.yml
 ```
 
-Notice that we installed the gateway on the default namespace which is where our application will be deployed as well. If you want the gateway to honor routes from other namespaces you need to install Traefik with a different option for `namespacePolicy` in the Helm chart.
+Get the IP of the Traefik LoadBalancer:
 
-This concludes the setup that is specific to Traefik Proxy. The rest of the steps are generic to any implementation of the Gateway API.
+```shell
+export GATEWAY_IP=$(kubectl get svc traefik -n traefik -o jsonpath="{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}")
+echo $GATEWAY_IP
+```
 
+__Note:__ The Traefik service listens on port 80 externally and forwards to the `web` entrypoint (port 8000) internally. Use the service IP/hostname with port 80 when testing.
 
 ## Step 3 - Give access to Argo Rollouts for the Gateway/Http Route
 
@@ -104,7 +104,7 @@ rules:
       - "*"
 ```
 
-__Note:__ These permission are not very strict. You should lock them down according to your needs.
+__Note:__ These permissions are not very strict. You should lock them down according to your needs.
 
 With the following role we allow Argo Rollouts to have write access to HTTPRoutes and Gateways.
 
@@ -112,7 +112,7 @@ With the following role we allow Argo Rollouts to have write access to HTTPRoute
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: gateway-admin
+  name: gateway-admin-rollouts
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -130,54 +130,25 @@ kubectl apply -f cluster-role.yml
 kubectl apply -f cluster-role-binding.yml
 ```
 
-## Step 4 - Create HTTPRoute that defines a traffic split
+## Step 4 - Create HTTPRoute that defines a traffic split between two services
 
-Create HTTPRoute and connect to the created Gateway resource
+Create HTTPRoute and connect to the created Gateway resource:
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+```yaml title="httproute.yml"
+apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: argo-rollouts-http-route
 spec:
   parentRefs:
-    - name: argo-rollouts-gateway
+    - name: traefik-gateway
+      namespace: default
   rules:
     - backendRefs:
         - name: argo-rollouts-stable-service
           port: 80
         - name: argo-rollouts-canary-service
           port: 80
-```
-
-Note that this route is accessible the route prefix `/` in your browser
-simply by visiting your Loadbalancer IP address.
-
-
-Apply it with:
-
-```shell
-kubectl apply -f cluster-role.yaml
-kubectl apply -f cluster-role-binding.yaml
-```
-
-## Step 5 - Create canary and stable services for your application
-
-- Canary service
-
-```yaml title="canary.yml"
-apiVersion: v1
-kind: Service
-metadata:
-  name: argo-rollouts-canary-service
-spec:
-  ports:
-    - port: 80
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    app: rollouts-demo
 ```
 
 - Stable service
@@ -197,13 +168,38 @@ spec:
     app: rollouts-demo
 ```
 
-Apply both file with kubectl.
+- Canary service
 
-## Step 6 - Create an example Rollout
+```yaml title="canary.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-rollouts-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollouts-demo
+```
 
-We can finally create the definition of the application.
+Apply the files with `kubectl`:
 
-```yaml
+```shell
+kubectl apply -f httproute.yml
+kubectl apply -f stable.yml
+kubectl apply -f canary.yml
+```
+
+## Step 5 - Create an example Rollout
+
+Deploy a rollout to get the initial version.
+
+Here is an example rollout:
+
+```yaml title="rollout.yml"
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -218,7 +214,7 @@ spec:
         plugins:
           argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
-            namespace: default # namespace where this rollout resides.
+            namespace: default
       steps:
         - setWeight: 30
         - pause: {}
@@ -228,6 +224,8 @@ spec:
         - pause: { duration: 10 }
         - setWeight: 80
         - pause: { duration: 10 }
+        - setWeight: 100
+        - pause: {}
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -250,36 +248,42 @@ spec:
               cpu: 5m
 ```
 
-Apply the file with kubectl
+Apply the file with `kubectl`:
 
-You can check the Rollout status with 
-
+```shell
+kubectl apply -f rollout.yml
 ```
+
+Check the rollout status:
+
+```shell
 kubectl argo rollouts get rollout rollouts-demo
 ```
 
-Once the application is deployed you can visit your browser at `localhost`
-or whatever is the IP of your loadbalancer.
+Once the application is deployed you can visit your browser at `$GATEWAY_IP` or test from the command line:
 
-## Step 8 - Test the canary
-
-Change the Rollout YAML and use a different color for `argoproj/rollouts-demo` image such as red or green.
-
-Apply the `rollout.yml` file again and the Gateway plugin will split the traffic to your canary by instructing Traefik proxy via the Gateway API.
-
-You should see the rollout with multiple colors in your browser.
-
-You can also monitor the canary with from the command line with:
-
+```shell
+export GATEWAY_IP=$(kubectl get svc traefik -n traefik -o jsonpath="{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}")
+curl $GATEWAY_IP
 ```
+
+## Step 6 - Test the canary
+
+Change the Rollout to use a different color for the `argoproj/rollouts-demo` image:
+
+```shell
+kubectl patch rollout rollouts-demo -n default \
+  --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value":"argoproj/rollouts-demo:blue"}]'
+```
+
+The Gateway plugin will split the traffic to your canary by instructing Traefik via the Gateway API. Run the command below and depending on the canary status you will sometimes see the red or blue version returned:
+
+```shell
+while true; do curl $GATEWAY_IP; done
+```
+
+You can monitor the canary progress from the command line with:
+
+```shell
 watch kubectl argo rollouts get rollout rollouts-demo
 ```
-
-Finished!
-
-
-
-
-
-
-
