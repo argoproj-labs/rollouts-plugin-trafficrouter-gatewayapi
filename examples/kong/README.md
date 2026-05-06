@@ -1,66 +1,55 @@
 # Using Kong Gateway with Argo Rollouts
 
-Kong Ingress has [native support](https://docs.konghq.com/kubernetes-ingress-controller/latest/concepts/gateway-api/) for the Gateway API making the integration with Argo Rollouts a straightforward process.
+[Kong Kubernetes Ingress Controller](https://docs.konghq.com/kubernetes-ingress-controller/latest/) has native support for the Gateway API making the integration with Argo Rollouts a straightforward process.
 
-## Step 0 - Install Argo Rollouts and the API Gateway Plugin
+Note that Argo Rollouts also [supports Kong natively via its NGINX-based ingress](https://argoproj.github.io/argo-rollouts/features/traffic-management/nginx/).
 
-See [instructions](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/installation/).
+## Prerequisites
 
-## Step 1 - Install the Gateway APIs
+A Kubernetes cluster.
 
-Kong does not install the Gateway APIs by default. You need to install them manually
-as described in the [instructions](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api).
+__Note:__ Refer to the [compatibility documentation](https://docs.konghq.com/kubernetes-ingress-controller/latest/support/version-support-policy/) for supported Kubernetes versions.
+
+Kong does not install the Gateway API CRDs by default. Install them before installing Kong, as the Helm chart detects the APIs and configures the correct roles automatically:
 
 ```shell
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.7.1/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
 ```
 
-It is imperative you install the APIs **before** installing Kong, as the Helm chart detects the APIs and also installs the correct roles for Kong itself to manage Gateway resources.
-
-## Step 2 - Deploy Kong Ingress to the cluster
-
-Follow [the official instructions](https://docs.konghq.com/kubernetes-ingress-controller/2.9.x/deployment/k4k8s/#helm)
-
+Install Kong Ingress Controller:
 
 ```shell
 helm repo add kong https://charts.konghq.com
 helm repo update
-
-
-# Helm 3
-helm install kong/kong --generate-name --set ingressController.installCRDs=false -n kong --create-namespace
-
+helm install kong kong/ingress --version 0.24.0 -n kong --create-namespace
 ```
 
-Then enable Gateway support by toggling [the respective feature](https://docs.konghq.com/kubernetes-ingress-controller/2.9.x/deployment/install-gateway-apis/):
+Wait for Kong to become available:
 
 ```shell
-kubectl set env -n kong deployment/ingress-kong CONTROLLER_FEATURE_GATES="GatewayAlpha=true" -c ingress-controller
-kubectl rollout restart -n NAMESPACE deployment DEPLOYMENT_NAME
+kubectl wait --timeout=5m -n kong deployment/kong-controller --for=condition=Available
+kubectl wait --timeout=5m -n kong deployment/kong-gateway --for=condition=Available
 ```
 
-## Step 3 - Create Gateway and Gateway class
+## Step 1 - Create GatewayClass and Gateway
 
-Now create the GatewayClass object (it needs to be created only once). 
+Create the GatewayClass (created only once per cluster):
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+```yaml title="gatewayclass.yml"
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: kong
   annotations:
     konghq.com/gatewayclass-unmanaged: 'true'
-
 spec:
   controllerName: konghq.com/kic-gateway-controller
 ```
 
-Apply the file with `kubectl`
+Create a Gateway:
 
-Create a gateway:
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+```yaml title="gateway.yml"
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: kong
@@ -70,23 +59,28 @@ spec:
   - name: proxy
     port: 80
     protocol: HTTP
-
 ```
 
-Get the IP of the gateway with:
+Apply the files with `kubectl`:
 
 ```shell
-kubectl get gateways.gateway.networking.k8s.io kong -o=jsonpath="{.status.addresses[0].value}"
+cd examples/kong
+kubectl apply -f gatewayclass.yml
+kubectl apply -f gateway.yml
 ```
 
-Note down the IP address for testing the application later.
+Get the IP of the Kong proxy service:
 
-## Step 4 - Give access to Argo Rollouts for the Gateway/Http Route
+```shell
+export GATEWAY_IP=$(kubectl get svc kong-gateway-proxy -n kong -o jsonpath="{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}")
+echo $GATEWAY_IP
+```
 
+## Step 2 - Give access to Argo Rollouts for the Gateway/Http Route
 
 Create Cluster Role resource with needed permissions for Gateway API provider.
 
-```yaml
+```yaml title="cluster-role.yml"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -101,15 +95,15 @@ rules:
       - "*"
 ```
 
-Note that these permission are not very strict. You should lock them down according to your needs.
+__Note:__ These permissions are not very strict. You should lock them down according to your needs.
 
-With the following role we allow Argo Rollouts to have write access to Http Routes and Gateways.
+With the following role we allow Argo Rollouts to have write access to HTTPRoutes and Gateways.
 
-```yaml
+```yaml title="cluster-role-binding.yml"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: gateway-admin
+  name: gateway-admin-rollouts
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -120,15 +114,20 @@ subjects:
     name: argo-rollouts
 ```
 
-Apply both files with `kubectl`.
+Apply both files with `kubectl`:
 
-## Step 5 - Create HTTPRoute that defines a traffic split between two services
+```shell
+kubectl apply -f cluster-role.yml
+kubectl apply -f cluster-role-binding.yml
+```
 
-Create HTTPRoute and connect to the created Gateway resource
+## Step 3 - Create HTTPRoute that defines a traffic split between two services
 
-```yaml
+Create HTTPRoute and connect to the created Gateway resource:
+
+```yaml title="httproute.yml"
 kind: HTTPRoute
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 metadata:
   name: argo-rollouts-http-route
   annotations:
@@ -143,7 +142,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: /  
+        value: /
     backendRefs:
     - name: argo-rollouts-stable-service
       kind: Service
@@ -153,27 +152,9 @@ spec:
       port: 80
 ```
 
-
-- Canary service
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: argo-rollouts-canary-service
-spec:
-  ports:
-    - port: 80
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    app: rollouts-demo
-```
-
 - Stable service
 
-```yaml
+```yaml title="stable.yml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -188,22 +169,44 @@ spec:
     app: rollouts-demo
 ```
 
-Apply all the above manifests with `kubectl`.
+- Canary service
 
-## Step 6 - Create an example Rollout
+```yaml title="canary.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-rollouts-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollouts-demo
+```
 
-Deploy a rollout to get the initial version
+Apply the files with `kubectl`:
 
-```yaml
-Here is an example rollout
+```shell
+kubectl apply -f httproute.yml
+kubectl apply -f stable.yml
+kubectl apply -f canary.yml
+```
 
+## Step 4 - Create an example Rollout
+
+Deploy a rollout to get the initial version.
+
+Here is an example rollout:
+
+```yaml title="rollout.yml"
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
   name: rollouts-demo
   namespace: default
 spec:
-  revisionHistoryLimit: 1
   replicas: 10
   strategy:
     canary:
@@ -243,11 +246,36 @@ spec:
               cpu: 5m
 ```
 
-Change the manifest to the `v2` tag and while the rollout is progressing you should see
-the split traffic by visiting the IP of the gateway (see step 2)
+Apply the file with `kubectl`:
 
 ```shell
-curl -H "host: demo.example.com" <IP>/call-me
+kubectl apply -f rollout.yml
 ```
-Run the command above multiple times and depending on the canary status you will sometimes see "v1" returned and sometimes "v2"
 
+Check the rollout:
+
+```shell
+export GATEWAY_IP=$(kubectl get svc kong-gateway-proxy -n kong -o jsonpath="{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}")
+curl -H "host: demo.example.com" $GATEWAY_IP/callme
+```
+
+The output should be:
+
+```shell
+<div class='pod' style='background:#44B3C2'> ver: 1.0
+ </div>%
+```
+
+Change the manifest to the `v2` tag and while the rollout is progressing you should see
+the split traffic by visiting the IP of the gateway (see step 1)
+
+```shell
+kubectl patch rollout rollouts-demo -n default \
+  --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value":"kostiscodefresh/summer-of-k8s-app:v2"}]'
+```
+
+Run the command and depending on the canary status you will sometimes see "v1" returned and sometimes "v2"
+
+```shell
+while true; do curl -H "host: demo.example.com" $GATEWAY_IP/callme; done
+```
