@@ -8,7 +8,7 @@ Note that Argo Rollouts also [supports Kong natively via its NGINX-based ingress
 
 A Kubernetes cluster.
 
-__Note:__ Refer to the [compatibility documentation](https://docs.konghq.com/kubernetes-ingress-controller/latest/support/version-support-policy/) for supported Kubernetes versions.
+__Note:__ Refer to the [compatibility documentation](https://developer.konghq.com/kubernetes-ingress-controller/support/) for supported Kubernetes versions.
 
 Kong does not install the Gateway API CRDs by default. Install them before installing Kong, as the Helm chart detects the APIs and configures the correct roles automatically:
 
