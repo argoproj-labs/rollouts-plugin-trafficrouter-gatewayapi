@@ -1,6 +1,6 @@
 # Using Kong Gateway with Argo Rollouts
 
-[Kong Kubernetes Ingress Controller](https://docs.konghq.com/kubernetes-ingress-controller/latest/) has native support for the Gateway API making the integration with Argo Rollouts a straightforward process.
+[Kong Kubernetes Ingress Controller](https://developer.konghq.com/kubernetes-ingress-controller/) has native support for the Gateway API making the integration with Argo Rollouts a straightforward process.
 
 Note that Argo Rollouts also [supports Kong natively via its NGINX-based ingress](https://argoproj.github.io/argo-rollouts/features/traffic-management/nginx/).
 

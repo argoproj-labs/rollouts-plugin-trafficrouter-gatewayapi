@@ -9,7 +9,7 @@ Note that Argo Rollouts also [supports Traefik natively](https://argoproj.github
 
 Before enabling a Gateway Provider you also need to install Traefik. Follow the official [installation instructions](https://doc.traefik.io/traefik/getting-started/install-traefik/).
 
-You should also read the documentation on how [Traefik implements the Gateway API](https://doc.traefik.io/traefik/providers/kubernetes-gateway/).
+You should also read the documentation on how [Traefik implements the Gateway API](https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/).
 
 1. Register [Gateway API CRD](https://gateway-api.sigs.k8s.io/guides/#install-standard-channel)
 

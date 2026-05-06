@@ -1,10 +1,10 @@
 # Using Google Cloud with Argo Rollouts
 
-Google cloud has [native support](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api) for the Gateway API making the integration with Argo Rollouts a straightforward process.
+Google cloud has [native support](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api) for the Gateway API making the integration with Argo Rollouts a straightforward process.
 
 ## Step 1 - Create a cluster with Gateway support in Google Cloud
 
-Follow [the official instructions](https://cloud.google.com/kubernetes-engine/docs/how-to/deploying-gateways#internal-gateway)
+Follow [the official instructions](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/deploying-gateways#internal-gateway)
 
 The example below is for an internal gateway as it is simple but the integration should work for all Google cloud gateways.
 
@@ -28,7 +28,7 @@ gcloud container clusters update CLUSTER_NAME \
 
 ## Step 2 - Create Google Load balancer with Gateway support
 
-Then create a proxy subnet as shown in the [instructions](https://cloud.google.com/kubernetes-engine/docs/how-to/deploying-gateways#configure_a_proxy-only_subnet) 
+Then create a proxy subnet as shown in the [instructions](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/deploying-gateways#configure_a_proxy-only_subnet) 
 
 ```shell
 gcloud compute networks subnets create demo-subnet \
