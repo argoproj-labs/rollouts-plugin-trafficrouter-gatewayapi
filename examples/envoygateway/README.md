@@ -11,7 +11,7 @@ __Note:__ Refer to the [Compatibility Matrix](https://gateway.envoyproxy.io/late
 Install the Gateway API CRDs and Envoy Gateway:
 
 ```shell
-helm install eg oci://docker.io/envoyproxy/gateway-helm --version v0.5.0 -n envoy-gateway-system --create-namespace
+helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.7.2 -n envoy-gateway-system --create-namespace
 ```
 
 Wait for Envoy Gateway to become available:
@@ -26,7 +26,7 @@ Create a gateway:
 
 ```yaml title="gateway.yaml"
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: eg
@@ -34,7 +34,7 @@ metadata:
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: eg
@@ -106,12 +106,12 @@ kubectl apply -f cluster-role.yaml
 kubectl apply -f cluster-role-binding.yaml
 ```
 
-## Step 4 - Create HTTPRoute that defines a traffic split between two services
+## Step 3 - Create HTTPRoute that defines a traffic split between two services
 Create HTTPRoute and connect to the created Gateway resource
 
 ```yaml title="httproute.yaml"
 kind: HTTPRoute
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 metadata:
   name: argo-rollouts-http-route
   namespace: default
@@ -179,7 +179,7 @@ kubectl apply -f canary.yaml
 ```
 
 
-## Step 5 - Create an example Rollout
+## Step 4 - Create an example Rollout
 
 Deploy a rollout to get the initial version.
 
