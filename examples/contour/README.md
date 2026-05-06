@@ -1,26 +1,26 @@
-# Using Envoy Gateway with Argo Rollouts
+# Using Contour with Argo Rollouts
 
-[Envoy Gateway](https://gateway.envoyproxy.io/) is an open source project for managing Envoy Proxy as a standalone or Kubernetes-based application gateway. Gateway API resources are used to dynamically provision and configure the managed Envoy Proxies
+[Contour](https://projectcontour.io/) is an open source Kubernetes ingress controller that acts as a control plane for the Envoy edge and service proxy. It implements the Gateway API using a dynamic provisioning model where Contour automatically deploys and manages Envoy proxy instances in response to Gateway resources.
 
 ## Prerequisites
 
 A Kubernetes cluster.
 
-__Note:__ Refer to the [Compatibility Matrix](https://gateway.envoyproxy.io/news/releases/matrix/) for supported Kubernetes versions.
+__Note:__ Refer to the [Compatibility Matrix](https://projectcontour.io/resources/compatibility-matrix/) for supported Kubernetes versions.
 
-Install the Gateway API CRDs and Envoy Gateway:
-
-```shell
-helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.7.2 -n envoy-gateway-system --create-namespace
-```
-
-Wait for Envoy Gateway to become available:
+Install the Contour Gateway Provisioner (this also installs the required Gateway API CRDs):
 
 ```shell
-kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
+kubectl apply -f https://projectcontour.io/quickstart/contour-gateway-provisioner.yaml
 ```
 
-## Step 1 - Create EnvoyGateway GatewayClass and Gateway object
+Wait for the Contour Gateway Provisioner to become available:
+
+```shell
+kubectl wait --timeout=5m -n projectcontour deployment/contour-gateway-provisioner --for=condition=Available
+```
+
+## Step 1 - Create Contour GatewayClass and Gateway object
 
 Create a gateway:
 
@@ -29,35 +29,43 @@ Create a gateway:
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
-  name: eg
-  namespace: default
+  name: contour
 spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  controllerName: projectcontour.io/gateway-controller
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: eg
-  namespace: default
+  name: contour
+  namespace: projectcontour
 spec:
-  gatewayClassName: eg
+  gatewayClassName: contour
   listeners:
     - name: http
       protocol: HTTP
       port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
 ```
 
 Apply the file with `kubectl`:
 
 ```shell
-cd examples/envoygateway
+cd examples/contour
 kubectl apply -f gateway.yaml
 ```
 
-Get the IP of your Gateway
+Wait for the Gateway to be programmed (Contour will automatically provision an Envoy instance):
 
 ```shell
-export GATEWAY_IP=$(kubectl get gateway eg -o=jsonpath="{.status.addresses[0].value}")
+kubectl wait --timeout=3m -n projectcontour gateway/contour --for=condition=Programmed
+```
+
+Get the IP of your Gateway:
+
+```shell
+export GATEWAY_IP=$(kubectl get gateway contour -n projectcontour -o=jsonpath="{.status.addresses[0].value}")
 echo $GATEWAY_IP
 ```
 
@@ -80,7 +88,7 @@ rules:
       - "*"
 ```
 
-__Note:__ These permission are not very strict. You should lock them down according to your needs.
+__Note:__ These permissions are not very strict. You should lock them down according to your needs.
 
 With the following role we allow Argo Rollouts to have write access to HTTPRoutes and Gateways.
 
@@ -107,7 +115,10 @@ kubectl apply -f cluster-role-binding.yaml
 ```
 
 ## Step 3 - Create HTTPRoute that defines a traffic split between two services
-Create HTTPRoute and connect to the created Gateway resource
+
+Create HTTPRoute and connect to the created Gateway resource.
+
+__Note:__ The HTTPRoute must reference the Gateway by both name and namespace since the Gateway lives in the `projectcontour` namespace while the HTTPRoute lives in `default`.
 
 ```yaml title="httproute.yaml"
 kind: HTTPRoute
@@ -117,14 +128,15 @@ metadata:
   namespace: default
 spec:
   parentRefs:
-    - name: eg
+    - name: contour
+      namespace: projectcontour
   hostnames:
   - "demo.example.com"
   rules:
   - matches:
     - path:
         type: PathPrefix
-        value: /  
+        value: /
     backendRefs:
     - name: argo-rollouts-stable-service
       kind: Service
@@ -177,7 +189,6 @@ kubectl apply -f httproute.yaml
 kubectl apply -f stable.yaml
 kubectl apply -f canary.yaml
 ```
-
 
 ## Step 4 - Create an example Rollout
 
@@ -237,9 +248,10 @@ Apply the file with `kubectl`:
 kubectl apply -f rollout.yaml
 ```
 
-Check the rollout: 
+Check the rollout:
+
 ```shell
-export GATEWAY_IP=$(kubectl get gateway eg -o=jsonpath="{.status.addresses[0].value}")
+export GATEWAY_IP=$(kubectl get gateway contour -n projectcontour -o=jsonpath="{.status.addresses[0].value}")
 curl -H "host: demo.example.com" $GATEWAY_IP/callme
 ```
 
@@ -251,7 +263,7 @@ The output should be:
 ```
 
 Change the manifest to the `v2` tag and while the rollout is progressing you should see
-the split traffic by visiting the IP of the gateway (see step 2)
+the split traffic by visiting the IP of the gateway (see step 1)
 
 ```shell
 kubectl patch rollout rollouts-demo -n default \
@@ -259,6 +271,7 @@ kubectl patch rollout rollouts-demo -n default \
 ```
 
 Run the command and depending on the canary status you will sometimes see "v1" returned and sometimes "v2"
+
 ```shell
 while true; do curl -H "host: demo.example.com" $GATEWAY_IP/callme; done
 ```
