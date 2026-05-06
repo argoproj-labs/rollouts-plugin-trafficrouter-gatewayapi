@@ -1,52 +1,129 @@
-# Using NGINX Kubernetes Gateway with Argo Rollouts
+# Using NGINX Gateway Fabric with Argo Rollouts
 
-This guide will describe how to use NGINX Kubernetes Gateway as an implementation
-for the Gateway API in order to do split traffic with Argo Rollouts.
+[NGINX Gateway Fabric](https://github.com/nginx/nginx-gateway-fabric) is an open source project that implements the Gateway API using NGINX as the data plane. It provisions a dedicated NGINX instance for each Gateway resource.
 
 Note that Argo Rollouts also [supports NGINX natively](https://argoproj.github.io/argo-rollouts/features/traffic-management/nginx/).
 
-## Step 1 - Enable Gateway Provider and create Gateway entrypoint
+## Prerequisites
 
-Before enabling a Gateway Provider you also need to install NGINX Kubernetes Gateway. Follow the official [installation instructions](https://docs.nginx.com/nginx-gateway-fabric/installation/installing-ngf/helm/).
+A Kubernetes cluster.
 
-This installation will create an `nginx` gateway class that we can use later on.
+__Note:__ Refer to the [Technical Specifications](https://docs.nginx.com/nginx-gateway-fabric/overview/technical-specifications/) for supported Kubernetes versions.
 
+Install the Gateway API CRDs:
 
-1. If not already done through the previous installation instructions, register the [Gateway API CRDs](https://gateway-api.sigs.k8s.io/guides/#install-standard-channel)
-
+```shell
+kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v2.5.1" | kubectl apply -f -
 ```
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v0.8.0/standard-install.yaml
+
+Install NGINX Gateway Fabric:
+
+```shell
+helm install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --version 2.5.1 --create-namespace -n nginx-gateway
 ```
 
-## Step 2 - Create a Gateway resource and HTTPRoute that defines a traffic split
+Wait for NGINX Gateway Fabric to become available:
 
+```shell
+kubectl wait --timeout=5m -n nginx-gateway deployment/ngf-nginx-gateway-fabric --for=condition=Available
+```
 
-After we deployed the Gateway API provider and Gateway class, we can create a Gateway resource:
+## Step 1 - Create a Gateway resource
 
+NGINX Gateway Fabric automatically provisions an NGINX instance when a Gateway resource is created.
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+```yaml title="gateway.yml"
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: argo-rollouts-gateway
+  namespace: default
 spec:
   gatewayClassName: nginx
   listeners:
     - protocol: HTTP
       name: web
-      port: 80 # one of Gateway entrypoint that was created following the official installation instructions
+      port: 80
 ```
+
+Apply the file with `kubectl`:
+
+```shell
+cd examples/nginx
+kubectl apply -f gateway.yml
+```
+
+Wait for the Gateway to be programmed:
+
+```shell
+kubectl wait --timeout=3m gateway/argo-rollouts-gateway -n default --for=condition=Programmed
+```
+
+Get the IP of your Gateway (NGINX Gateway Fabric creates a LoadBalancer service per Gateway):
+
+```shell
+export GATEWAY_IP=$(kubectl get svc argo-rollouts-gateway-nginx -n default -o jsonpath="{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}")
+echo $GATEWAY_IP
+```
+
+## Step 2 - Give access to Argo Rollouts for the Gateway/Http Route
+
+Create Cluster Role resource with needed permissions for Gateway API provider.
+
+```yaml title="cluster-role.yaml"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gateway-controller-role
+  namespace: argo-rollouts
+rules:
+  - apiGroups:
+      - "*"
+    resources:
+      - "*"
+    verbs:
+      - "*"
+```
+
+__Note:__ These permissions are not very strict. You should lock them down according to your needs.
+
+With the following role we allow Argo Rollouts to have write access to HTTPRoutes and Gateways.
+
+```yaml title="cluster-role-binding.yaml"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gateway-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gateway-controller-role
+subjects:
+  - namespace: argo-rollouts
+    kind: ServiceAccount
+    name: argo-rollouts
+```
+
+Apply both files with `kubectl`:
+
+```shell
+kubectl apply -f cluster-role.yaml
+kubectl apply -f cluster-role-binding.yaml
+```
+
+## Step 3 - Create HTTPRoute that defines a traffic split between two services
 
 Create HTTPRoute and connect to the created Gateway resource:
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+```yaml title="httproute.yml"
+apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: argo-rollouts-http-route
 spec:
   parentRefs:
     - name: argo-rollouts-gateway
+      namespace: default
   rules:
     - backendRefs:
         - name: argo-rollouts-stable-service
@@ -55,11 +132,26 @@ spec:
           port: 80
 ```
 
-## Step 3 - Create canary and stable services for your application
+- Stable service
+
+```yaml title="stable.yml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-rollouts-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollouts-demo
+```
 
 - Canary service
 
-```yaml
+```yaml title="canary.yml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -74,45 +166,21 @@ spec:
     app: rollouts-demo
 ```
 
-- Stable service
+Apply the files with `kubectl`:
 
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: argo-rollouts-stable-service
-spec:
-  ports:
-    - port: 80
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    app: rollouts-demo
-```
-## Step 4 - Grant argo-rollouts permissions to view and modify Gateway HTTPRoute resources
-
-The argo-rollouts service account needs the ability to be able to view and modify HTTPRoutes as well as its existing permissions. Edit the `argo-rollouts` cluster role to add the following permissions:
-
-```yaml
-rules:
-- apiGroups:
-  - gateway.networking.k8s.io
-  resources:
-  - httproutes
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-  - patch
+```shell
+kubectl apply -f httproute.yml
+kubectl apply -f stable.yml
+kubectl apply -f canary.yml
 ```
 
-## Step 5 - Create argo-rollouts resources
+## Step 4 - Create an example Rollout
 
-We can finally create the definition of the application.
+Deploy a rollout to get the initial version.
 
-```yaml
+Here is an example rollout:
+
+```yaml title="rollout.yml"
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -127,7 +195,7 @@ spec:
         plugins:
           argoproj-labs/gatewayAPI:
             httpRoute: argo-rollouts-http-route # our created httproute
-            namespace: default # namespace where this rollout resides.
+            namespace: default
       steps:
         - setWeight: 30
         - pause: {}
@@ -137,6 +205,8 @@ spec:
         - pause: { duration: 10 }
         - setWeight: 80
         - pause: { duration: 10 }
+        - setWeight: 100
+        - pause: {}
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -159,10 +229,29 @@ spec:
               cpu: 5m
 ```
 
-Apply all the yaml files to your cluster
+Apply the file with `kubectl`:
 
-## Step 6 - Test the canary
+```shell
+kubectl apply -f rollout.yml
+```
 
-Perform a deployment like any other Rollout and the Gateway plugin will split the traffic to your canary by instructing NGINX Gateway to proxy via the Gateway API
+Check the rollout:
 
+```shell
+export GATEWAY_IP=$(kubectl get svc argo-rollouts-gateway-nginx -n default -o jsonpath="{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}")
+curl $GATEWAY_IP
+```
 
+Change the manifest to the `blue` tag and while the rollout is progressing you should see
+the split traffic by visiting the IP of the gateway (see step 1)
+
+```shell
+kubectl patch rollout rollouts-demo -n default \
+  --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value":"argoproj/rollouts-demo:blue"}]'
+```
+
+Run the command and depending on the canary status you will sometimes see the red or blue version returned:
+
+```shell
+while true; do curl $GATEWAY_IP; done
+```

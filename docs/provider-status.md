@@ -25,7 +25,7 @@ For convenience we are including here a list of those actually tested with the p
 | [kgateway](https://kgateway.dev/)     | 2.2.2 | 1.4.0 | 0.11.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kgateway)    |
 | [Kong](https://docs.konghq.com/kubernetes-ingress-controller/latest/concepts/gateway-api/)     | 2.9.x  | 0.7.1    | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kong)    |
 | [Linkerd](https://linkerd.io/)     | edge-25.9.4 |   1.2.1    | 0.8.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/linkerd-header-based)    |
-| [NGINX Gateway](https://github.com/nginxinc/nginx-gateway-fabric)     | Unknown | 0.8.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/nginx)    |
+| [NGINX Gateway Fabric](https://github.com/nginx/nginx-gateway-fabric)     | 2.5.1 | 1.5.1      | 0.13.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/nginx)    |
 | [Traefik](https://doc.traefik.io/traefik/providers/kubernetes-gateway/)     | 3.1.3 | 1.1      | 0.4.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/traefik)    |
 
 Note that these examples are included just for completeness. You should be able
