@@ -26,7 +26,7 @@ different parts of the solution. In this guide you will wear multiple hats, so t
 Install Envoy Gateway with Helm:
 
 ```
-helm install eg oci://docker.io/envoyproxy/gateway-helm --version v0.5.0 -n envoy-gateway-system --create-namespace
+helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.7.2 -n envoy-gateway-system --create-namespace
 ```
 
 Wait for it to become ready
@@ -44,14 +44,14 @@ Create a Gateway
 
 ```yaml
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: eg
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: eg
@@ -122,7 +122,7 @@ Create a route that has as backend two services (stable and canary)
 ```yaml
 ---
 kind: HTTPRoute
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 metadata:
   name: argo-rollouts-http-route
   namespace: default
