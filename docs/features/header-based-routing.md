@@ -109,7 +109,20 @@ Now when the canary reaches 10% an extra route will be created that uses the `X-
 
 These smart rules will be created by Argo Rollouts and will be destroyed automatically when the rollout has finished. In your manifests you only need to provide the `argo-rollouts-http-route` definition. See also the [HTTP routing](https://gateway-api.sigs.k8s.io/guides/http-routing/) documentation.
 
-If you are using Argo CD you can use the [ignoreDifferences feature](https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/) to make sure that Argo CD [honors the rule changes](https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/istio/#integrating-with-gitops).
+!!! info
+    **Argo CD integration**
+
+    While the canary is running, the plugin injects extra rules into the HTTPRoute for the managed header routes. If you use Argo CD, configure `ignoreDifferences` to skip exactly those injected rules by name so Argo CD does not revert them:
+
+    ```yaml
+    ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jqPathExpressions:
+      - .spec.rules[] | select(.name == "canary-route1")
+    ```
+
+    Replace `canary-route1` with the managed route name(s) you defined in the Rollout's `managedRoutes` block. Alternatively you can ignore the whole resource using the [in-progress label](../quick-start.md#daily-task-perform-a-canary).
 
 ## Using multiple routes with headers
 
