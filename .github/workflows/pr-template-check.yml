@@ -1,0 +1,48 @@
+name: "PR Template Checker"
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-body:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check PR Description
+        # Pinned to actions/github-script v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const body = context.payload.pull_request.body;
+            
+            // 1. Check if the body exists
+            if (!body || body.trim() === "") {
+              core.setFailed("The PR description is completely empty. Please fill out the PR template.");
+              return;
+            }
+            
+            // 2. Define all sentences that MUST remain in the PR body
+            const requiredPhrases = [
+              "I have run all tests locally and they pass",
+              "I understand what the code does and WHY it works that way according to my use case",
+              "I know if my code is just adding new functionality or changing old functionality for existing users"
+            ];
+            
+            // Find any phrases that are missing from the PR body
+            const missingPhrases = requiredPhrases.filter(phrase => !body.includes(phrase));
+            
+            if (missingPhrases.length > 0) {
+              core.setFailed("Please follow the PR template of the project. Pay attention to the checkboxes as well.");
+            }
+            
+            // 3. Ensure they didn't leave default placeholder text
+            if (body.includes("Explain what this PR does, what is the use case and if it breaks existing behavior for other users")) {
+              core.setFailed("You forgot to explain what this PR is about");
+            }
+            
+            // 4. Ensure at least one checklist item is checked
+            const checkboxRegex = /- \[[xX]\]/g;
+            if (!checkboxRegex.test(body)) {
+              core.setFailed("Please check at least one box in the checklist to confirm your verification.");
+            }
