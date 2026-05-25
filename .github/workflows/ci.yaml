@@ -7,13 +7,15 @@ on:
       - "main"
     paths-ignore:
       - '**.md'
-      - 'docs/**'      
+      - 'docs/**'     
+      - 'examples/**'        
   pull_request:
     branches:
       - "main"
     paths-ignore:
       - '**.md'
-      - 'docs/**'      
+      - 'docs/**' 
+      - 'examples/**'            
 env:
   GOLANG_VERSION: '1.24'
 
