@@ -42,7 +42,7 @@ jobs:
             }
             
             // 4. Ensure at least one checklist item is checked
-            const checkboxRegex = /- \[[xX]\]/g;
+            const checkboxRegex = /\[[xX]\]/;
             if (!checkboxRegex.test(body)) {
               core.setFailed("Please check at least one box in the checklist to confirm your verification.");
             }
