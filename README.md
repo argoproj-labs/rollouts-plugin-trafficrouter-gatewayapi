@@ -12,6 +12,11 @@ This repository is a [plugin](https://argoproj.github.io/argo-rollouts/features/
 
 See [the main documentation site](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/) for all the details.
 
+Argo Project blog posts:
+
+- [Original Announcement](https://blog.argoproj.io/argo-rollouts-now-supports-version-1-0-of-the-kubernetes-gateway-api-acc429729e42)
+- [Header based routing support](https://blog.argoproj.io/header-based-routing-with-argo-rollouts-and-the-gateway-api-777f9a1f614d)
+
 ## Feedback needed
 
 The gateway API plugin should cover all providers that support it. If you find an issue
