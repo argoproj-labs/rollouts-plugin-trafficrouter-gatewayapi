@@ -1893,3 +1893,243 @@ func TestGetRouteRuleReturnsErrorWhenBackendNotFound(t *testing.T) {
 	assert.Nil(t, httpRouteRule, "Route rule should be nil on error")
 	assert.Equal(t, BackendRefWasNotFoundInHTTPRouteError, err.Error())
 }
+
+// newPingPongRollout creates a Rollout configured with PingPong (no canaryService/stableService).
+func newPingPongRollout(pingService, pongService string, config *GatewayAPITrafficRouting) *v1alpha1.Rollout {
+	encodedConfig, err := json.Marshal(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &v1alpha1.Rollout{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rollout",
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: v1alpha1.RolloutSpec{
+			Strategy: v1alpha1.RolloutStrategy{
+				Canary: &v1alpha1.CanaryStrategy{
+					PingPong: &v1alpha1.PingPongSpec{
+						PingService: pingService,
+						PongService: pongService,
+					},
+					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+						Plugins: map[string]json.RawMessage{
+							PluginName: encodedConfig,
+						},
+					},
+				},
+			},
+		},
+		Status: v1alpha1.RolloutStatus{
+			Canary: v1alpha1.CanaryStatus{},
+		},
+	}
+}
+
+func TestSetHTTPRouteWeightPingPong(t *testing.T) {
+	var desiredWeight int32 = 30
+
+	t.Run("StablePing", func(t *testing.T) {
+		httpRoute := mocks.CreateHTTPRouteWithPingPong(mocks.HTTPRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPing
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// ping is stable → restWeight; pong is canary → desiredWeight
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+
+	t.Run("StablePong", func(t *testing.T) {
+		httpRoute := mocks.CreateHTTPRouteWithPingPong(mocks.HTTPRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			HTTPRoute: mocks.HTTPRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPong
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// pong is stable → restWeight; ping is canary → desiredWeight
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+}
+
+func TestSetGRPCRouteWeightPingPong(t *testing.T) {
+	var desiredWeight int32 = 30
+
+	t.Run("StablePing", func(t *testing.T) {
+		grpcRoute := mocks.CreateGRPCRouteWithPingPong(mocks.GRPCRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPing
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// ping is stable → restWeight; pong is canary → desiredWeight
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+
+	t.Run("StablePong", func(t *testing.T) {
+		grpcRoute := mocks.CreateGRPCRouteWithPingPong(mocks.GRPCRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			GRPCRoute: mocks.GRPCRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPong
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// pong is stable → restWeight; ping is canary → desiredWeight
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+}
+
+func TestSetTCPRouteWeightPingPong(t *testing.T) {
+	var desiredWeight int32 = 30
+
+	t.Run("StablePing", func(t *testing.T) {
+		tcpRoute := mocks.CreateTCPRouteWithPingPong(mocks.TCPRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(tcpRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			TCPRoute:  mocks.TCPRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPing
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.TCPRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// ping is stable → restWeight; pong is canary → desiredWeight
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+
+	t.Run("StablePong", func(t *testing.T) {
+		tcpRoute := mocks.CreateTCPRouteWithPingPong(mocks.TCPRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(tcpRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			TCPRoute:  mocks.TCPRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPong
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.TCPRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// pong is stable → restWeight; ping is canary → desiredWeight
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+}
+
+func TestSetTLSRouteWeightPingPong(t *testing.T) {
+	var desiredWeight int32 = 30
+
+	t.Run("StablePing", func(t *testing.T) {
+		tlsRoute := mocks.CreateTLSRouteWithPingPong(mocks.TLSRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(tlsRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			TLSRoute:  mocks.TLSRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPing
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.TLSRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// ping is stable → restWeight; pong is canary → desiredWeight
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+
+	t.Run("StablePong", func(t *testing.T) {
+		tlsRoute := mocks.CreateTLSRouteWithPingPong(mocks.TLSRouteName)
+		rpcPluginImp := &RpcPlugin{
+			LogCtx:              utils.SetupLog(),
+			GatewayAPIClientset: gwFake.NewSimpleClientset(tlsRoute),
+		}
+		rollout := newPingPongRollout(mocks.PingServiceName, mocks.PongServiceName, &GatewayAPITrafficRouting{
+			Namespace: mocks.RolloutNamespace,
+			TLSRoute:  mocks.TLSRouteName,
+		})
+		rollout.Status.Canary.StablePingPong = v1alpha1.PPPong
+
+		rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+		assert.Empty(t, rpcErr.Error())
+
+		updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.TLSRouteName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PingServiceName), updated.Spec.Rules[0].BackendRefs[0].Name)
+		assert.Equal(t, gatewayv1.ObjectName(mocks.PongServiceName), updated.Spec.Rules[0].BackendRefs[1].Name)
+		// pong is stable → restWeight; ping is canary → desiredWeight
+		assert.Equal(t, desiredWeight, *updated.Spec.Rules[0].BackendRefs[0].Weight)
+		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	})
+}

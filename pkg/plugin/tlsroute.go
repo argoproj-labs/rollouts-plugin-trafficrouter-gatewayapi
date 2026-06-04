@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+	"github.com/argoproj/argo-rollouts/rollout/trafficrouting"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -14,8 +15,7 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 	ctx := context.TODO()
 	tlsRouteClient := r.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(gatewayAPIConfig.Namespace)
 
-	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	stableServiceName, canaryServiceName := trafficrouting.GetStableAndCanaryServices(rollout, true)
 	restWeight := 100 - desiredWeight
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
