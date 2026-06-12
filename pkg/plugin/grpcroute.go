@@ -136,7 +136,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			}
 		} else {
 			// Copy matches from original route and merge headers
-			for i := 0; i < matchLength; i++ {
+			for i := range matchLength {
 				// Merge existing headers with new canary headers
 				mergedHeaders := make([]gatewayv1.GRPCHeaderMatch, 0)
 				// First, add existing headers from the original match

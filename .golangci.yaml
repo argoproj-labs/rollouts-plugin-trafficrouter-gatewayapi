@@ -9,6 +9,25 @@ linters:
     - misspell
     - unconvert
     - unused
+    - staticcheck
+    - modernize
+    - testifylint
+    - whitespace
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+    modernize:
+      disable:
+        - omitzero
+        - newexpr
+    testifylint:
+      enable-all: true
+      disable:
+        - go-require
   exclusions:
     generated: lax
     presets:

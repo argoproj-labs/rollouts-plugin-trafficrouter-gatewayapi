@@ -132,14 +132,15 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 		for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
 			serviceName := string(backendRef.Name)
 
-			if serviceName == stableService {
+			switch serviceName {
+			case stableService:
 				backendRef.Weight = &stableWeight
 				filteredBackendRefs = append(filteredBackendRefs, backendRef)
-			} else if serviceName == canaryService {
+			case canaryService:
 				zeroWeight := int32(0)
 				backendRef.Weight = &zeroWeight
 				filteredBackendRefs = append(filteredBackendRefs, backendRef)
-			} else {
+			default:
 				logger.Info(fmt.Sprintf("Removing experiment service from HTTPRoute: %s", serviceName))
 			}
 		}
