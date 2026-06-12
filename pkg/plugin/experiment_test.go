@@ -197,10 +197,11 @@ func TestHandleExperiment_RemoveExperimentServices(t *testing.T) {
 	for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
 		serviceName := string(backendRef.Name)
 
-		if serviceName == stableService {
+		switch serviceName {
+		case stableService:
 			backendRef.Weight = &stableWeight
 			filteredBackendRefs = append(filteredBackendRefs, backendRef)
-		} else if serviceName == canaryService {
+		case canaryService:
 			backendRef.Weight = &canaryWeight
 			filteredBackendRefs = append(filteredBackendRefs, backendRef)
 		}
