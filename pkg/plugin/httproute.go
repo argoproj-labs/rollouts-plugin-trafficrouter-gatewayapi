@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+	"github.com/argoproj/argo-rollouts/rollout/trafficrouting"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -15,8 +16,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	ctx := context.TODO()
 	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
 
-	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	stableServiceName, canaryServiceName := trafficrouting.GetStableAndCanaryServices(rollout, true)
 	canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
 	restWeight := 100 - desiredWeight
 	managedNames := managedRouteNamesSet(rollout)
@@ -82,8 +82,8 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		return rpcError
 	}
 
-	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
-	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	stableServiceName, canaryService := trafficrouting.GetStableAndCanaryServices(rollout, true)
+	canaryServiceName := gatewayv1.ObjectName(canaryService)
 	managedName := gatewayv1.SectionName(headerRouting.Name)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -262,7 +262,8 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 	ctx := context.TODO()
 	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
 
-	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+	_, canaryService := trafficrouting.GetStableAndCanaryServices(rollout, true)
+	canaryServiceName := gatewayv1.ObjectName(canaryService)
 	managedNames := managedRouteNamesSet(rollout)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
