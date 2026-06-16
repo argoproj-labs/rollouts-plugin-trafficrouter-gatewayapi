@@ -35,10 +35,20 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 
 	isExperimentActive := rollout.Spec.Strategy.Canary != nil && rollout.Status.Canary.CurrentExperiment != ""
 
+	// previousServices are the experiment services the controller told the plugin to add
+	// on the previous reconcile, recorded in the rollout status. These are the only
+	// backends the plugin owns and may remove; any other backend in the route is managed
+	// externally and must be left untouched (issue #203).
+	previousServices := make(map[string]bool)
+	if rollout.Status.Canary.Weights != nil {
+		for _, dest := range rollout.Status.Canary.Weights.Additional {
+			previousServices[dest.ServiceName] = true
+		}
+	}
+
 	hasExperimentServices := false
 	for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
-		serviceName := string(backendRef.Name)
-		if serviceName != stableService && serviceName != canaryService {
+		if previousServices[string(backendRef.Name)] {
 			hasExperimentServices = true
 			break
 		}
@@ -132,17 +142,19 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 		for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
 			serviceName := string(backendRef.Name)
 
+			if previousServices[serviceName] {
+				logger.Info(fmt.Sprintf("Removing experiment service from HTTPRoute: %s", serviceName))
+				continue
+			}
+
 			switch serviceName {
 			case stableService:
 				backendRef.Weight = &stableWeight
-				filteredBackendRefs = append(filteredBackendRefs, backendRef)
 			case canaryService:
 				zeroWeight := int32(0)
 				backendRef.Weight = &zeroWeight
-				filteredBackendRefs = append(filteredBackendRefs, backendRef)
-			default:
-				logger.Info(fmt.Sprintf("Removing experiment service from HTTPRoute: %s", serviceName))
 			}
+			filteredBackendRefs = append(filteredBackendRefs, backendRef)
 		}
 
 		httpRoute.Spec.Rules[ruleIdx].BackendRefs = filteredBackendRefs
