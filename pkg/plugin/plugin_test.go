@@ -1854,6 +1854,88 @@ func TestGetRouteRuleOnlyReturnsRuleWithAllBackends(t *testing.T) {
 	assert.True(t, foundCanary, "Should have canary backend")
 }
 
+// TestSetWeightPreservesUnmanagedHTTPBackends verifies that SetWeight does not strip
+// HTTPRoute backends that are not managed by the plugin (issue #203). An HTTPRoute
+// with extra backends beyond stable and canary must retain all backends at every
+// weight step — during the canary and after it completes.
+func TestSetWeightPreservesUnmanagedHTTPBackends(t *testing.T) {
+	const extraServiceName = "extra-pipeline-service"
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	extraWeight := int32(1)
+	port := gatewayv1.PortNumber(80)
+
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mocks.HTTPRouteName,
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: mocks.StableServiceName,
+									Port: &port,
+								},
+								Weight: &stableWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: mocks.CanaryServiceName,
+									Port: &port,
+								},
+								Weight: &canaryWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: extraServiceName,
+									Port: &port,
+								},
+								Weight: &extraWeight,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog(),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute, &mocks.GRPCRouteObj, &mocks.TCPPRouteObj, &mocks.TLSRouteObj),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	rpcErr := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	assert.Empty(t, rpcErr.Error())
+
+	updated, err := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, updated.Spec.Rules[0].BackendRefs, 3, "extra backend must not be stripped during canary")
+	assert.Equal(t, int32(70), *updated.Spec.Rules[0].BackendRefs[0].Weight)
+	assert.Equal(t, int32(30), *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	assert.Equal(t, gatewayv1.ObjectName(extraServiceName), updated.Spec.Rules[0].BackendRefs[2].Name)
+
+	rpcErr = rpcPluginImp.SetWeight(rollout, 0, []v1alpha1.WeightDestination{})
+	assert.Empty(t, rpcErr.Error())
+
+	updated, err = rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, updated.Spec.Rules[0].BackendRefs, 3, "extra backend must not be stripped after rollout completes")
+	assert.Equal(t, int32(0), *updated.Spec.Rules[0].BackendRefs[1].Weight)
+	assert.Equal(t, gatewayv1.ObjectName(extraServiceName), updated.Spec.Rules[0].BackendRefs[2].Name)
+}
+
 // TestGetRouteRuleReturnsErrorWhenBackendNotFound verifies that getRouteRule returns
 // an error when no rule contains all requested backends.
 func TestGetRouteRuleReturnsErrorWhenBackendNotFound(t *testing.T) {
