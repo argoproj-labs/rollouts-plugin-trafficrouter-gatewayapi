@@ -54,6 +54,11 @@ lint:
 unit-tests:
 	go test -v -count=1 ./pkg/...
 
+.PHONY: coverage
+coverage:
+	go test -v -count=1 -coverprofile=coverage.out -covermode=atomic ./pkg/...
+	go tool cover -html=coverage.out -o coverage.html
+
 .PHONY: setup-e2e-cluster
 setup-e2e-cluster:
 	make BIN_NAME=gatewayapi-plugin-linux-amd64 GOOS=linux GOARCH=amd64 gatewayapi-plugin-build
