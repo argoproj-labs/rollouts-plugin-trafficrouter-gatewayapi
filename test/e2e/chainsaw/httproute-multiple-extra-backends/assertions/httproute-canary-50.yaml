@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-multiple-extra-backends
+  namespace: default
+spec:
+  (length(rules)): 1
+  rules:
+    - (length(backendRefs)): 4
+      backendRefs:
+        - name: httproute-multiple-extra-backends-stable-service
+          (weight): 50
+        - name: httproute-multiple-extra-backends-canary-service
+          (weight): 50
+        - name: httproute-multiple-extra-backends-extra-service-1
+        - name: httproute-multiple-extra-backends-extra-service-2

@@ -1,0 +1,86 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-multiple-extra-backends
+  labels:
+    route-type: http
+spec:
+  description: >
+    Verifies that the plugin does not strip unmanaged backends from an HTTPRoute
+    when using the httpRoutes (plural) config syntax (issue #203). The HTTPRoute
+    has 4 backends: stable and canary (managed by the rollout) plus two extra
+    backends managed by separate deployment pipelines. All 4 backends must remain
+    present at every stage of the canary rollout. Mirrors the exact configuration
+    reported in the issue.
+  namespace: default
+  concurrent: true
+
+  steps:
+    - name: create-resources
+      description: Create an HTTPRoute with 4 backends and a Rollout using httpRoutes plural syntax.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: Plugin sets canary weight to 0; both unmanaged extra backends must still be present.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start a canary (setWeight:20 -> pause:30s -> setWeight:50 -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-multiple-extra-backends-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-canary-weight-20
+      description: Plugin sets canary=20 stable=80; both extra backends must still be present.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-canary-20.yaml
+
+    - name: assert-canary-weight-50
+      description: Plugin sets canary=50 stable=50; both extra backends must still be present.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-canary-50.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (two 30s pauses auto-expire).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: Plugin resets canary weight to 0; both extra backends must still be present.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml
