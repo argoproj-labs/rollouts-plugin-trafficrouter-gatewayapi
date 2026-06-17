@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-multiple-extra-backends-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-multiple-extra-backends
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-multiple-extra-backends-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-multiple-extra-backends
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-multiple-extra-backends-extra-service-1
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-multiple-extra-backends-extra-1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-multiple-extra-backends-extra-service-2
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-multiple-extra-backends-extra-2

@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-multiple-extra-backends-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: httproute-multiple-extra-backends-canary-service
+      stableService: httproute-multiple-extra-backends-stable-service
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            namespace: default
+            httpRoutes:
+              - name: httproute-multiple-extra-backends
+      steps:
+        - setWeight: 20
+        - pause: {duration: 30s}
+        - setWeight: 50
+        - pause: {duration: 30s}
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: httproute-multiple-extra-backends
+  template:
+    metadata:
+      labels:
+        app: httproute-multiple-extra-backends
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
