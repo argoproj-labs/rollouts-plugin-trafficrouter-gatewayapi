@@ -56,8 +56,8 @@ unit-tests:
 
 .PHONY: coverage
 coverage:
-	go test -v -count=1 -coverprofile=coverage.out -covermode=atomic ./pkg/...
-	go tool cover -html=coverage.out -o coverage.html
+	go test -v -count=1 -coverprofile=cover.out -covermode=atomic ./pkg/...
+	go tool cover -html=cover.out -o cover.html
 
 .PHONY: setup-e2e-cluster
 setup-e2e-cluster:

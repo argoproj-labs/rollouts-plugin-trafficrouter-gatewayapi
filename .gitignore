@@ -2,5 +2,5 @@
 .DS_Store
 dist
 .idea
-coverage.out
-coverage.html
+cover.out
+cover.html

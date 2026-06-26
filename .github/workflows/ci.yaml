@@ -51,6 +51,9 @@ jobs:
   unit-tests:
     name: Unit tests running
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
     steps:
       - name: Set up Go
         uses: actions/setup-go@v3
@@ -62,7 +65,12 @@ jobs:
 
       - name: Unit tests running
         run: |
-          make unit-tests
+          make coverage
+
+      - name: Coverage report
+        uses: gha-common/go-beautiful-html-coverage@v1
+        with:
+          threshold: 50
 
   e2e-tests:
     name: E2E tests 
