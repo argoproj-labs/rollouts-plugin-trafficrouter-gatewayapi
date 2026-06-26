@@ -27,13 +27,15 @@ func main() {
 	logFormat := flag.String("logformat", "text", "Set the logging format. One of: text|json")
 	flag.Parse()
 
+	logger := utils.SetupLog(*logFormat)
+
 	// Create the plugin implementation, injecting command line options:
 	rpcPluginImp := &plugin.RpcPlugin{
 		CommandLineOpts: plugin.CommandLineOpts{
 			KubeClientQPS:   float32(*kubeClientQPS),
 			KubeClientBurst: *kubeClientBurst,
 		},
-		LogCtx: utils.SetupLog(*logFormat),
+		LogCtx: logger,
 	}
 
 	pluginMap := map[string]goPlugin.Plugin{
@@ -43,5 +45,6 @@ func main() {
 	goPlugin.Serve(&goPlugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
+		Logger:          logger,
 	})
 }

@@ -3,34 +3,34 @@ package utils
 import (
 	"testing"
 
-	log "github.com/sirupsen/logrus"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSetupLog_DefaultIsTextFormatter(t *testing.T) {
-	entry := SetupLog("text")
+func TestSetupLog_DefaultIsTextFormat(t *testing.T) {
+	logger := SetupLog("text")
 
-	assert.NotNil(t, entry)
-	assert.IsType(t, &log.TextFormatter{}, entry.Logger.Formatter)
+	assert.NotNil(t, logger)
+	assert.Implements(t, (*hclog.Logger)(nil), logger)
 }
 
-func TestSetupLog_EmptyIsTextFormatter(t *testing.T) {
-	entry := SetupLog("")
+func TestSetupLog_EmptyIsTextFormat(t *testing.T) {
+	logger := SetupLog("")
 
-	assert.NotNil(t, entry)
-	assert.IsType(t, &log.TextFormatter{}, entry.Logger.Formatter)
+	assert.NotNil(t, logger)
+	assert.Implements(t, (*hclog.Logger)(nil), logger)
 }
 
-func TestSetupLog_JSONFormatter(t *testing.T) {
-	entry := SetupLog("json")
+func TestSetupLog_JSONFormat(t *testing.T) {
+	logger := SetupLog("json")
 
-	assert.NotNil(t, entry)
-	assert.IsType(t, &log.JSONFormatter{}, entry.Logger.Formatter)
+	assert.NotNil(t, logger)
+	assert.Implements(t, (*hclog.Logger)(nil), logger)
 }
 
-func TestSetupLog_JSONFormatterCaseInsensitive(t *testing.T) {
-	entry := SetupLog("JSON")
+func TestSetupLog_JSONFormatCaseInsensitive(t *testing.T) {
+	logger := SetupLog("JSON")
 
-	assert.NotNil(t, entry)
-	assert.IsType(t, &log.JSONFormatter{}, entry.Logger.Formatter)
+	assert.NotNil(t, logger)
+	assert.Implements(t, (*hclog.Logger)(nil), logger)
 }

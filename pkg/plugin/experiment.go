@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
-	"github.com/sirupsen/logrus"
+	hclog "github.com/hashicorp/go-hclog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
-func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient gatewayApiClientset.Interface, logger *logrus.Entry, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute, additionalDestinations []v1alpha1.WeightDestination) error {
+func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient gatewayApiClientset.Interface, logger hclog.Logger, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute, additionalDestinations []v1alpha1.WeightDestination) error {
 	ruleIdx := -1
 	stableService := rollout.Spec.Strategy.Canary.StableService
 	canaryService := rollout.Spec.Strategy.Canary.CanaryService
@@ -55,7 +55,7 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 	}
 
 	if isExperimentActive {
-		logger.Info(fmt.Sprintf("Found active experiment %s", rollout.Status.Canary.CurrentExperiment))
+		logger.Info("Found active experiment", "experiment", rollout.Status.Canary.CurrentExperiment)
 
 		if len(additionalDestinations) == 0 {
 			logger.Info("No experiment services found in additionalDestinations, skipping experiment service addition")
@@ -70,7 +70,7 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 
 		// Sanity cap: don't allow overflow
 		if totalExperimentWeight > 100 {
-			logger.Warnf("Total experiment weight exceeds 100 (got %d), capping at 100", totalExperimentWeight)
+			logger.Warn("Total experiment weight exceeds 100, capping at 100", "weight", totalExperimentWeight)
 			totalExperimentWeight = 100
 		}
 
@@ -96,11 +96,11 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 			}
 
 			if !exists {
-				logger.Info(fmt.Sprintf("Adding experiment service to HTTPRoute: %s with weight %d", serviceName, weight))
+				logger.Info("Adding experiment service to HTTPRoute", "service", serviceName, "weight", weight)
 
 				service, err := clientset.CoreV1().Services(rollout.Namespace).Get(ctx, serviceName, metav1.GetOptions{})
 				if err != nil {
-					logger.Warn(fmt.Sprintf("Failed to get service %s: %v", serviceName, err))
+					logger.Warn("Failed to get service", "service", serviceName, "error", err)
 					continue
 				}
 
@@ -143,7 +143,7 @@ func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gate
 			serviceName := string(backendRef.Name)
 
 			if previousServices[serviceName] {
-				logger.Info(fmt.Sprintf("Removing experiment service from HTTPRoute: %s", serviceName))
+				logger.Info("Removing experiment service from HTTPRoute", "service", serviceName)
 				continue
 			}
 
