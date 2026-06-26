@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
@@ -103,8 +104,11 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 
 		// Build one managed header rule per source rule so that the canary header
 		// applies to every rule on a multi-rule HTTPRoute (issue #207).
+		// Each rule needs a unique name within the route (Gateway API constraint).
+		// Index 0 keeps the bare managedName for backward compatibility with single-rule routes;
+		// subsequent rules are named managedName-1, managedName-2, etc.
 		newManagedRules := make([]gatewayv1.HTTPRouteRule, 0, len(sourceRules))
-		for _, httpRouteRule := range sourceRules {
+		for idx, httpRouteRule := range sourceRules {
 			var canaryBackendRef *HTTPBackendRef
 			for i := 0; i < len(httpRouteRule.BackendRefs); i++ {
 				backendRef := httpRouteRule.BackendRefs[i]
@@ -113,8 +117,12 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 					break
 				}
 			}
+			ruleName := managedName
+			if idx > 0 {
+				ruleName = gatewayv1.SectionName(fmt.Sprintf("%s-%d", managedName, idx))
+			}
 			httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
-				Name:    &managedName,
+				Name:    &ruleName,
 				Matches: []gatewayv1.HTTPRouteMatch{},
 				Filters: []gatewayv1.HTTPRouteFilter{},
 				BackendRefs: []gatewayv1.HTTPBackendRef{

@@ -32,6 +32,7 @@ spec:
             - name: x-ct-env
               value: production
     # managed rule for source rule 0 — canary only, queryParam + canary header
+    # index 0 keeps the bare managed name for backward compatibility
     - name: canary-route1
       backendRefs:
         - name: httproute-multi-rule-header-canary-service
@@ -44,7 +45,8 @@ spec:
               type: Exact
               value: v2
     # managed rule for source rule 1 — canary only, header discriminator + canary header
-    - name: canary-route1
+    # index 1 gets a "-1" suffix so Gateway API's unique-name constraint is satisfied
+    - name: canary-route1-1
       backendRefs:
         - name: httproute-multi-rule-header-canary-service
       matches:

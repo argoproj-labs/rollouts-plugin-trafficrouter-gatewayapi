@@ -134,6 +134,12 @@ Or to run only header-based tests:
 chainsaw test --selector test-scope=headers ./test/e2e/chainsaw
 ```
 
+Or even a specific test with:
+
+```bash
+chainsaw test ./test/e2e/chainsaw/httproute-multi-rule-header
+```
+
 ## Cleaning up after failed E2E tests
 
 If your E2E tests fail, the kind cluster will stay behind.

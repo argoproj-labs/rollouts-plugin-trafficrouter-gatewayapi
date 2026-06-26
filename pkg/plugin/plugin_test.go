@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -2042,10 +2043,11 @@ func TestSetHTTPHeaderRouteMultiRuleHTTPRoute(t *testing.T) {
 	// Expect 4 rules: 2 original source rules + 1 managed header rule per source rule.
 	assert.Len(t, updated.Spec.Rules, 4, "expected one managed header rule per source rule (2 source + 2 managed = 4 total)")
 
-	// Both managed rules share the same name.
+	// Managed rules are identified by name: index 0 gets the bare managed name,
+	// subsequent rules get managedName-N (Gateway API requires unique names per route).
 	managedRules := []gatewayv1.HTTPRouteRule{}
 	for _, rule := range updated.Spec.Rules {
-		if rule.Name != nil && string(*rule.Name) == mocks.ManagedRouteName {
+		if rule.Name != nil && strings.HasPrefix(string(*rule.Name), mocks.ManagedRouteName) {
 			managedRules = append(managedRules, rule)
 		}
 	}
@@ -2137,10 +2139,11 @@ func TestSetGRPCHeaderRouteMultiRuleGRPCRoute(t *testing.T) {
 	// Expect 4 rules: 2 original source rules + 1 managed header rule per source rule.
 	assert.Len(t, updated.Spec.Rules, 4, "expected one managed header rule per source rule (2 source + 2 managed = 4 total)")
 
-	// Both managed rules share the same name.
+	// Managed rules are identified by name: index 0 gets the bare managed name,
+	// subsequent rules get managedName-N (Gateway API requires unique names per route).
 	managedRules := []gatewayv1.GRPCRouteRule{}
 	for _, rule := range updated.Spec.Rules {
-		if rule.Name != nil && string(*rule.Name) == mocks.ManagedRouteName {
+		if rule.Name != nil && strings.HasPrefix(string(*rule.Name), mocks.ManagedRouteName) {
 			managedRules = append(managedRules, rule)
 		}
 	}

@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
@@ -98,8 +99,11 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 
 		// Build one managed header rule per source rule so that the canary header
 		// applies to every rule on a multi-rule GRPCRoute (issue #207).
+		// Each rule needs a unique name within the route (Gateway API constraint).
+		// Index 0 keeps the bare managedName for backward compatibility with single-rule routes;
+		// subsequent rules are named managedName-1, managedName-2, etc.
 		newManagedRules := make([]gatewayv1.GRPCRouteRule, 0, len(sourceRules))
-		for _, grpcRouteRule := range sourceRules {
+		for idx, grpcRouteRule := range sourceRules {
 			var canaryBackendRef *GRPCBackendRef
 			for i := 0; i < len(grpcRouteRule.BackendRefs); i++ {
 				backendRef := grpcRouteRule.BackendRefs[i]
@@ -108,8 +112,12 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 					break
 				}
 			}
+			ruleName := managedName
+			if idx > 0 {
+				ruleName = gatewayv1.SectionName(fmt.Sprintf("%s-%d", managedName, idx))
+			}
 			grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
-				Name:    &managedName,
+				Name:    &ruleName,
 				Matches: []gatewayv1.GRPCRouteMatch{},
 				Filters: []gatewayv1.GRPCRouteFilter{},
 				BackendRefs: []gatewayv1.GRPCBackendRef{
