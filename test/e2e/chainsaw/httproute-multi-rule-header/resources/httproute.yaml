@@ -1,0 +1,38 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-multi-rule
+  namespace: default
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: default
+  # Two rules on the same path, differentiated by match criteria (issue #143 pattern):
+  # rule 0 — queryParam discriminator
+  # rule 1 — header discriminator
+  rules:
+    - backendRefs:
+        - name: httproute-multi-rule-header-stable-service
+          port: 80
+        - name: httproute-multi-rule-header-canary-service
+          port: 80
+      matches:
+        - path:
+            type: PathPrefix
+            value: /v1/api
+          queryParams:
+            - name: env
+              value: production
+    - backendRefs:
+        - name: httproute-multi-rule-header-stable-service
+          port: 80
+        - name: httproute-multi-rule-header-canary-service
+          port: 80
+      matches:
+        - path:
+            type: PathPrefix
+            value: /v1/api
+          headers:
+            - name: x-ct-env
+              type: Exact
+              value: production
