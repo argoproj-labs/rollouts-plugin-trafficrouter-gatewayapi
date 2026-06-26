@@ -59,6 +59,11 @@ coverage:
 	go test -v -count=1 -coverprofile=coverage.out -covermode=atomic ./pkg/...
 	go tool cover -html=coverage.out -o coverage.html
 
+.PHONY: html-coverage
+html-coverage:
+	go test -v -count=1 -coverprofile=coverage.out -covermode=atomic ./pkg/...
+	go-better-html-coverage -profile coverage.out -o coverage.html -n
+
 .PHONY: setup-e2e-cluster
 setup-e2e-cluster:
 	make BIN_NAME=gatewayapi-plugin-linux-amd64 GOOS=linux GOARCH=amd64 gatewayapi-plugin-build

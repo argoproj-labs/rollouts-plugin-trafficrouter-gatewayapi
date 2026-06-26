@@ -60,9 +60,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3.1.0
 
+      - name: Install go-better-html-coverage
+        run: go install github.com/chmouel/go-better-html-coverage@latest
+
       - name: Unit tests running
         run: |
-          make unit-tests
+          make html-coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Coverage Report
+          path: coverage.html
 
   e2e-tests:
     name: E2E tests 
