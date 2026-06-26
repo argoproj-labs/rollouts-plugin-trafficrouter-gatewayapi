@@ -35,7 +35,7 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			// Fallback: structural check (single canary-only BackendRef) for rules injected
 			// by older plugin versions that did not set the Name field.
 			rule := grpcRoute.Spec.Rules[i]
-			if (rule.Name != nil && managedNames[string(*rule.Name)]) || isGRPCManagedRule(rule, canaryServiceObjName, nil) {
+			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames)) || isGRPCManagedRule(rule, canaryServiceObjName, nil) {
 				continue
 			}
 			for j := range grpcRoute.Spec.Rules[i].BackendRefs {
@@ -167,7 +167,7 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		// Primary: match by rule Name. Fallback: structural check for unnamed legacy rules.
 		cleanedRules := make(GRPCRouteRuleList, 0, len(grpcRouteRuleList))
 		for _, rule := range grpcRouteRuleList {
-			if (rule.Name != nil && *rule.Name == managedName) || isGRPCManagedRule(rule, canaryServiceName, grpcHeaderRouteRuleList) {
+			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), map[string]bool{string(managedName): true})) || isGRPCManagedRule(rule, canaryServiceName, grpcHeaderRouteRuleList) {
 				continue
 			}
 			cleanedRules = append(cleanedRules, rule)
@@ -270,7 +270,7 @@ func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 		changed := false
 		for _, rule := range grpcRoute.Spec.Rules {
 			// Primary: remove by Name. Fallback: structural check for unnamed legacy rules.
-			if (rule.Name != nil && managedNames[string(*rule.Name)]) || isGRPCManagedRule(rule, canaryServiceName, nil) {
+			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames)) || isGRPCManagedRule(rule, canaryServiceName, nil) {
 				changed = true
 				continue
 			}

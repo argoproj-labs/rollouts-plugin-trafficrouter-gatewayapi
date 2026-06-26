@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
@@ -370,6 +372,25 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 			UseHeaderRoutes: true,
 		})
 	}
+}
+
+// isManagedRuleName reports whether ruleName was produced by this plugin for any of
+// the given managed route base names. It matches both the bare base name (index 0,
+// e.g. "canary-route1") and derived names (index N>0, e.g. "canary-route1-1") that
+// the plugin assigns to satisfy Gateway API's uniqueness constraint on rule names.
+func isManagedRuleName(ruleName string, managedNames map[string]bool) bool {
+	if managedNames[ruleName] {
+		return true
+	}
+	for base := range managedNames {
+		prefix := base + "-"
+		if strings.HasPrefix(ruleName, prefix) {
+			if _, err := strconv.Atoi(ruleName[len(prefix):]); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getRouteRule[BackendRef GatewayAPIBackendRef, RouteRule GatewayAPIRouteRule[BackendRef], RouteRuleList GatewayAPIRouteRuleList[BackendRef, RouteRule]](routeRuleList RouteRuleList, backendRefNameList ...string) (RouteRule, error) {

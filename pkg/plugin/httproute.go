@@ -35,7 +35,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			// Fallback: structural check (single canary-only BackendRef) for rules injected
 			// by older plugin versions that did not set the Name field.
 			rule := httpRoute.Spec.Rules[i]
-			if (rule.Name != nil && managedNames[string(*rule.Name)]) || isHTTPManagedRule(rule, canaryServiceObjName, nil) {
+			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames)) || isHTTPManagedRule(rule, canaryServiceObjName, nil) {
 				continue
 			}
 			for j := range httpRoute.Spec.Rules[i].BackendRefs {
@@ -174,7 +174,7 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		// Primary: match by rule Name. Fallback: structural check for unnamed legacy rules.
 		cleanedRules := make(HTTPRouteRuleList, 0, len(httpRouteRuleList))
 		for _, rule := range httpRouteRuleList {
-			if (rule.Name != nil && *rule.Name == managedName) || isHTTPManagedRule(rule, canaryServiceName, httpHeaderRouteRuleList) {
+			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), map[string]bool{string(managedName): true})) || isHTTPManagedRule(rule, canaryServiceName, httpHeaderRouteRuleList) {
 				continue
 			}
 			cleanedRules = append(cleanedRules, rule)
@@ -277,7 +277,7 @@ func (r *RpcPlugin) removeHTTPManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 		changed := false
 		for _, rule := range httpRoute.Spec.Rules {
 			// Primary: remove by Name. Fallback: structural check for unnamed legacy rules.
-			if (rule.Name != nil && managedNames[string(*rule.Name)]) || isHTTPManagedRule(rule, canaryServiceName, nil) {
+			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames)) || isHTTPManagedRule(rule, canaryServiceName, nil) {
 				changed = true
 				continue
 			}
