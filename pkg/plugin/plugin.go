@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
@@ -372,9 +374,28 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 	}
 }
 
-func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](routeRuleList T3, backendRefNameList ...string) (T2, error) {
-	var backendRef T1
-	var routeRule T2
+// isManagedRuleName reports whether ruleName was produced by this plugin for any of
+// the given managed route base names. It matches both the bare base name (index 0,
+// e.g. "canary-route1") and derived names (index N>0, e.g. "canary-route1-1") that
+// the plugin assigns to satisfy Gateway API's uniqueness constraint on rule names.
+func isManagedRuleName(ruleName string, managedNames map[string]bool) bool {
+	if managedNames[ruleName] {
+		return true
+	}
+	for base := range managedNames {
+		prefix := base + "-"
+		if strings.HasPrefix(ruleName, prefix) {
+			if _, err := strconv.Atoi(ruleName[len(prefix):]); err == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getRouteRule[BackendRef GatewayAPIBackendRef, RouteRule GatewayAPIRouteRule[BackendRef], RouteRuleList GatewayAPIRouteRuleList[BackendRef, RouteRule]](routeRuleList RouteRuleList, backendRefNameList ...string) (RouteRule, error) {
+	var backendRef BackendRef
+	var routeRule RouteRule
 	isFound := false
 	for next, hasNext := routeRuleList.Iterator(); hasNext; {
 		routeRule, hasNext = next()
@@ -400,6 +421,43 @@ func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 Gatewa
 		}
 	}
 	return nil, routeRuleList.Error()
+}
+
+// getAllRouteRules returns every rule in routeRuleList that contains all of the named
+// backends. Used by setHeaderRoute to build one managed rule per source rule on
+// multi-rule routes (issue #207).
+func getAllRouteRules[BackendRef GatewayAPIBackendRef, RouteRule GatewayAPIRouteRule[BackendRef], RouteRuleList GatewayAPIRouteRuleList[BackendRef, RouteRule]](routeRuleList RouteRuleList, backendRefNameList ...string) ([]RouteRule, error) {
+	var backendRef BackendRef
+	var routeRule RouteRule
+	var result []RouteRule
+	for nextRule, hasNext := routeRuleList.Iterator(); hasNext; {
+		routeRule, hasNext = nextRule()
+		_, hasBackends := routeRule.Iterator()
+		if !hasBackends {
+			continue
+		}
+		allFound := true
+		for _, backendRefName := range backendRefNameList {
+			found := false
+			for nextRef, hasRef := routeRule.Iterator(); hasRef; {
+				backendRef, hasRef = nextRef()
+				if backendRefName == backendRef.GetName() {
+					found = true
+				}
+			}
+			if !found {
+				allFound = false
+				break
+			}
+		}
+		if allFound {
+			result = append(result, routeRule)
+		}
+	}
+	if len(result) == 0 {
+		return nil, routeRuleList.Error()
+	}
+	return result, nil
 }
 
 func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3) ([]T1, error) {

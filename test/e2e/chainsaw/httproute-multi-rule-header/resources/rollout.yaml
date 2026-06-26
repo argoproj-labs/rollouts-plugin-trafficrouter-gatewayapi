@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: multi-rule-header-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: httproute-multi-rule-header-canary-service
+      stableService: httproute-multi-rule-header-stable-service
+      trafficRouting:
+        managedRoutes:
+          - name: canary-route1
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-multi-rule
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+        - setWeight: 30
+        - setHeaderRoute:
+            name: canary-route1
+            match:
+              - headerName: X-Version
+                headerValue:
+                  exact: v2
+        - pause: {duration: 30s}   # auto-promotes — no promote command needed in tests
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: httproute-multi-rule-header
+  template:
+    metadata:
+      labels:
+        app: httproute-multi-rule-header
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

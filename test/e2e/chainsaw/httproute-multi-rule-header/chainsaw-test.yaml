@@ -1,0 +1,82 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-multi-rule-header
+  labels:
+    route-type: http
+    test-scope: headers
+spec:
+  description: >
+    Verifies header-based routing on a multi-rule HTTPRoute (issue #143 / #207).
+    The HTTPRoute has two source rules that share the same path but differ by match
+    discriminator (queryParam vs header). setHeaderRoute must inject one managed
+    canary-only rule per source rule (4 rules total), not just one for the first
+    source rule. The managed rules are cleaned up after the rollout completes.
+  namespace: default
+  concurrent: true
+
+  steps:
+    - name: create-resources
+      description: Create the services, HTTPRoute, and Rollout.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: Plugin initializes both source rules with canary weight 0.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start the canary (setWeight:30 -> setHeaderRoute -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: multi-rule-header-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-header-routing-active
+      description: >
+        Plugin must have added one managed header rule per source rule — 4 rules total.
+        Currently fails (issue #207): only 3 rules are produced because setHeaderRoute
+        only clones the first source rule.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-header-routes.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (30s pause auto-expires).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: Plugin must remove both managed header rules and reset canary weight to 0.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml
