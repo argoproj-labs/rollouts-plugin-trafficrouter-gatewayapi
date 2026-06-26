@@ -199,6 +199,130 @@ spec:
 With the `useHeaderRoutes` variable you can decide which routes
 will honor the custom headers.
 
+## Using multiple rules in a single route
+
+!!! info
+    Available since 0.15.0
+  
+
+A single HTTPRoute can contain multiple rules — for example, a service that exposes several
+path prefixes from the same host. Before v0.15.0, `setHeaderRoute` only injected a managed
+header rule for the **first** matching source rule, so requests to the other paths would
+ignore the canary header and always reach the stable backend.
+
+Starting with v0.15.0 the plugin injects **one managed header rule per source rule**, so the
+canary header applies to the entire HTTPRoute regardless of how many rules it has.
+
+A typical scenario is a backend service that serves multiple paths:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: my-app-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: my-gateway
+  hostnames:
+    - api.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /products
+      backendRefs:
+        - name: my-app-stable
+          port: 80
+          weight: 100
+        - name: my-app-canary
+          port: 80
+          weight: 0
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /orders
+      backendRefs:
+        - name: my-app-stable
+          port: 80
+          weight: 100
+        - name: my-app-canary
+          port: 80
+          weight: 0
+```
+
+The Rollout uses the route with `useHeaderRoutes: true`:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  strategy:
+    canary:
+      canaryService: my-app-canary
+      stableService: my-app-stable
+      trafficRouting:
+        managedRoutes:
+          - name: canary-header
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: my-app-route
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+        - setWeight: 20
+        - setHeaderRoute:
+            name: canary-header
+            match:
+              - headerName: X-Canary
+                headerValue:
+                  exact: "true"
+        - pause: {}
+```
+
+When `setHeaderRoute` runs the plugin produces **two** managed header rules — one for
+`/products` and one for `/orders` — so requests carrying `X-Canary: true` reach the
+canary backend on both paths:
+
+```yaml
+# what the plugin writes to my-app-route during the canary
+rules:
+  # original weight-split rules (unchanged)
+  - matches:
+      - path: { type: PathPrefix, value: /products }
+    backendRefs:
+      - { name: my-app-stable, weight: 80 }
+      - { name: my-app-canary, weight: 20 }
+  - matches:
+      - path: { type: PathPrefix, value: /orders }
+    backendRefs:
+      - { name: my-app-stable, weight: 80 }
+      - { name: my-app-canary, weight: 20 }
+  # managed header rule for /products  (name = canary-header)
+  - name: canary-header
+    matches:
+      - path: { type: PathPrefix, value: /products }
+        headers:
+          - { name: X-Canary, type: Exact, value: "true" }
+    backendRefs:
+      - { name: my-app-canary }
+  # managed header rule for /orders  (name = canary-header-1)
+  - name: canary-header-1
+    matches:
+      - path: { type: PathPrefix, value: /orders }
+        headers:
+          - { name: X-Canary, type: Exact, value: "true" }
+    backendRefs:
+      - { name: my-app-canary }
+```
+
+The naming convention of _original-name-indexN_ is needed because the [Gateway API spec](https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/) needs
+the names of rules to be unique.
+
 ## Full example with Header based routing and Argo Rollouts
 
 For a complete example with header based routing see our [LinkerD example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/linkerd-header-based).
