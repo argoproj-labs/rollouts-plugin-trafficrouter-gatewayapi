@@ -96,88 +96,82 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		canaryServiceGroup := gatewayv1.Group("")
 		httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
 		backendRefNameList := []string{string(canaryServiceName), stableServiceName}
-		httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+		sourceRules, err := getAllRouteRules(httpRouteRuleList, backendRefNameList...)
 		if err != nil {
 			return err
 		}
-		var canaryBackendRef *HTTPBackendRef
-		for i := 0; i < len(httpRouteRule.BackendRefs); i++ {
-			backendRef := httpRouteRule.BackendRefs[i]
-			if canaryServiceName == backendRef.Name {
-				canaryBackendRef = (*HTTPBackendRef)(&backendRef)
-				break
+
+		// Build one managed header rule per source rule so that the canary header
+		// applies to every rule on a multi-rule HTTPRoute (issue #207).
+		newManagedRules := make([]gatewayv1.HTTPRouteRule, 0, len(sourceRules))
+		for _, httpRouteRule := range sourceRules {
+			var canaryBackendRef *HTTPBackendRef
+			for i := 0; i < len(httpRouteRule.BackendRefs); i++ {
+				backendRef := httpRouteRule.BackendRefs[i]
+				if canaryServiceName == backendRef.Name {
+					canaryBackendRef = (*HTTPBackendRef)(&backendRef)
+					break
+				}
 			}
-		}
-		httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
-			Name:    &managedName,
-			Matches: []gatewayv1.HTTPRouteMatch{},
-			Filters: []gatewayv1.HTTPRouteFilter{},
-			BackendRefs: []gatewayv1.HTTPBackendRef{
-				{
-					BackendRef: gatewayv1.BackendRef{
-						BackendObjectReference: gatewayv1.BackendObjectReference{
-							Group: &canaryServiceGroup,
-							Kind:  &canaryServiceKind,
-							Name:  canaryServiceName,
-							Port:  canaryBackendRef.Port,
+			httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
+				Name:    &managedName,
+				Matches: []gatewayv1.HTTPRouteMatch{},
+				Filters: []gatewayv1.HTTPRouteFilter{},
+				BackendRefs: []gatewayv1.HTTPBackendRef{
+					{
+						BackendRef: gatewayv1.BackendRef{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
+								Group: &canaryServiceGroup,
+								Kind:  &canaryServiceKind,
+								Name:  canaryServiceName,
+								Port:  canaryBackendRef.Port,
+							},
 						},
 					},
 				},
-			},
-		}
-
-		// Copy filters from original route
-		if httpRouteRule.Filters != nil {
-			for i := 0; i < len(httpRouteRule.Filters); i++ {
-				httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
 			}
-		}
 
-		// Copy matches from original route and merge headers
-		if len(httpRouteRule.Matches) == 0 {
-			// Original rule has no matches - create a match with just the canary headers
-			httpHeaderRouteRule.Matches = []gatewayv1.HTTPRouteMatch{
-				{
-					Headers: httpHeaderRouteRuleList,
-				},
-			}
-		} else {
-			// Copy existing matches and merge headers
-			for i := 0; i < len(httpRouteRule.Matches); i++ {
-				// Merge existing headers with new canary headers
-				mergedHeaders := make([]gatewayv1.HTTPHeaderMatch, 0)
-				// First, add existing headers from the original match
-				if httpRouteRule.Matches[i].Headers != nil {
-					mergedHeaders = append(mergedHeaders, httpRouteRule.Matches[i].Headers...)
+			// Copy filters from original route
+			if httpRouteRule.Filters != nil {
+				for i := 0; i < len(httpRouteRule.Filters); i++ {
+					httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
 				}
-				// Then, add the new canary headers
-				mergedHeaders = append(mergedHeaders, httpHeaderRouteRuleList...)
-
-				httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
-					Path:        httpRouteRule.Matches[i].Path,
-					Headers:     mergedHeaders,
-					QueryParams: httpRouteRule.Matches[i].QueryParams,
-					Method:      httpRouteRule.Matches[i].Method,
-				})
 			}
+
+			// Copy matches from original route and merge headers
+			if len(httpRouteRule.Matches) == 0 {
+				httpHeaderRouteRule.Matches = []gatewayv1.HTTPRouteMatch{
+					{Headers: httpHeaderRouteRuleList},
+				}
+			} else {
+				for i := 0; i < len(httpRouteRule.Matches); i++ {
+					mergedHeaders := make([]gatewayv1.HTTPHeaderMatch, 0)
+					if httpRouteRule.Matches[i].Headers != nil {
+						mergedHeaders = append(mergedHeaders, httpRouteRule.Matches[i].Headers...)
+					}
+					mergedHeaders = append(mergedHeaders, httpHeaderRouteRuleList...)
+					httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
+						Path:        httpRouteRule.Matches[i].Path,
+						Headers:     mergedHeaders,
+						QueryParams: httpRouteRule.Matches[i].QueryParams,
+						Method:      httpRouteRule.Matches[i].Method,
+					})
+				}
+			}
+
+			newManagedRules = append(newManagedRules, httpHeaderRouteRule)
 		}
 
-		// Upsert: find an existing managed rule to replace in-place.
-		// Primary: match by rule Name (set by this plugin on injection).
-		// Fallback: structural check for rules injected by older plugin versions without a Name.
-		foundIndex := -1
-		for i, rule := range httpRouteRuleList {
+		// Upsert: remove all existing managed rules for this name, then append the new set.
+		// Primary: match by rule Name. Fallback: structural check for unnamed legacy rules.
+		cleanedRules := make(HTTPRouteRuleList, 0, len(httpRouteRuleList))
+		for _, rule := range httpRouteRuleList {
 			if (rule.Name != nil && *rule.Name == managedName) || isHTTPManagedRule(rule, canaryServiceName, httpHeaderRouteRuleList) {
-				foundIndex = i
-				break
+				continue
 			}
+			cleanedRules = append(cleanedRules, rule)
 		}
-		if foundIndex >= 0 {
-			httpRouteRuleList[foundIndex] = httpHeaderRouteRule
-		} else {
-			httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
-		}
-		httpRoute.Spec.Rules = httpRouteRuleList
+		httpRoute.Spec.Rules = append(cleanedRules, newManagedRules...)
 
 		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 		return err
