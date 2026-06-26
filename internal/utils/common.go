@@ -3,8 +3,8 @@ package utils
 import (
 	"strings"
 
-	hclog "github.com/hashicorp/go-hclog"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+	hclog "github.com/hashicorp/go-hclog"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
