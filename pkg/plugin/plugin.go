@@ -21,7 +21,7 @@ const (
 )
 
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
-	log := utils.SetupLog()
+	log := r.LogCtx
 
 	kubeConfig, err := utils.GetKubeConfig()
 	if err != nil {

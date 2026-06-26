@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"strings"
+
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
@@ -20,12 +22,13 @@ func GetKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-func SetupLog() *log.Entry {
-	log.SetLevel(log.InfoLevel)
-	log.SetFormatter(
-		&log.TextFormatter{
-			FullTimestamp: true,
-		},
-	)
-	return log.WithFields(log.Fields{"plugin": "trafficrouter"})
+func SetupLog(logFormat string) *log.Entry {
+	logger := log.New()
+	logger.SetLevel(log.InfoLevel)
+	if strings.EqualFold(logFormat, "json") {
+		logger.SetFormatter(&log.JSONFormatter{})
+	} else {
+		logger.SetFormatter(&log.TextFormatter{FullTimestamp: true})
+	}
+	return logger.WithFields(log.Fields{"plugin": "trafficrouter"})
 }

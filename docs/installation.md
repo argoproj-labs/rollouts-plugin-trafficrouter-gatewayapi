@@ -160,6 +160,22 @@ If you want to further fine-tune permissions:
 
 ## Configuration 
 
+### Log format
+
+By default the plugin logs in text format. To switch to JSON (useful when your log aggregation stack expects structured logs), pass `--logformat=json`:
+
+```yaml
+  trafficRouterPlugins: |-
+    - name: "argoproj-labs/gatewayAPI"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/vX.X.X/gatewayapi-plugin-linux-amd64"
+      args:
+      - "-logformat=json"
+```
+
+Note that the plugin runs as a separate process from the Argo Rollouts controller, so the log format must be configured independently for each.
+
+### Kubernetes client tuning
+
 The `kubeClientQPS` and `kubeClientBurst` options configure the behavior of the Kubernetes client. These
 values may need to be increased if you operate Argo Rollouts in a large cluster.  These values can be specified
 using the `args` block of the plugin configuration:

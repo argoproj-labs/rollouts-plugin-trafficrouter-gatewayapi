@@ -32,7 +32,7 @@ func TestRunSuccessfully(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj, &mocks.GRPCRouteObj, &mocks.TCPPRouteObj, &mocks.TLSRouteObj),
 	}
 
@@ -935,7 +935,7 @@ func TestSetHTTPHeaderRouteWithExistingHeaders(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1004,7 +1004,7 @@ func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1070,7 +1070,7 @@ func TestSetHTTPHeaderRouteWithExistingQueryParams(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1143,7 +1143,7 @@ func TestSetHTTPHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1240,7 +1240,7 @@ func TestSetHTTPHeaderRouteWithCombinedMatches(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1326,7 +1326,7 @@ func TestSetGRPCHeaderRouteWithExistingHeaders(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
 	}
 
@@ -1408,7 +1408,7 @@ func TestSetGRPCHeaderRouteWithMultipleExistingHeaders(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
 	}
 
@@ -1497,7 +1497,7 @@ func TestSetGRPCHeaderRouteWithMethodAndHeaders(t *testing.T) {
 
 	// Setup plugin
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
 	}
 
@@ -1579,7 +1579,7 @@ func TestSetHTTPHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1621,7 +1621,7 @@ func TestSetGRPCHeaderRouteNoDuplicateOnRepeatedCall(t *testing.T) {
 	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
 	}
 
@@ -1663,7 +1663,7 @@ func TestSetHTTPHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 
@@ -1712,7 +1712,7 @@ func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
 	}
 
@@ -1908,7 +1908,7 @@ func TestSetWeightPreservesUnmanagedHTTPBackends(t *testing.T) {
 	}
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute, &mocks.GRPCRouteObj, &mocks.TCPPRouteObj, &mocks.TLSRouteObj),
 	}
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
