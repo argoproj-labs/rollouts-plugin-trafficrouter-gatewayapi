@@ -2017,7 +2017,7 @@ func TestSetHTTPHeaderRouteMultiRuleHTTPRoute(t *testing.T) {
 	}
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
 	}
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
@@ -2112,7 +2112,7 @@ func TestSetGRPCHeaderRouteMultiRuleGRPCRoute(t *testing.T) {
 	}
 
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog(),
+		LogCtx:              utils.SetupLog("text"),
 		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
 	}
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
