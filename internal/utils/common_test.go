@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"os"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -9,28 +8,28 @@ import (
 )
 
 func TestSetupLog_DefaultIsTextFormatter(t *testing.T) {
-	os.Unsetenv("LOG_FORMAT")
-	t.Cleanup(func() { os.Unsetenv("LOG_FORMAT") })
-
-	entry := SetupLog()
+	entry := SetupLog("text")
 
 	assert.NotNil(t, entry)
 	assert.IsType(t, &log.TextFormatter{}, entry.Logger.Formatter)
 }
 
-func TestSetupLog_JSONFormatterWhenEnvSet(t *testing.T) {
-	t.Setenv("LOG_FORMAT", "json")
+func TestSetupLog_EmptyIsTextFormatter(t *testing.T) {
+	entry := SetupLog("")
 
-	entry := SetupLog()
+	assert.NotNil(t, entry)
+	assert.IsType(t, &log.TextFormatter{}, entry.Logger.Formatter)
+}
+
+func TestSetupLog_JSONFormatter(t *testing.T) {
+	entry := SetupLog("json")
 
 	assert.NotNil(t, entry)
 	assert.IsType(t, &log.JSONFormatter{}, entry.Logger.Formatter)
 }
 
 func TestSetupLog_JSONFormatterCaseInsensitive(t *testing.T) {
-	t.Setenv("LOG_FORMAT", "JSON")
-
-	entry := SetupLog()
+	entry := SetupLog("JSON")
 
 	assert.NotNil(t, entry)
 	assert.IsType(t, &log.JSONFormatter{}, entry.Logger.Formatter)
