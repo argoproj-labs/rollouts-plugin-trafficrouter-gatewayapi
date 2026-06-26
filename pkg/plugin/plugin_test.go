@@ -1976,3 +1976,193 @@ func TestGetRouteRuleReturnsErrorWhenBackendNotFound(t *testing.T) {
 	assert.Nil(t, httpRouteRule, "Route rule should be nil on error")
 	assert.Equal(t, BackendRefWasNotFoundInHTTPRouteError, err.Error())
 }
+
+// TestSetHTTPHeaderRouteMultiRuleHTTPRoute verifies that SetHeaderRoute injects one managed
+// header rule per source rule on a multi-rule HTTPRoute (issue #207).
+//
+// A two-rule HTTPRoute with paths /a and /b should produce two managed header rules after
+// SetHeaderRoute — one covering /a and one covering /b — so the canary header applies to the
+// entire route, not just its first rule.
+func TestSetHTTPHeaderRouteMultiRuleHTTPRoute(t *testing.T) {
+	port := gatewayv1.PortNumber(80)
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	pathPrefixType := gatewayv1.PathMatchPathPrefix
+	pathA := "/a"
+	pathB := "/b"
+
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mocks.HTTPRouteName,
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.StableServiceName, Port: &port}, Weight: &stableWeight}},
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.CanaryServiceName, Port: &port}, Weight: &canaryWeight}},
+					},
+					Matches: []gatewayv1.HTTPRouteMatch{{Path: &gatewayv1.HTTPPathMatch{Type: &pathPrefixType, Value: &pathA}}},
+				},
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.StableServiceName, Port: &port}, Weight: &stableWeight}},
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.CanaryServiceName, Port: &port}, Weight: &canaryWeight}},
+					},
+					Matches: []gatewayv1.HTTPRouteMatch{{Path: &gatewayv1.HTTPPathMatch{Type: &pathPrefixType, Value: &pathB}}},
+				},
+			},
+		},
+	}
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog(),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	exactMatch := v1alpha1.StringMatch{Exact: "v2"}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Version", HeaderValue: &exactMatch},
+		},
+	}
+
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	updated, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+
+	// Expect 4 rules: 2 original source rules + 1 managed header rule per source rule.
+	assert.Len(t, updated.Spec.Rules, 4, "expected one managed header rule per source rule (2 source + 2 managed = 4 total)")
+
+	// Both managed rules share the same name.
+	managedRules := []gatewayv1.HTTPRouteRule{}
+	for _, rule := range updated.Spec.Rules {
+		if rule.Name != nil && string(*rule.Name) == mocks.ManagedRouteName {
+			managedRules = append(managedRules, rule)
+		}
+	}
+	assert.Len(t, managedRules, 2, "expected two managed header rules (one per source path)")
+
+	// Each managed rule must carry the canary header and preserve its source path prefix.
+	paths := map[string]bool{}
+	for _, rule := range managedRules {
+		require.Len(t, rule.BackendRefs, 1, "managed rule must have exactly one (canary) backend ref")
+		assert.Equal(t, gatewayv1.ObjectName(mocks.CanaryServiceName), rule.BackendRefs[0].Name)
+		require.NotEmpty(t, rule.Matches)
+		require.NotNil(t, rule.Matches[0].Path)
+		paths[*rule.Matches[0].Path.Value] = true
+		hasCanaryHeader := false
+		for _, h := range rule.Matches[0].Headers {
+			if string(h.Name) == "X-Version" && h.Value == "v2" {
+				hasCanaryHeader = true
+			}
+		}
+		assert.True(t, hasCanaryHeader, "managed rule for path %s must carry the canary header", *rule.Matches[0].Path.Value)
+	}
+	assert.True(t, paths["/a"], "expected a managed header rule covering path /a")
+	assert.True(t, paths["/b"], "expected a managed header rule covering path /b")
+}
+
+// TestSetGRPCHeaderRouteMultiRuleGRPCRoute verifies that SetHeaderRoute injects one managed
+// header rule per source rule on a multi-rule GRPCRoute (issue #207).
+//
+// A two-rule GRPCRoute with different gRPC methods should produce two managed header rules —
+// one per method — so the canary header applies to the entire route, not just its first rule.
+func TestSetGRPCHeaderRouteMultiRuleGRPCRoute(t *testing.T) {
+	port := gatewayv1.PortNumber(80)
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	methodMatchType := gatewayv1.GRPCMethodMatchExact
+	serviceA := "svc.Service"
+	methodA := "MethodA"
+	serviceB := "svc.Service"
+	methodB := "MethodB"
+
+	grpcRoute := &gatewayv1.GRPCRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mocks.GRPCRouteName,
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: gatewayv1.GRPCRouteSpec{
+			Rules: []gatewayv1.GRPCRouteRule{
+				{
+					BackendRefs: []gatewayv1.GRPCBackendRef{
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.StableServiceName, Port: &port}, Weight: &stableWeight}},
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.CanaryServiceName, Port: &port}, Weight: &canaryWeight}},
+					},
+					Matches: []gatewayv1.GRPCRouteMatch{{Method: &gatewayv1.GRPCMethodMatch{Type: &methodMatchType, Service: &serviceA, Method: &methodA}}},
+				},
+				{
+					BackendRefs: []gatewayv1.GRPCBackendRef{
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.StableServiceName, Port: &port}, Weight: &stableWeight}},
+						{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.CanaryServiceName, Port: &port}, Weight: &canaryWeight}},
+					},
+					Matches: []gatewayv1.GRPCRouteMatch{{Method: &gatewayv1.GRPCMethodMatch{Type: &methodMatchType, Service: &serviceB, Method: &methodB}}},
+				},
+			},
+		},
+	}
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog(),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+	})
+
+	exactMatch := v1alpha1.StringMatch{Exact: "v2"}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Version", HeaderValue: &exactMatch},
+		},
+	}
+
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	updated, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+
+	// Expect 4 rules: 2 original source rules + 1 managed header rule per source rule.
+	assert.Len(t, updated.Spec.Rules, 4, "expected one managed header rule per source rule (2 source + 2 managed = 4 total)")
+
+	// Both managed rules share the same name.
+	managedRules := []gatewayv1.GRPCRouteRule{}
+	for _, rule := range updated.Spec.Rules {
+		if rule.Name != nil && string(*rule.Name) == mocks.ManagedRouteName {
+			managedRules = append(managedRules, rule)
+		}
+	}
+	assert.Len(t, managedRules, 2, "expected two managed header rules (one per source method)")
+
+	// Each managed rule must carry the canary header and preserve its source method.
+	methods := map[string]bool{}
+	for _, rule := range managedRules {
+		require.Len(t, rule.BackendRefs, 1, "managed rule must have exactly one (canary) backend ref")
+		assert.Equal(t, gatewayv1.ObjectName(mocks.CanaryServiceName), rule.BackendRefs[0].Name)
+		require.NotEmpty(t, rule.Matches)
+		require.NotNil(t, rule.Matches[0].Method)
+		require.NotNil(t, rule.Matches[0].Method.Method)
+		methods[*rule.Matches[0].Method.Method] = true
+		hasCanaryHeader := false
+		for _, h := range rule.Matches[0].Headers {
+			if string(h.Name) == "X-Version" && h.Value == "v2" {
+				hasCanaryHeader = true
+			}
+		}
+		assert.True(t, hasCanaryHeader, "managed rule for method %s must carry the canary header", *rule.Matches[0].Method.Method)
+	}
+	assert.True(t, methods["MethodA"], "expected a managed header rule covering MethodA")
+	assert.True(t, methods["MethodB"], "expected a managed header rule covering MethodB")
+}
