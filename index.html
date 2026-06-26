@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Waiting for GitHub Pages Deployment</title>
+    <style>
+      * {
+        font-family: Menlo, Monaco, source-code-pro, 'Ubuntu Mono',
+          'DejaVu sans mono', Consolas, monospace, Menlo, Monaco, 'Courier New',
+          monospace;
+      }
+      body {
+        background: #2e3440;
+        color: #4c566a;
+        height: 100vh;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      #spinner {
+        display: none;
+        border: 4px solid #3b4252;
+        border-top: 4px solid #4c566a;
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        animation: spin 2s linear infinite;
+      }
+      p {
+        font-size: 12px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+    <script>
+      function getHashFromQueryString() {
+        const params = new URLSearchParams(window.location.search)
+        return params.get('hash')
+      }
+
+      async function checkFileExists(url) {
+        try {
+          const response = await fetch(url, { method: 'HEAD' })
+          return response.ok
+        } catch (error) {
+          return false
+        }
+      }
+
+      async function waitForFileToExist(url, interval = 2000) {
+        while (true) {
+          if (await checkFileExists(url)) {
+            return true
+          }
+          await new Promise((resolve) => setTimeout(resolve, interval))
+        }
+      }
+
+      async function loadContent() {
+        const spinner = document.getElementById('spinner')
+        const hash = getHashFromQueryString()
+        const fileUrl = `revisions/${hash}.html`
+
+        spinner.style.display = 'block'
+
+        await waitForFileToExist(fileUrl)
+
+        window.location.href = fileUrl
+      }
+
+      document.addEventListener('DOMContentLoaded', loadContent)
+    </script>
+  </head>
+  <body>
+    <div id="spinner"></div>
+    <p>Waiting for GitHub Pages Deployment</p>
+  </body>
+</html>

@@ -1,0 +1,1900 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		<title>mocks: Go Coverage Report</title>
+		<script src="../index.js?ad79d67a7b27030a910cdcdaaaf1e441"></script>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/mocks/plugin.go (0.0%)</option>
+				
+				<option value="file1">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/experiment.go (25.0%)</option>
+				
+				<option value="file2">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/grpcroute.go (83.2%)</option>
+				
+				<option value="file3">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/httproute.go (85.3%)</option>
+				
+				<option value="file4">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/labels.go (78.6%)</option>
+				
+				<option value="file5">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/plugin.go (57.0%)</option>
+				
+				<option value="file6">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/tcproute.go (85.1%)</option>
+				
+				<option value="file7">github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/pkg/plugin/tlsroute.go (85.1%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package mocks
+
+import (
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+        "sigs.k8s.io/gateway-api/apis/v1alpha2"
+
+        gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+)
+
+const (
+        HTTPRoute         = "HTTPRoute"
+        TCPRoute          = "TCPRoute"
+        TLSRoute          = "TLSRoute"
+        StableServiceName = "argo-rollouts-stable-service"
+        CanaryServiceName = "argo-rollouts-canary-service"
+        HTTPRouteName     = "argo-rollouts-http-route"
+        GRPCRouteName     = "argo-rollouts-grpc-route"
+        TCPRouteName      = "argo-rollouts-tcp-route"
+        TLSRouteName      = "argo-rollouts-tls-route"
+        RolloutNamespace  = "default"
+        ManagedRouteName  = "test-header-route"
+)
+
+var (
+        port                     = gatewayv1.PortNumber(80)
+        weight             int32 = 0
+        httpPathMatchType        = gatewayv1.PathMatchPathPrefix
+        httpPathMatchValue       = "/"
+        httpPathMatch            = gatewayv1.HTTPPathMatch{
+                Type:  &amp;httpPathMatchType,
+                Value: &amp;httpPathMatchValue,
+        }
+)
+
+func CreateHTTPRouteWithLabels(name string, labels map[string]string) *gatewayv1.HTTPRoute <span class="cov0" title="0">{
+        stableWeight := int32(100)
+        canaryWeight := int32(0)
+        return &amp;gatewayv1.HTTPRoute{
+                ObjectMeta: metav1.ObjectMeta{
+                        Name:      name,
+                        Namespace: RolloutNamespace,
+                        Labels:    labels,
+                },
+                Spec: gatewayv1.HTTPRouteSpec{
+                        Rules: []gatewayv1.HTTPRouteRule{
+                                {
+                                        BackendRefs: []gatewayv1.HTTPBackendRef{
+                                                {
+                                                        BackendRef: gatewayv1.BackendRef{
+                                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                        Name: StableServiceName,
+                                                                        Port: &amp;port,
+                                                                },
+                                                                Weight: &amp;stableWeight,
+                                                        },
+                                                },
+                                                {
+                                                        BackendRef: gatewayv1.BackendRef{
+                                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                        Name: CanaryServiceName,
+                                                                        Port: &amp;port,
+                                                                },
+                                                                Weight: &amp;canaryWeight,
+                                                        },
+                                                },
+                                        },
+                                        Matches: []gatewayv1.HTTPRouteMatch{
+                                                {
+                                                        Path: &amp;httpPathMatch,
+                                                },
+                                        },
+                                },
+                        },
+                },
+        }
+}</span>
+
+var HTTPRouteObj = gatewayv1.HTTPRoute{
+        ObjectMeta: metav1.ObjectMeta{
+                Name:      HTTPRouteName,
+                Namespace: RolloutNamespace,
+        },
+        Spec: gatewayv1.HTTPRouteSpec{
+                Rules: []gatewayv1.HTTPRouteRule{
+                        {
+                                BackendRefs: []gatewayv1.HTTPBackendRef{
+                                        {
+                                                BackendRef: gatewayv1.BackendRef{
+                                                        BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                Name: StableServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;weight,
+                                                },
+                                        },
+                                        {
+                                                BackendRef: gatewayv1.BackendRef{
+                                                        BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                Name: CanaryServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;weight,
+                                                },
+                                        },
+                                },
+                                Matches: []gatewayv1.HTTPRouteMatch{
+                                        {
+                                                Path: &amp;httpPathMatch,
+                                        },
+                                },
+                        },
+                },
+        },
+}
+
+func CreateGRPCRouteWithLabels(name string, labels map[string]string) *gatewayv1.GRPCRoute <span class="cov0" title="0">{
+        stableWeight := int32(100)
+        canaryWeight := int32(0)
+        return &amp;gatewayv1.GRPCRoute{
+                ObjectMeta: metav1.ObjectMeta{
+                        Name:      name,
+                        Namespace: RolloutNamespace,
+                        Labels:    labels,
+                },
+                Spec: gatewayv1.GRPCRouteSpec{
+                        Rules: []gatewayv1.GRPCRouteRule{
+                                {
+                                        BackendRefs: []gatewayv1.GRPCBackendRef{
+                                                {
+                                                        BackendRef: gatewayv1.BackendRef{
+                                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                        Name: StableServiceName,
+                                                                        Port: &amp;port,
+                                                                },
+                                                                Weight: &amp;stableWeight,
+                                                        },
+                                                },
+                                                {
+                                                        BackendRef: gatewayv1.BackendRef{
+                                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                        Name: CanaryServiceName,
+                                                                        Port: &amp;port,
+                                                                },
+                                                                Weight: &amp;canaryWeight,
+                                                        },
+                                                },
+                                        },
+                                },
+                        },
+                },
+        }
+}</span>
+
+func CreateTCPRouteWithLabels(name string, labels map[string]string) *v1alpha2.TCPRoute <span class="cov0" title="0">{
+        stableWeight := int32(100)
+        canaryWeight := int32(0)
+        return &amp;v1alpha2.TCPRoute{
+                ObjectMeta: metav1.ObjectMeta{
+                        Name:      name,
+                        Namespace: RolloutNamespace,
+                        Labels:    labels,
+                },
+                Spec: v1alpha2.TCPRouteSpec{
+                        Rules: []v1alpha2.TCPRouteRule{
+                                {
+                                        BackendRefs: []v1alpha2.BackendRef{
+                                                {
+                                                        BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                                Name: StableServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;stableWeight,
+                                                },
+                                                {
+                                                        BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                                Name: CanaryServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;canaryWeight,
+                                                },
+                                        },
+                                },
+                        },
+                },
+        }
+}</span>
+
+func CreateTLSRouteWithLabels(name string, labels map[string]string) *v1alpha2.TLSRoute <span class="cov0" title="0">{
+        stableWeight := int32(100)
+        canaryWeight := int32(0)
+        return &amp;v1alpha2.TLSRoute{
+                ObjectMeta: metav1.ObjectMeta{
+                        Name:      name,
+                        Namespace: RolloutNamespace,
+                        Labels:    labels,
+                },
+                Spec: v1alpha2.TLSRouteSpec{
+                        Rules: []v1alpha2.TLSRouteRule{
+                                {
+                                        BackendRefs: []v1alpha2.BackendRef{
+                                                {
+                                                        BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                                Name: StableServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;stableWeight,
+                                                },
+                                                {
+                                                        BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                                Name: CanaryServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;canaryWeight,
+                                                },
+                                        },
+                                },
+                        },
+                },
+        }
+}</span>
+
+var GRPCRouteObj = gatewayv1.GRPCRoute{
+        ObjectMeta: metav1.ObjectMeta{
+                Name:      GRPCRouteName,
+                Namespace: RolloutNamespace,
+        },
+        Spec: gatewayv1.GRPCRouteSpec{
+                Rules: []gatewayv1.GRPCRouteRule{
+                        {
+                                BackendRefs: []gatewayv1.GRPCBackendRef{
+                                        {
+                                                BackendRef: gatewayv1.BackendRef{
+                                                        BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                Name: StableServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;weight,
+                                                },
+                                        },
+                                        {
+                                                BackendRef: gatewayv1.BackendRef{
+                                                        BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                                Name: CanaryServiceName,
+                                                                Port: &amp;port,
+                                                        },
+                                                        Weight: &amp;weight,
+                                                },
+                                        },
+                                },
+                        },
+                },
+        },
+}
+
+var TCPPRouteObj = v1alpha2.TCPRoute{
+        ObjectMeta: metav1.ObjectMeta{
+                Name:      TCPRouteName,
+                Namespace: RolloutNamespace,
+        },
+        Spec: v1alpha2.TCPRouteSpec{
+                Rules: []v1alpha2.TCPRouteRule{
+                        {
+                                BackendRefs: []v1alpha2.BackendRef{
+                                        {
+                                                BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                        Name: StableServiceName,
+                                                        Port: &amp;port,
+                                                },
+                                                Weight: &amp;weight,
+                                        },
+                                        {
+                                                BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                        Name: CanaryServiceName,
+                                                        Port: &amp;port,
+                                                },
+                                                Weight: &amp;weight,
+                                        },
+                                },
+                        },
+                },
+        },
+}
+
+var TLSRouteObj = v1alpha2.TLSRoute{
+        ObjectMeta: metav1.ObjectMeta{
+                Name:      TLSRouteName,
+                Namespace: RolloutNamespace,
+        },
+        Spec: v1alpha2.TLSRouteSpec{
+                Rules: []v1alpha2.TLSRouteRule{
+                        {
+                                BackendRefs: []v1alpha2.BackendRef{
+                                        {
+                                                BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                        Name: StableServiceName,
+                                                        Port: &amp;port,
+                                                },
+                                                Weight: &amp;weight,
+                                        },
+                                        {
+                                                BackendObjectReference: v1alpha2.BackendObjectReference{
+                                                        Name: CanaryServiceName,
+                                                        Port: &amp;port,
+                                                },
+                                                Weight: &amp;weight,
+                                        },
+                                },
+                        },
+                },
+        },
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package plugin
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+        "github.com/sirupsen/logrus"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/client-go/kubernetes"
+        gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+        gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
+)
+
+func HandleExperiment(ctx context.Context, clientset *kubernetes.Clientset, gatewayClient gatewayApiClientset.Interface, logger *logrus.Entry, rollout *v1alpha1.Rollout, httpRoute *gatewayv1.HTTPRoute, additionalDestinations []v1alpha1.WeightDestination) error <span class="cov8" title="1">{
+        ruleIdx := -1
+        stableService := rollout.Spec.Strategy.Canary.StableService
+        canaryService := rollout.Spec.Strategy.Canary.CanaryService
+
+        for i, rule := range httpRoute.Spec.Rules </span><span class="cov8" title="1">{
+                if ruleIdx != -1 </span><span class="cov8" title="1">{
+                        break</span>
+                }
+                <span class="cov8" title="1">for _, backendRef := range rule.BackendRefs </span><span class="cov8" title="1">{
+                        if string(backendRef.Name) == stableService || string(backendRef.Name) == canaryService </span><span class="cov8" title="1">{
+                                ruleIdx = i
+                                break</span>
+                        }
+                }
+        }
+
+        <span class="cov8" title="1">if ruleIdx == -1 </span><span class="cov0" title="0">{
+                return fmt.Errorf("no matching rule found for rollout %s", rollout.Name)
+        }</span>
+
+        <span class="cov8" title="1">isExperimentActive := rollout.Spec.Strategy.Canary != nil &amp;&amp; rollout.Status.Canary.CurrentExperiment != ""
+
+        // previousServices are the experiment services the controller told the plugin to add
+        // on the previous reconcile, recorded in the rollout status. These are the only
+        // backends the plugin owns and may remove; any other backend in the route is managed
+        // externally and must be left untouched (issue #203).
+        previousServices := make(map[string]bool)
+        if rollout.Status.Canary.Weights != nil </span><span class="cov0" title="0">{
+                for _, dest := range rollout.Status.Canary.Weights.Additional </span><span class="cov0" title="0">{
+                        previousServices[dest.ServiceName] = true
+                }</span>
+        }
+
+        <span class="cov8" title="1">hasExperimentServices := false
+        for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs </span><span class="cov8" title="1">{
+                if previousServices[string(backendRef.Name)] </span><span class="cov0" title="0">{
+                        hasExperimentServices = true
+                        break</span>
+                }
+        }
+
+        <span class="cov8" title="1">if isExperimentActive </span><span class="cov0" title="0">{
+                logger.Info(fmt.Sprintf("Found active experiment %s", rollout.Status.Canary.CurrentExperiment))
+
+                if len(additionalDestinations) == 0 </span><span class="cov0" title="0">{
+                        logger.Info("No experiment services found in additionalDestinations, skipping experiment service addition")
+                        return nil
+                }</span>
+
+                // Compute total experiment weight
+                <span class="cov0" title="0">var totalExperimentWeight int32
+                for _, dest := range additionalDestinations </span><span class="cov0" title="0">{
+                        totalExperimentWeight += dest.Weight
+                }</span>
+
+                // Sanity cap: don't allow overflow
+                <span class="cov0" title="0">if totalExperimentWeight &gt; 100 </span><span class="cov0" title="0">{
+                        logger.Warnf("Total experiment weight exceeds 100 (got %d), capping at 100", totalExperimentWeight)
+                        totalExperimentWeight = 100
+                }</span>
+
+                <span class="cov0" title="0">stableWeight := int32(100) - totalExperimentWeight
+
+                for i, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs </span><span class="cov0" title="0">{
+                        if string(backendRef.Name) == stableService </span><span class="cov0" title="0">{
+                                httpRoute.Spec.Rules[ruleIdx].BackendRefs[i].Weight = &amp;stableWeight
+                                break</span>
+                        }
+                }
+
+                <span class="cov0" title="0">for _, additionalDest := range additionalDestinations </span><span class="cov0" title="0">{
+                        serviceName := additionalDest.ServiceName
+                        weight := additionalDest.Weight
+
+                        exists := false
+                        for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs </span><span class="cov0" title="0">{
+                                if string(backendRef.Name) == serviceName </span><span class="cov0" title="0">{
+                                        exists = true
+                                        break</span>
+                                }
+                        }
+
+                        <span class="cov0" title="0">if !exists </span><span class="cov0" title="0">{
+                                logger.Info(fmt.Sprintf("Adding experiment service to HTTPRoute: %s with weight %d", serviceName, weight))
+
+                                service, err := clientset.CoreV1().Services(rollout.Namespace).Get(ctx, serviceName, metav1.GetOptions{})
+                                if err != nil </span><span class="cov0" title="0">{
+                                        logger.Warn(fmt.Sprintf("Failed to get service %s: %v", serviceName, err))
+                                        continue</span>
+                                }
+
+                                <span class="cov0" title="0">port := gatewayv1.PortNumber(8080)
+                                portName := "http"
+                                for _, servicePort := range service.Spec.Ports </span><span class="cov0" title="0">{
+                                        if servicePort.Name == portName </span><span class="cov0" title="0">{
+                                                port = servicePort.Port
+                                                break</span>
+                                        }
+                                }
+
+                                <span class="cov0" title="0">if len(service.Spec.Ports) &gt; 0 &amp;&amp; port == 8080 </span><span class="cov0" title="0">{
+                                        port = service.Spec.Ports[0].Port
+                                }</span>
+
+                                <span class="cov0" title="0">namespace := gatewayv1.Namespace(rollout.Namespace)
+                                httpRoute.Spec.Rules[ruleIdx].BackendRefs = append(httpRoute.Spec.Rules[ruleIdx].BackendRefs, gatewayv1.HTTPBackendRef{
+                                        BackendRef: gatewayv1.BackendRef{
+                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                        Name:      gatewayv1.ObjectName(serviceName),
+                                                        Namespace: &amp;namespace,
+                                                        Port:      &amp;port,
+                                                },
+                                                Weight: &amp;weight,
+                                        },
+                                })</span>
+                        }
+                }
+                <span class="cov0" title="0">return nil</span>
+        }
+
+        <span class="cov8" title="1">if !isExperimentActive &amp;&amp; hasExperimentServices </span><span class="cov0" title="0">{
+                logger.Info("Experiment is no longer active, removing experiment services from HTTPRoute")
+
+                stableWeight := int32(100)
+                filteredBackendRefs := []gatewayv1.HTTPBackendRef{}
+
+                for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs </span><span class="cov0" title="0">{
+                        serviceName := string(backendRef.Name)
+
+                        if previousServices[serviceName] </span><span class="cov0" title="0">{
+                                logger.Info(fmt.Sprintf("Removing experiment service from HTTPRoute: %s", serviceName))
+                                continue</span>
+                        }
+
+                        <span class="cov0" title="0">switch serviceName </span>{
+                        case stableService:<span class="cov0" title="0">
+                                backendRef.Weight = &amp;stableWeight</span>
+                        case canaryService:<span class="cov0" title="0">
+                                zeroWeight := int32(0)
+                                backendRef.Weight = &amp;zeroWeight</span>
+                        }
+                        <span class="cov0" title="0">filteredBackendRefs = append(filteredBackendRefs, backendRef)</span>
+                }
+
+                <span class="cov0" title="0">httpRoute.Spec.Rules[ruleIdx].BackendRefs = filteredBackendRefs
+                logger.Info("Experiment services removed from HTTPRoute")</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package plugin
+
+import (
+        "context"
+        "errors"
+
+        "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+        pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/client-go/util/retry"
+        gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+)
+
+func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        ctx := context.TODO()
+        grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
+
+        canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+        stableServiceName := rollout.Spec.Strategy.Canary.StableService
+        canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
+        restWeight := 100 - desiredWeight
+        managedNames := managedRouteNamesSet(rollout)
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">canaryFound, stableFound := false, false
+                for i := range grpcRoute.Spec.Rules </span><span class="cov8" title="1">{
+                        // Skip plugin-injected header-routing rules.
+                        // Primary: rule carries a Name matching a known managed route.
+                        // Fallback: structural check (single canary-only BackendRef) for rules injected
+                        // by older plugin versions that did not set the Name field.
+                        rule := grpcRoute.Spec.Rules[i]
+                        if (rule.Name != nil &amp;&amp; managedNames[string(*rule.Name)]) || isGRPCManagedRule(rule, canaryServiceObjName, nil) </span><span class="cov8" title="1">{
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">for j := range grpcRoute.Spec.Rules[i].BackendRefs </span><span class="cov8" title="1">{
+                                switch string(grpcRoute.Spec.Rules[i].BackendRefs[j].Name) </span>{
+                                case canaryServiceName:<span class="cov8" title="1">
+                                        grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &amp;desiredWeight
+                                        canaryFound = true</span>
+                                case stableServiceName:<span class="cov8" title="1">
+                                        grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &amp;restWeight
+                                        stableFound = true</span>
+                                }
+                        }
+                }
+                <span class="cov8" title="1">if !canaryFound || !stableFound </span><span class="cov0" title="0">{
+                        return errors.New(BackendRefWasNotFoundInGRPCRouteError)
+                }</span>
+
+                <span class="cov8" title="1">ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
+
+                _, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        if headerRouting.Match == nil </span><span class="cov0" title="0">{
+                return r.removeGRPCManagedRoutes(rollout, gatewayAPIConfig)
+        }</span>
+        <span class="cov8" title="1">ctx := context.TODO()
+        grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
+        grpcHeaderRouteRuleList, rpcError := getGRPCHeaderRouteRuleList(headerRouting)
+        if rpcError.HasError() </span><span class="cov0" title="0">{
+                return rpcError
+        }</span>
+
+        <span class="cov8" title="1">canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+        stableServiceName := rollout.Spec.Strategy.Canary.StableService
+        managedName := gatewayv1.SectionName(headerRouting.Name)
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">canaryServiceKind := gatewayv1.Kind("Service")
+                canaryServiceGroup := gatewayv1.Group("")
+                grpcRouteRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
+                backendRefNameList := []string{string(canaryServiceName), stableServiceName}
+                grpcRouteRule, err := getRouteRule(grpcRouteRuleList, backendRefNameList...)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">var canaryBackendRef *GRPCBackendRef
+                for i := 0; i &lt; len(grpcRouteRule.BackendRefs); i++ </span><span class="cov8" title="1">{
+                        backendRef := grpcRouteRule.BackendRefs[i]
+                        if canaryServiceName == backendRef.Name </span><span class="cov8" title="1">{
+                                canaryBackendRef = (*GRPCBackendRef)(&amp;backendRef)
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
+                        Name:    &amp;managedName,
+                        Matches: []gatewayv1.GRPCRouteMatch{},
+                        Filters: []gatewayv1.GRPCRouteFilter{},
+                        BackendRefs: []gatewayv1.GRPCBackendRef{
+                                {
+                                        BackendRef: gatewayv1.BackendRef{
+                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                        Group: &amp;canaryServiceGroup,
+                                                        Kind:  &amp;canaryServiceKind,
+                                                        Name:  canaryServiceName,
+                                                        Port:  canaryBackendRef.Port,
+                                                },
+                                        },
+                                },
+                        },
+                }
+
+                // Copy filters from original route
+                if grpcRouteRule.Filters != nil </span><span class="cov8" title="1">{
+                        for i := 0; i &lt; len(grpcRouteRule.Filters); i++ </span><span class="cov8" title="1">{
+                                grpcHeaderRouteRule.Filters = append(grpcHeaderRouteRule.Filters, *grpcRouteRule.Filters[i].DeepCopy())
+                        }</span>
+                }
+                <span class="cov8" title="1">matchLength := len(grpcRouteRule.Matches)
+                if matchLength == 0 </span><span class="cov8" title="1">{
+                        grpcHeaderRouteRule.Matches = []gatewayv1.GRPCRouteMatch{
+                                {
+                                        Headers: grpcHeaderRouteRuleList,
+                                },
+                        }
+                }</span> else<span class="cov8" title="1"> {
+                        // Copy matches from original route and merge headers
+                        for i := range matchLength </span><span class="cov8" title="1">{
+                                // Merge existing headers with new canary headers
+                                mergedHeaders := make([]gatewayv1.GRPCHeaderMatch, 0)
+                                // First, add existing headers from the original match
+                                if grpcRouteRule.Matches[i].Headers != nil </span><span class="cov8" title="1">{
+                                        mergedHeaders = append(mergedHeaders, grpcRouteRule.Matches[i].Headers...)
+                                }</span>
+                                // Then, add the new canary headers
+                                <span class="cov8" title="1">mergedHeaders = append(mergedHeaders, grpcHeaderRouteRuleList...)
+
+                                grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, gatewayv1.GRPCRouteMatch{
+                                        Method:  grpcRouteRule.Matches[i].Method,
+                                        Headers: mergedHeaders,
+                                })</span>
+                        }
+                }
+
+                // Upsert: find an existing managed rule to replace in-place.
+                // Primary: match by rule Name (set by this plugin on injection).
+                // Fallback: structural check for rules injected by older plugin versions without a Name.
+                <span class="cov8" title="1">foundIndex := -1
+                for i, rule := range grpcRouteRuleList </span><span class="cov8" title="1">{
+                        if (rule.Name != nil &amp;&amp; *rule.Name == managedName) || isGRPCManagedRule(rule, canaryServiceName, grpcHeaderRouteRuleList) </span><span class="cov8" title="1">{
+                                foundIndex = i
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if foundIndex &gt;= 0 </span><span class="cov8" title="1">{
+                        grpcRouteRuleList[foundIndex] = grpcHeaderRouteRule
+                }</span> else<span class="cov8" title="1"> {
+                        grpcRouteRuleList = append(grpcRouteRuleList, grpcHeaderRouteRule)
+                }</span>
+                <span class="cov8" title="1">grpcRoute.Spec.Rules = grpcRouteRuleList
+
+                _, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+// isGRPCManagedRule reports whether the given rule was injected by this plugin.
+// A plugin-injected rule always has exactly one BackendRef pointing to the canary service.
+// If canaryHeaders is non-nil, the rule must also have at least one match whose header list
+// contains all of the specified canary header names — this distinguishes between multiple
+// managed routes that each inject rules with different header sets.
+func isGRPCManagedRule(rule gatewayv1.GRPCRouteRule, canaryService gatewayv1.ObjectName, canaryHeaders []gatewayv1.GRPCHeaderMatch) bool <span class="cov8" title="1">{
+        if len(rule.BackendRefs) != 1 || rule.BackendRefs[0].Name != canaryService </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">if canaryHeaders == nil </span><span class="cov0" title="0">{
+                return true
+        }</span>
+        <span class="cov8" title="1">for _, match := range rule.Matches </span><span class="cov8" title="1">{
+                if grpcMatchContainsAllCanaryHeaders(match.Headers, canaryHeaders) </span><span class="cov0" title="0">{
+                        return true
+                }</span>
+        }
+        <span class="cov8" title="1">return false</span>
+}
+
+// grpcMatchContainsAllCanaryHeaders returns true if matchHeaders contains a header entry
+// for every name present in canaryHeaders.
+func grpcMatchContainsAllCanaryHeaders(matchHeaders []gatewayv1.GRPCHeaderMatch, canaryHeaders []gatewayv1.GRPCHeaderMatch) bool <span class="cov8" title="1">{
+        for _, canary := range canaryHeaders </span><span class="cov8" title="1">{
+                found := false
+                for _, h := range matchHeaders </span><span class="cov8" title="1">{
+                        if h.Name == canary.Name </span><span class="cov0" title="0">{
+                                found = true
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if !found </span><span class="cov8" title="1">{
+                        return false
+                }</span>
+        }
+        <span class="cov0" title="0">return true</span>
+}
+
+func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatewayv1.GRPCHeaderMatch, pluginTypes.RpcError) <span class="cov8" title="1">{
+        grpcHeaderRouteRuleList := []gatewayv1.GRPCHeaderMatch{}
+        for _, headerRule := range headerRouting.Match </span><span class="cov8" title="1">{
+                grpcHeaderRouteRule := gatewayv1.GRPCHeaderMatch{
+                        Name: gatewayv1.GRPCHeaderName(headerRule.HeaderName),
+                }
+                switch </span>{
+                case headerRule.HeaderValue.Exact != "":<span class="cov8" title="1">
+                        headerMatchType := gatewayv1.GRPCHeaderMatchExact
+                        grpcHeaderRouteRule.Type = &amp;headerMatchType
+                        grpcHeaderRouteRule.Value = headerRule.HeaderValue.Exact</span>
+                case headerRule.HeaderValue.Prefix != "":<span class="cov8" title="1">
+                        headerMatchType := gatewayv1.GRPCHeaderMatchRegularExpression
+                        grpcHeaderRouteRule.Type = &amp;headerMatchType
+                        grpcHeaderRouteRule.Value = headerRule.HeaderValue.Prefix + ".*"</span>
+                case headerRule.HeaderValue.Regex != "":<span class="cov0" title="0">
+                        headerMatchType := gatewayv1.GRPCHeaderMatchRegularExpression
+                        grpcHeaderRouteRule.Type = &amp;headerMatchType
+                        grpcHeaderRouteRule.Value = headerRule.HeaderValue.Regex</span>
+                default:<span class="cov0" title="0">
+                        return nil, pluginTypes.RpcError{
+                                ErrorString: InvalidHeaderMatchTypeError,
+                        }</span>
+                }
+                <span class="cov8" title="1">grpcHeaderRouteRuleList = append(grpcHeaderRouteRuleList, grpcHeaderRouteRule)</span>
+        }
+        <span class="cov8" title="1">return grpcHeaderRouteRuleList, pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        ctx := context.TODO()
+        grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
+
+        canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+        managedNames := managedRouteNamesSet(rollout)
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">newRules := make([]gatewayv1.GRPCRouteRule, 0, len(grpcRoute.Spec.Rules))
+                changed := false
+                for _, rule := range grpcRoute.Spec.Rules </span><span class="cov8" title="1">{
+                        // Primary: remove by Name. Fallback: structural check for unnamed legacy rules.
+                        if (rule.Name != nil &amp;&amp; managedNames[string(*rule.Name)]) || isGRPCManagedRule(rule, canaryServiceName, nil) </span><span class="cov0" title="0">{
+                                changed = true
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">newRules = append(newRules, rule)</span>
+                }
+                <span class="cov8" title="1">if !changed </span><span class="cov8" title="1">{
+                        return nil
+                }</span>
+                <span class="cov0" title="0">grpcRoute.Spec.Rules = newRules
+
+                _, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *GRPCRouteRule) Iterator() (GatewayAPIRouteRuleIterator[*GRPCBackendRef], bool) <span class="cov8" title="1">{
+        backendRefList := r.BackendRefs
+        index := 0
+        next := func() (*GRPCBackendRef, bool) </span><span class="cov8" title="1">{
+                if len(backendRefList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">backendRef := (*GRPCBackendRef)(&amp;backendRefList[index])
+                index = index + 1
+                return backendRef, len(backendRefList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(backendRefList) &gt; index</span>
+}
+
+func (r GRPCRouteRuleList) Iterator() (GatewayAPIRouteRuleListIterator[*GRPCBackendRef, *GRPCRouteRule], bool) <span class="cov8" title="1">{
+        routeRuleList := r
+        index := 0
+        next := func() (*GRPCRouteRule, bool) </span><span class="cov8" title="1">{
+                if len(routeRuleList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">routeRule := (*GRPCRouteRule)(&amp;routeRuleList[index])
+                index++
+                return routeRule, len(routeRuleList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(routeRuleList) != index</span>
+}
+
+func (r GRPCRouteRuleList) Error() error <span class="cov0" title="0">{
+        return errors.New(BackendRefWasNotFoundInGRPCRouteError)
+}</span>
+
+func (r *GRPCBackendRef) GetName() string <span class="cov8" title="1">{
+        return string(r.Name)
+}</span>
+
+func (r GRPCRoute) GetName() string <span class="cov8" title="1">{
+        return r.Name
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package plugin
+
+import (
+        "context"
+        "errors"
+
+        "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+        pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/client-go/util/retry"
+        gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+)
+
+func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        ctx := context.TODO()
+        httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+
+        canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+        stableServiceName := rollout.Spec.Strategy.Canary.StableService
+        canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
+        restWeight := 100 - desiredWeight
+        managedNames := managedRouteNamesSet(rollout)
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">canaryFound, stableFound := false, false
+                for i := range httpRoute.Spec.Rules </span><span class="cov8" title="1">{
+                        // Skip plugin-injected header-routing rules.
+                        // Primary: rule carries a Name matching a known managed route.
+                        // Fallback: structural check (single canary-only BackendRef) for rules injected
+                        // by older plugin versions that did not set the Name field.
+                        rule := httpRoute.Spec.Rules[i]
+                        if (rule.Name != nil &amp;&amp; managedNames[string(*rule.Name)]) || isHTTPManagedRule(rule, canaryServiceObjName, nil) </span><span class="cov8" title="1">{
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">for j := range httpRoute.Spec.Rules[i].BackendRefs </span><span class="cov8" title="1">{
+                                switch string(httpRoute.Spec.Rules[i].BackendRefs[j].Name) </span>{
+                                case canaryServiceName:<span class="cov8" title="1">
+                                        httpRoute.Spec.Rules[i].BackendRefs[j].Weight = &amp;desiredWeight
+                                        canaryFound = true</span>
+                                case stableServiceName:<span class="cov8" title="1">
+                                        httpRoute.Spec.Rules[i].BackendRefs[j].Weight = &amp;restWeight
+                                        stableFound = true</span>
+                                }
+                        }
+                }
+                <span class="cov8" title="1">if !canaryFound || !stableFound </span><span class="cov0" title="0">{
+                        return errors.New(BackendRefWasNotFoundInHTTPRouteError)
+                }</span>
+
+                <span class="cov8" title="1">err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
+                if err != nil </span><span class="cov0" title="0">{
+                        r.LogCtx.Error(err, "Failed to handle experiment services")
+                }</span>
+
+                <span class="cov8" title="1">ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)
+
+                _, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        if headerRouting.Match == nil </span><span class="cov0" title="0">{
+                return r.removeHTTPManagedRoutes(rollout, gatewayAPIConfig)
+        }</span>
+        <span class="cov8" title="1">ctx := context.TODO()
+        httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+        httpHeaderRouteRuleList, rpcError := getHTTPHeaderRouteRuleList(headerRouting)
+        if rpcError.HasError() </span><span class="cov0" title="0">{
+                return rpcError
+        }</span>
+
+        <span class="cov8" title="1">canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+        stableServiceName := rollout.Spec.Strategy.Canary.StableService
+        managedName := gatewayv1.SectionName(headerRouting.Name)
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">canaryServiceKind := gatewayv1.Kind("Service")
+                canaryServiceGroup := gatewayv1.Group("")
+                httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+                backendRefNameList := []string{string(canaryServiceName), stableServiceName}
+                httpRouteRule, err := getRouteRule(httpRouteRuleList, backendRefNameList...)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">var canaryBackendRef *HTTPBackendRef
+                for i := 0; i &lt; len(httpRouteRule.BackendRefs); i++ </span><span class="cov8" title="1">{
+                        backendRef := httpRouteRule.BackendRefs[i]
+                        if canaryServiceName == backendRef.Name </span><span class="cov8" title="1">{
+                                canaryBackendRef = (*HTTPBackendRef)(&amp;backendRef)
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
+                        Name:    &amp;managedName,
+                        Matches: []gatewayv1.HTTPRouteMatch{},
+                        Filters: []gatewayv1.HTTPRouteFilter{},
+                        BackendRefs: []gatewayv1.HTTPBackendRef{
+                                {
+                                        BackendRef: gatewayv1.BackendRef{
+                                                BackendObjectReference: gatewayv1.BackendObjectReference{
+                                                        Group: &amp;canaryServiceGroup,
+                                                        Kind:  &amp;canaryServiceKind,
+                                                        Name:  canaryServiceName,
+                                                        Port:  canaryBackendRef.Port,
+                                                },
+                                        },
+                                },
+                        },
+                }
+
+                // Copy filters from original route
+                if httpRouteRule.Filters != nil </span><span class="cov8" title="1">{
+                        for i := 0; i &lt; len(httpRouteRule.Filters); i++ </span><span class="cov8" title="1">{
+                                httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
+                        }</span>
+                }
+
+                // Copy matches from original route and merge headers
+                <span class="cov8" title="1">if len(httpRouteRule.Matches) == 0 </span><span class="cov0" title="0">{
+                        // Original rule has no matches - create a match with just the canary headers
+                        httpHeaderRouteRule.Matches = []gatewayv1.HTTPRouteMatch{
+                                {
+                                        Headers: httpHeaderRouteRuleList,
+                                },
+                        }
+                }</span> else<span class="cov8" title="1"> {
+                        // Copy existing matches and merge headers
+                        for i := 0; i &lt; len(httpRouteRule.Matches); i++ </span><span class="cov8" title="1">{
+                                // Merge existing headers with new canary headers
+                                mergedHeaders := make([]gatewayv1.HTTPHeaderMatch, 0)
+                                // First, add existing headers from the original match
+                                if httpRouteRule.Matches[i].Headers != nil </span><span class="cov8" title="1">{
+                                        mergedHeaders = append(mergedHeaders, httpRouteRule.Matches[i].Headers...)
+                                }</span>
+                                // Then, add the new canary headers
+                                <span class="cov8" title="1">mergedHeaders = append(mergedHeaders, httpHeaderRouteRuleList...)
+
+                                httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
+                                        Path:        httpRouteRule.Matches[i].Path,
+                                        Headers:     mergedHeaders,
+                                        QueryParams: httpRouteRule.Matches[i].QueryParams,
+                                        Method:      httpRouteRule.Matches[i].Method,
+                                })</span>
+                        }
+                }
+
+                // Upsert: find an existing managed rule to replace in-place.
+                // Primary: match by rule Name (set by this plugin on injection).
+                // Fallback: structural check for rules injected by older plugin versions without a Name.
+                <span class="cov8" title="1">foundIndex := -1
+                for i, rule := range httpRouteRuleList </span><span class="cov8" title="1">{
+                        if (rule.Name != nil &amp;&amp; *rule.Name == managedName) || isHTTPManagedRule(rule, canaryServiceName, httpHeaderRouteRuleList) </span><span class="cov8" title="1">{
+                                foundIndex = i
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if foundIndex &gt;= 0 </span><span class="cov8" title="1">{
+                        httpRouteRuleList[foundIndex] = httpHeaderRouteRule
+                }</span> else<span class="cov8" title="1"> {
+                        httpRouteRuleList = append(httpRouteRuleList, httpHeaderRouteRule)
+                }</span>
+                <span class="cov8" title="1">httpRoute.Spec.Rules = httpRouteRuleList
+
+                _, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+// isHTTPManagedRule reports whether the given rule was injected by this plugin.
+// A plugin-injected rule always has exactly one BackendRef pointing to the canary service.
+// If canaryHeaders is non-nil, the rule must also have at least one match whose header list
+// contains all of the specified canary header names — this distinguishes between multiple
+// managed routes that each inject rules with different header sets.
+func isHTTPManagedRule(rule gatewayv1.HTTPRouteRule, canaryService gatewayv1.ObjectName, canaryHeaders []gatewayv1.HTTPHeaderMatch) bool <span class="cov8" title="1">{
+        if len(rule.BackendRefs) != 1 || rule.BackendRefs[0].Name != canaryService </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">if canaryHeaders == nil </span><span class="cov0" title="0">{
+                return true
+        }</span>
+        <span class="cov8" title="1">for _, match := range rule.Matches </span><span class="cov8" title="1">{
+                if httpMatchContainsAllCanaryHeaders(match.Headers, canaryHeaders) </span><span class="cov0" title="0">{
+                        return true
+                }</span>
+        }
+        <span class="cov8" title="1">return false</span>
+}
+
+// httpMatchContainsAllCanaryHeaders returns true if matchHeaders contains a header entry
+// for every name present in canaryHeaders.
+func httpMatchContainsAllCanaryHeaders(matchHeaders []gatewayv1.HTTPHeaderMatch, canaryHeaders []gatewayv1.HTTPHeaderMatch) bool <span class="cov8" title="1">{
+        for _, canary := range canaryHeaders </span><span class="cov8" title="1">{
+                found := false
+                for _, h := range matchHeaders </span><span class="cov8" title="1">{
+                        if h.Name == canary.Name </span><span class="cov0" title="0">{
+                                found = true
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if !found </span><span class="cov8" title="1">{
+                        return false
+                }</span>
+        }
+        <span class="cov0" title="0">return true</span>
+}
+
+func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatewayv1.HTTPHeaderMatch, pluginTypes.RpcError) <span class="cov8" title="1">{
+        httpHeaderRouteRuleList := []gatewayv1.HTTPHeaderMatch{}
+        for _, headerRule := range headerRouting.Match </span><span class="cov8" title="1">{
+                httpHeaderRouteRule := gatewayv1.HTTPHeaderMatch{
+                        Name: gatewayv1.HTTPHeaderName(headerRule.HeaderName),
+                }
+                switch </span>{
+                case headerRule.HeaderValue.Exact != "":<span class="cov8" title="1">
+                        headerMatchType := gatewayv1.HeaderMatchExact
+                        httpHeaderRouteRule.Type = &amp;headerMatchType
+                        httpHeaderRouteRule.Value = headerRule.HeaderValue.Exact</span>
+                case headerRule.HeaderValue.Prefix != "":<span class="cov8" title="1">
+                        headerMatchType := gatewayv1.HeaderMatchRegularExpression
+                        httpHeaderRouteRule.Type = &amp;headerMatchType
+                        httpHeaderRouteRule.Value = headerRule.HeaderValue.Prefix + ".*"</span>
+                case headerRule.HeaderValue.Regex != "":<span class="cov0" title="0">
+                        headerMatchType := gatewayv1.HeaderMatchRegularExpression
+                        httpHeaderRouteRule.Type = &amp;headerMatchType
+                        httpHeaderRouteRule.Value = headerRule.HeaderValue.Regex</span>
+                default:<span class="cov0" title="0">
+                        return nil, pluginTypes.RpcError{
+                                ErrorString: InvalidHeaderMatchTypeError,
+                        }</span>
+                }
+                <span class="cov8" title="1">httpHeaderRouteRuleList = append(httpHeaderRouteRuleList, httpHeaderRouteRule)</span>
+        }
+        <span class="cov8" title="1">return httpHeaderRouteRuleList, pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) removeHTTPManagedRoutes(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        ctx := context.TODO()
+        httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+
+        canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
+        managedNames := managedRouteNamesSet(rollout)
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">newRules := make([]gatewayv1.HTTPRouteRule, 0, len(httpRoute.Spec.Rules))
+                changed := false
+                for _, rule := range httpRoute.Spec.Rules </span><span class="cov8" title="1">{
+                        // Primary: remove by Name. Fallback: structural check for unnamed legacy rules.
+                        if (rule.Name != nil &amp;&amp; managedNames[string(*rule.Name)]) || isHTTPManagedRule(rule, canaryServiceName, nil) </span><span class="cov8" title="1">{
+                                changed = true
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">newRules = append(newRules, rule)</span>
+                }
+                <span class="cov8" title="1">if !changed </span><span class="cov0" title="0">{
+                        return nil
+                }</span>
+                <span class="cov8" title="1">httpRoute.Spec.Rules = newRules
+
+                _, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *HTTPRouteRule) Iterator() (GatewayAPIRouteRuleIterator[*HTTPBackendRef], bool) <span class="cov8" title="1">{
+        backendRefList := r.BackendRefs
+        index := 0
+        next := func() (*HTTPBackendRef, bool) </span><span class="cov8" title="1">{
+                if len(backendRefList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">backendRef := (*HTTPBackendRef)(&amp;backendRefList[index])
+                index = index + 1
+                return backendRef, len(backendRefList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(backendRefList) &gt; index</span>
+}
+
+func (r HTTPRouteRuleList) Iterator() (GatewayAPIRouteRuleListIterator[*HTTPBackendRef, *HTTPRouteRule], bool) <span class="cov8" title="1">{
+        routeRuleList := r
+        index := 0
+        next := func() (*HTTPRouteRule, bool) </span><span class="cov8" title="1">{
+                if len(routeRuleList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">routeRule := (*HTTPRouteRule)(&amp;routeRuleList[index])
+                index++
+                return routeRule, len(routeRuleList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(routeRuleList) != index</span>
+}
+
+func (r HTTPRouteRuleList) Error() error <span class="cov8" title="1">{
+        return errors.New(BackendRefWasNotFoundInHTTPRouteError)
+}</span>
+
+func (r *HTTPBackendRef) GetName() string <span class="cov8" title="1">{
+        return string(r.Name)
+}</span>
+
+func (r HTTPRoute) GetName() string <span class="cov8" title="1">{
+        return r.Name
+}</span>
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package plugin
+
+import (
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+        "github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/defaults"
+)
+
+func ensureInProgressLabel(obj metav1.Object, desiredWeight int32, config *GatewayAPITrafficRouting) bool <span class="cov8" title="1">{
+        if obj == nil || config == nil || config.DisableInProgressLabel </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        <span class="cov8" title="1">key := config.inProgressLabelKey()
+        if key == "" </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        <span class="cov8" title="1">labels := obj.GetLabels()
+        if desiredWeight == 0 </span><span class="cov8" title="1">{
+                if labels == nil </span><span class="cov8" title="1">{
+                        return false
+                }</span>
+                <span class="cov8" title="1">if _, ok := labels[key]; ok </span><span class="cov8" title="1">{
+                        delete(labels, key)
+                        obj.SetLabels(labels)
+                        return true
+                }</span>
+                <span class="cov0" title="0">return false</span>
+        }
+
+        <span class="cov8" title="1">value := config.inProgressLabelValue()
+        if labels == nil </span><span class="cov8" title="1">{
+                labels = make(map[string]string)
+        }</span>
+        <span class="cov8" title="1">if current, ok := labels[key]; ok &amp;&amp; current == value </span><span class="cov0" title="0">{
+                return false
+        }</span>
+        <span class="cov8" title="1">labels[key] = value
+        obj.SetLabels(labels)
+        return true</span>
+}
+
+func (c *GatewayAPITrafficRouting) inProgressLabelKey() string <span class="cov8" title="1">{
+        if c.InProgressLabelKey != "" </span><span class="cov0" title="0">{
+                return c.InProgressLabelKey
+        }</span>
+        <span class="cov8" title="1">return defaults.InProgressLabelKey</span>
+}
+
+func (c *GatewayAPITrafficRouting) inProgressLabelValue() string <span class="cov8" title="1">{
+        if c.InProgressLabelValue != "" </span><span class="cov0" title="0">{
+                return c.InProgressLabelValue
+        }</span>
+        <span class="cov8" title="1">return defaults.InProgressLabelValue</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package plugin
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+
+        "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+        pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+        "github.com/go-playground/validator/v10"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/client-go/kubernetes"
+        gatewayApiClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
+
+        "github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/internal/utils"
+)
+
+const (
+        Type       = "GatewayAPI"
+        PluginName = "argoproj-labs/gatewayAPI"
+)
+
+func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError <span class="cov0" title="0">{
+        log := utils.SetupLog()
+
+        kubeConfig, err := utils.GetKubeConfig()
+        if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+
+        // Configure command-line overrides for the Kubernetes client:
+        <span class="cov0" title="0">if r.CommandLineOpts.KubeClientQPS != 0 </span><span class="cov0" title="0">{
+                log.Infof("KubeClientQPS set to: %f", r.CommandLineOpts.KubeClientQPS)
+                kubeConfig.QPS = r.CommandLineOpts.KubeClientQPS
+        }</span>
+        <span class="cov0" title="0">if r.CommandLineOpts.KubeClientBurst != 0 </span><span class="cov0" title="0">{
+                log.Infof("KubeClientBurst set to: %d", r.CommandLineOpts.KubeClientBurst)
+                kubeConfig.Burst = r.CommandLineOpts.KubeClientBurst
+        }</span>
+
+        <span class="cov0" title="0">gatewayAPIClientset, err := gatewayApiClientset.NewForConfig(kubeConfig)
+        if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov0" title="0">clientset, err := kubernetes.NewForConfig(kubeConfig)
+        if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov0" title="0">r.GatewayAPIClientset = gatewayAPIClientset
+        r.Clientset = clientset
+        return pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) UpdateHash(rollout *v1alpha1.Rollout, canaryHash, stableHash string, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError <span class="cov0" title="0">{
+        return pluginTypes.RpcError{}
+}</span>
+
+func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) pluginTypes.RpcError <span class="cov8" title="1">{
+        gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
+        if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">if !isConfigHasRoutes(gatewayAPIConfig) </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: GatewayAPIManifestError,
+                }
+        }</span>
+        <span class="cov8" title="1">r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+        rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                gatewayAPIConfig.HTTPRoute = route.Name
+                return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
+        }</span>)
+        <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                return rpcError
+        }</span>
+        <span class="cov8" title="1">r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+        rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                gatewayAPIConfig.GRPCRoute = route.Name
+                return r.setGRPCRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+        }</span>)
+        <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                return rpcError
+        }</span>
+        <span class="cov8" title="1">r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
+        rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                gatewayAPIConfig.TCPRoute = route.Name
+                return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+        }</span>)
+        <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                return rpcError
+        }</span>
+        <span class="cov8" title="1">r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TLSRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes)))
+        rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TLSRoutes, func(route TLSRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                gatewayAPIConfig.TLSRoute = route.Name
+                return r.setTLSRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+        }</span>)
+        <span class="cov8" title="1">return rpcError</span>
+}
+
+func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1alpha1.SetHeaderRoute) pluginTypes.RpcError <span class="cov8" title="1">{
+        gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
+        if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">if gatewayAPIConfig.HTTPRoutes != nil </span><span class="cov8" title="1">{
+                r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+                rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                        if !route.UseHeaderRoutes </span><span class="cov0" title="0">{
+                                return pluginTypes.RpcError{}
+                        }</span>
+                        <span class="cov8" title="1">gatewayAPIConfig.HTTPRoute = route.Name
+                        return r.setHTTPHeaderRoute(rollout, headerRouting, gatewayAPIConfig)</span>
+                })
+                <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                        return rpcError
+                }</span>
+        }
+        <span class="cov8" title="1">if gatewayAPIConfig.GRPCRoutes != nil </span><span class="cov8" title="1">{
+                r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+                rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                        if !route.UseHeaderRoutes </span><span class="cov0" title="0">{
+                                return pluginTypes.RpcError{}
+                        }</span>
+                        <span class="cov8" title="1">gatewayAPIConfig.GRPCRoute = route.Name
+                        return r.setGRPCHeaderRoute(rollout, headerRouting, gatewayAPIConfig)</span>
+                })
+                <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                        return rpcError
+                }</span>
+        }
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) SetMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute) pluginTypes.RpcError <span class="cov0" title="0">{
+        return pluginTypes.RpcError{}
+}</span>
+
+func (r *RpcPlugin) VerifyWeight(rollout *v1alpha1.Rollout, desiredWeight int32, additionalDestinations []v1alpha1.WeightDestination) (pluginTypes.RpcVerified, pluginTypes.RpcError) <span class="cov0" title="0">{
+        return pluginTypes.Verified, pluginTypes.RpcError{}
+}</span>
+
+func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.RpcError <span class="cov8" title="1">{
+        gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
+        if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">if gatewayAPIConfig.HTTPRoutes != nil </span><span class="cov8" title="1">{
+                r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+                rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                        if !route.UseHeaderRoutes </span><span class="cov0" title="0">{
+                                return pluginTypes.RpcError{}
+                        }</span>
+                        <span class="cov8" title="1">gatewayAPIConfig.HTTPRoute = route.Name
+                        return r.removeHTTPManagedRoutes(rollout, gatewayAPIConfig)</span>
+                })
+                <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                        return rpcError
+                }</span>
+        }
+        <span class="cov8" title="1">if gatewayAPIConfig.GRPCRoutes != nil </span><span class="cov8" title="1">{
+                r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+                rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError </span><span class="cov8" title="1">{
+                        if !route.UseHeaderRoutes </span><span class="cov0" title="0">{
+                                return pluginTypes.RpcError{}
+                        }</span>
+                        <span class="cov8" title="1">gatewayAPIConfig.GRPCRoute = route.Name
+                        return r.removeGRPCManagedRoutes(rollout, gatewayAPIConfig)</span>
+                })
+                <span class="cov8" title="1">if rpcError.HasError() </span><span class="cov0" title="0">{
+                        return rpcError
+                }</span>
+        }
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *RpcPlugin) Type() string <span class="cov0" title="0">{
+        return Type
+}</span>
+
+func (r *RpcPlugin) getGatewayAPIConfigWithDiscovery(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) <span class="cov8" title="1">{
+        gatewayAPIConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">if gatewayAPIConfig.HTTPRouteSelector != nil ||
+                gatewayAPIConfig.GRPCRouteSelector != nil ||
+                gatewayAPIConfig.TCPRouteSelector != nil ||
+                gatewayAPIConfig.TLSRouteSelector != nil </span><span class="cov0" title="0">{
+                if err := r.discoverRoutesBySelector(rollout, gatewayAPIConfig); err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+        }
+
+        <span class="cov8" title="1">return gatewayAPIConfig, nil</span>
+}
+
+func getGatewayAPITrafficRoutingConfig(rollout *v1alpha1.Rollout) (*GatewayAPITrafficRouting, error) <span class="cov8" title="1">{
+        validate := validator.New(validator.WithRequiredStructEnabled())
+        gatewayAPIConfig := &amp;GatewayAPITrafficRouting{}
+        err := json.Unmarshal(rollout.Spec.Strategy.Canary.TrafficRouting.Plugins[PluginName], &amp;gatewayAPIConfig)
+        if err != nil </span><span class="cov0" title="0">{
+                return gatewayAPIConfig, err
+        }</span>
+        // Default namespace to rollout's namespace if not specified
+        <span class="cov8" title="1">if gatewayAPIConfig.Namespace == "" </span><span class="cov8" title="1">{
+                gatewayAPIConfig.Namespace = rollout.Namespace
+        }</span>
+        <span class="cov8" title="1">insertGatewayAPIRouteLists(gatewayAPIConfig)
+        err = validate.Struct(gatewayAPIConfig)
+        if err != nil </span><span class="cov0" title="0">{
+                return gatewayAPIConfig, err
+        }</span>
+        <span class="cov8" title="1">return gatewayAPIConfig, err</span>
+}
+
+func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) error <span class="cov0" title="0">{
+        namespace := gatewayAPIConfig.Namespace
+
+        if gatewayAPIConfig.HTTPRouteSelector != nil </span><span class="cov0" title="0">{
+                selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.HTTPRouteSelector)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">httpRouteList, err := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(namespace).List(
+                        context.TODO(),
+                        metav1.ListOptions{LabelSelector: selector.String()},
+                )
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">for _, route := range httpRouteList.Items </span><span class="cov0" title="0">{
+                        gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, HTTPRoute{
+                                Name:            route.Name,
+                                UseHeaderRoutes: false,
+                        })
+                }</span>
+
+                <span class="cov0" title="0">if len(httpRouteList.Items) &gt; 0 </span><span class="cov0" title="0">{
+                        r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d HTTPRoutes via selector", len(httpRouteList.Items)))
+                }</span>
+        }
+
+        <span class="cov0" title="0">if gatewayAPIConfig.GRPCRouteSelector != nil </span><span class="cov0" title="0">{
+                selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.GRPCRouteSelector)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">grpcRouteList, err := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(namespace).List(
+                        context.TODO(),
+                        metav1.ListOptions{LabelSelector: selector.String()},
+                )
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">for _, route := range grpcRouteList.Items </span><span class="cov0" title="0">{
+                        gatewayAPIConfig.GRPCRoutes = append(gatewayAPIConfig.GRPCRoutes, GRPCRoute{
+                                Name:            route.Name,
+                                UseHeaderRoutes: false,
+                        })
+                }</span>
+
+                <span class="cov0" title="0">if len(grpcRouteList.Items) &gt; 0 </span><span class="cov0" title="0">{
+                        r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d GRPCRoutes via selector", len(grpcRouteList.Items)))
+                }</span>
+        }
+
+        <span class="cov0" title="0">if gatewayAPIConfig.TCPRouteSelector != nil </span><span class="cov0" title="0">{
+                selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.TCPRouteSelector)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">tcpRouteList, err := r.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(namespace).List(
+                        context.TODO(),
+                        metav1.ListOptions{LabelSelector: selector.String()},
+                )
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">for _, route := range tcpRouteList.Items </span><span class="cov0" title="0">{
+                        gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, TCPRoute{
+                                Name:            route.Name,
+                                UseHeaderRoutes: false,
+                        })
+                }</span>
+
+                <span class="cov0" title="0">if len(tcpRouteList.Items) &gt; 0 </span><span class="cov0" title="0">{
+                        r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d TCPRoutes via selector", len(tcpRouteList.Items)))
+                }</span>
+        }
+
+        <span class="cov0" title="0">if gatewayAPIConfig.TLSRouteSelector != nil </span><span class="cov0" title="0">{
+                selector, err := metav1.LabelSelectorAsSelector(gatewayAPIConfig.TLSRouteSelector)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">tlsRouteList, err := r.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(namespace).List(
+                        context.TODO(),
+                        metav1.ListOptions{LabelSelector: selector.String()},
+                )
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">for _, route := range tlsRouteList.Items </span><span class="cov0" title="0">{
+                        gatewayAPIConfig.TLSRoutes = append(gatewayAPIConfig.TLSRoutes, TLSRoute{
+                                Name:            route.Name,
+                                UseHeaderRoutes: false,
+                        })
+                }</span>
+
+                <span class="cov0" title="0">if len(tlsRouteList.Items) &gt; 0 </span><span class="cov0" title="0">{
+                        r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d TLSRoutes via selector", len(tlsRouteList.Items)))
+                }</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) <span class="cov8" title="1">{
+        if gatewayAPIConfig.HTTPRoute != "" </span><span class="cov8" title="1">{
+                gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, HTTPRoute{
+                        Name:            gatewayAPIConfig.HTTPRoute,
+                        UseHeaderRoutes: true,
+                })
+        }</span>
+        <span class="cov8" title="1">if gatewayAPIConfig.GRPCRoute != "" </span><span class="cov8" title="1">{
+                gatewayAPIConfig.GRPCRoutes = append(gatewayAPIConfig.GRPCRoutes, GRPCRoute{
+                        Name:            gatewayAPIConfig.GRPCRoute,
+                        UseHeaderRoutes: true,
+                })
+        }</span>
+        <span class="cov8" title="1">if gatewayAPIConfig.TCPRoute != "" </span><span class="cov8" title="1">{
+                gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, TCPRoute{
+                        Name:            gatewayAPIConfig.TCPRoute,
+                        UseHeaderRoutes: true,
+                })
+        }</span>
+        <span class="cov8" title="1">if gatewayAPIConfig.TLSRoute != "" </span><span class="cov8" title="1">{
+                gatewayAPIConfig.TLSRoutes = append(gatewayAPIConfig.TLSRoutes, TLSRoute{
+                        Name:            gatewayAPIConfig.TLSRoute,
+                        UseHeaderRoutes: true,
+                })
+        }</span>
+}
+
+func getRouteRule[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](routeRuleList T3, backendRefNameList ...string) (T2, error) <span class="cov8" title="1">{
+        var backendRef T1
+        var routeRule T2
+        isFound := false
+        for next, hasNext := routeRuleList.Iterator(); hasNext; </span><span class="cov8" title="1">{
+                routeRule, hasNext = next()
+                _, hasNext := routeRule.Iterator()
+                if !hasNext </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov8" title="1">for _, backendRefName := range backendRefNameList </span><span class="cov8" title="1">{
+                        isFound = false
+                        for next, hasNext := routeRule.Iterator(); hasNext; </span><span class="cov8" title="1">{
+                                backendRef, hasNext = next()
+                                if backendRefName == backendRef.GetName() </span><span class="cov8" title="1">{
+                                        isFound = true
+                                        continue</span>
+                                }
+                        }
+                        <span class="cov8" title="1">if !isFound </span><span class="cov8" title="1">{
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if isFound </span><span class="cov8" title="1">{
+                        return routeRule, nil
+                }</span>
+        }
+        <span class="cov8" title="1">return nil, routeRuleList.Error()</span>
+}
+
+func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3) ([]T1, error) <span class="cov8" title="1">{
+        var backendRef T1
+        var routeRule T2
+        var matchedRefs []T1
+        for next, hasNext := routeRuleList.Iterator(); hasNext; </span><span class="cov8" title="1">{
+                routeRule, hasNext = next()
+                for next, hasNext := routeRule.Iterator(); hasNext; </span><span class="cov8" title="1">{
+                        backendRef, hasNext = next()
+                        if backendRefName == backendRef.GetName() </span><span class="cov8" title="1">{
+                                matchedRefs = append(matchedRefs, backendRef)
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">if len(matchedRefs) &gt; 0 </span><span class="cov8" title="1">{
+                return matchedRefs, nil
+        }</span>
+        <span class="cov0" title="0">return nil, routeRuleList.Error()</span>
+}
+
+func isConfigHasRoutes(config *GatewayAPITrafficRouting) bool <span class="cov8" title="1">{
+        return len(config.HTTPRoutes) &gt; 0 || len(config.TCPRoutes) &gt; 0 || len(config.GRPCRoutes) &gt; 0 || len(config.TLSRoutes) &gt; 0
+}</span>
+
+func forEachGatewayAPIRoute[T1 GatewayAPIRoute](routeList []T1, fn func(route T1) pluginTypes.RpcError) pluginTypes.RpcError <span class="cov8" title="1">{
+        var err pluginTypes.RpcError
+        for _, route := range routeList </span><span class="cov8" title="1">{
+                if err = fn(route); err.HasError() </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+// managedRouteNamesSet returns a set of managed route names declared in the Rollout spec.
+// Used as the primary key for identifying plugin-injected rules by their Name field.
+func managedRouteNamesSet(rollout *v1alpha1.Rollout) map[string]bool <span class="cov8" title="1">{
+        names := make(map[string]bool)
+        for _, mr := range rollout.Spec.Strategy.Canary.TrafficRouting.ManagedRoutes </span><span class="cov8" title="1">{
+                names[mr.Name] = true
+        }</span>
+        <span class="cov8" title="1">return names</span>
+}
+
+func getGatewayAPIRouteNameList[T1 GatewayAPIRoute](gatewayAPIRouteList []T1) []string <span class="cov8" title="1">{
+        gatewayAPIRouteNameList := make([]string, len(gatewayAPIRouteList))
+        for index, value := range gatewayAPIRouteList </span><span class="cov8" title="1">{
+                gatewayAPIRouteNameList[index] = value.GetName()
+        }</span>
+        <span class="cov8" title="1">return gatewayAPIRouteNameList</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package plugin
+
+import (
+        "context"
+        "errors"
+
+        "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+        pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/client-go/util/retry"
+)
+
+func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        ctx := context.TODO()
+        tcpRouteClient := r.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(gatewayAPIConfig.Namespace)
+
+        canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+        stableServiceName := rollout.Spec.Strategy.Canary.StableService
+        restWeight := 100 - desiredWeight
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                tcpRoute, err := tcpRouteClient.Get(ctx, gatewayAPIConfig.TCPRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
+                canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">for _, ref := range canaryBackendRefs </span><span class="cov8" title="1">{
+                        ref.Weight = &amp;desiredWeight
+                }</span>
+                <span class="cov8" title="1">stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">for _, ref := range stableBackendRefs </span><span class="cov8" title="1">{
+                        ref.Weight = &amp;restWeight
+                }</span>
+
+                <span class="cov8" title="1">ensureInProgressLabel(tcpRoute, desiredWeight, gatewayAPIConfig)
+
+                _, err = tcpRouteClient.Update(ctx, tcpRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *TCPRouteRule) Iterator() (GatewayAPIRouteRuleIterator[*TCPBackendRef], bool) <span class="cov8" title="1">{
+        backendRefList := r.BackendRefs
+        index := 0
+        next := func() (*TCPBackendRef, bool) </span><span class="cov8" title="1">{
+                if len(backendRefList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">backendRef := (*TCPBackendRef)(&amp;backendRefList[index])
+                index = index + 1
+                return backendRef, len(backendRefList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(backendRefList) &gt; index</span>
+}
+
+func (r TCPRouteRuleList) Iterator() (GatewayAPIRouteRuleListIterator[*TCPBackendRef, *TCPRouteRule], bool) <span class="cov8" title="1">{
+        routeRuleList := r
+        index := 0
+        next := func() (*TCPRouteRule, bool) </span><span class="cov8" title="1">{
+                if len(routeRuleList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">routeRule := (*TCPRouteRule)(&amp;routeRuleList[index])
+                index = index + 1
+                return routeRule, len(routeRuleList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(routeRuleList) &gt; index</span>
+}
+
+func (r TCPRouteRuleList) Error() error <span class="cov0" title="0">{
+        return errors.New(BackendRefListWasNotFoundInTCPRouteError)
+}</span>
+
+func (r *TCPBackendRef) GetName() string <span class="cov8" title="1">{
+        return string(r.Name)
+}</span>
+
+func (r TCPRoute) GetName() string <span class="cov8" title="1">{
+        return r.Name
+}</span>
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package plugin
+
+import (
+        "context"
+        "errors"
+
+        "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+        pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/client-go/util/retry"
+)
+
+func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError <span class="cov8" title="1">{
+        ctx := context.TODO()
+        tlsRouteClient := r.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(gatewayAPIConfig.Namespace)
+
+        canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+        stableServiceName := rollout.Spec.Strategy.Canary.StableService
+        restWeight := 100 - desiredWeight
+
+        err := retry.RetryOnConflict(retry.DefaultRetry, func() error </span><span class="cov8" title="1">{
+                tlsRoute, err := tlsRouteClient.Get(ctx, gatewayAPIConfig.TLSRoute, metav1.GetOptions{})
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">routeRuleList := TLSRouteRuleList(tlsRoute.Spec.Rules)
+                canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">for _, ref := range canaryBackendRefs </span><span class="cov8" title="1">{
+                        ref.Weight = &amp;desiredWeight
+                }</span>
+                <span class="cov8" title="1">stableBackendRefs, err := getBackendRefs(stableServiceName, routeRuleList)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">for _, ref := range stableBackendRefs </span><span class="cov8" title="1">{
+                        ref.Weight = &amp;restWeight
+                }</span>
+
+                <span class="cov8" title="1">ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
+
+                _, err = tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
+                return err</span>
+        })
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return pluginTypes.RpcError{
+                        ErrorString: err.Error(),
+                }
+        }</span>
+        <span class="cov8" title="1">return pluginTypes.RpcError{}</span>
+}
+
+func (r *TLSRouteRule) Iterator() (GatewayAPIRouteRuleIterator[*TLSBackendRef], bool) <span class="cov8" title="1">{
+        backendRefList := r.BackendRefs
+        index := 0
+        next := func() (*TLSBackendRef, bool) </span><span class="cov8" title="1">{
+                if len(backendRefList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">backendRef := (*TLSBackendRef)(&amp;backendRefList[index])
+                index = index + 1
+                return backendRef, len(backendRefList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(backendRefList) &gt; index</span>
+}
+
+func (r TLSRouteRuleList) Iterator() (GatewayAPIRouteRuleListIterator[*TLSBackendRef, *TLSRouteRule], bool) <span class="cov8" title="1">{
+        routeRuleList := r
+        index := 0
+        next := func() (*TLSRouteRule, bool) </span><span class="cov8" title="1">{
+                if len(routeRuleList) == index </span><span class="cov0" title="0">{
+                        return nil, false
+                }</span>
+                <span class="cov8" title="1">routeRule := (*TLSRouteRule)(&amp;routeRuleList[index])
+                index = index + 1
+                return routeRule, len(routeRuleList) &gt; index</span>
+        }
+        <span class="cov8" title="1">return next, len(routeRuleList) &gt; index</span>
+}
+
+func (r TLSRouteRuleList) Error() error <span class="cov0" title="0">{
+        return errors.New(BackendRefListWasNotFoundInTLSRouteError)
+}</span>
+
+func (r *TLSBackendRef) GetName() string <span class="cov8" title="1">{
+        return string(r.Name)
+}</span>
+
+func (r TLSRoute) GetName() string <span class="cov8" title="1">{
+        return r.Name
+}</span>
+</pre>
+		
+		</div>
+	</body>
+</html>
