@@ -73,35 +73,44 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 			ErrorString: GatewayAPIManifestError,
 		}
 	}
-	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
-	rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
-		gatewayAPIConfig.HTTPRoute = route.Name
-		return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
-	})
-	if rpcError.HasError() {
-		return rpcError
+	var rpcError pluginTypes.RpcError
+	if gatewayAPIConfig.HTTPRoutes != nil {
+		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
+			gatewayAPIConfig.HTTPRoute = route.Name
+			return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			return rpcError
+		}
 	}
-	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
-	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
-		gatewayAPIConfig.GRPCRoute = route.Name
-		return r.setGRPCRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
-	})
-	if rpcError.HasError() {
-		return rpcError
+	if gatewayAPIConfig.GRPCRoutes != nil {
+		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
+			gatewayAPIConfig.GRPCRoute = route.Name
+			return r.setGRPCRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			return rpcError
+		}
 	}
-	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
-	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
-		gatewayAPIConfig.TCPRoute = route.Name
-		return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
-	})
-	if rpcError.HasError() {
-		return rpcError
+	if gatewayAPIConfig.TCPRoutes != nil {
+		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
+		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
+			gatewayAPIConfig.TCPRoute = route.Name
+			return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			return rpcError
+		}
 	}
-	r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TLSRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes)))
-	rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TLSRoutes, func(route TLSRoute) pluginTypes.RpcError {
-		gatewayAPIConfig.TLSRoute = route.Name
-		return r.setTLSRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
-	})
+	if gatewayAPIConfig.TLSRoutes != nil {
+		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TLSRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes)))
+		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TLSRoutes, func(route TLSRoute) pluginTypes.RpcError {
+			gatewayAPIConfig.TLSRoute = route.Name
+			return r.setTLSRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
+		})
+	}
 	return rpcError
 }
 
