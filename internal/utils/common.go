@@ -3,17 +3,15 @@ package utils
 import (
 	"strings"
 
+	hclog "github.com/hashicorp/go-hclog"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
-	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func GetKubeConfig() (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	// if you want to change the loading rules (which files in which order), you can do so here
 	configOverrides := &clientcmd.ConfigOverrides{}
-	// if you want to change override values or bind them to flags, there are methods to help you
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
@@ -22,13 +20,11 @@ func GetKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-func SetupLog(logFormat string) *log.Entry {
-	logger := log.New()
-	logger.SetLevel(log.InfoLevel)
-	if strings.EqualFold(logFormat, "json") {
-		logger.SetFormatter(&log.JSONFormatter{})
-	} else {
-		logger.SetFormatter(&log.TextFormatter{FullTimestamp: true})
-	}
-	return logger.WithFields(log.Fields{"plugin": "trafficrouter"})
+func SetupLog(logFormat string) hclog.Logger {
+	jsonFormat := strings.EqualFold(logFormat, "json")
+	return hclog.New(&hclog.LoggerOptions{
+		Name:       "plugin.gatewayAPI",
+		Level:      hclog.Info,
+		JSONFormat: jsonFormat,
+	})
 }
