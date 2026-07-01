@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-same-header-name-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-same-header-name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-same-header-name-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-same-header-name

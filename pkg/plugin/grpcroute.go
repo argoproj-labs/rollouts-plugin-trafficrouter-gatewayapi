@@ -18,7 +18,6 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
-	canaryServiceObjName := gatewayv1.ObjectName(canaryServiceName)
 	restWeight := 100 - desiredWeight
 	managedNames := managedRouteNamesSet(rollout)
 
@@ -30,12 +29,9 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 
 		canaryFound, stableFound := false, false
 		for i := range grpcRoute.Spec.Rules {
-			// Skip plugin-injected header-routing rules.
-			// Primary: rule carries a Name matching a known managed route.
-			// Fallback: structural check (single canary-only BackendRef) for rules injected
-			// by older plugin versions that did not set the Name field.
+			// Skip plugin-injected header-routing rules: rule carries a Name matching a known managed route.
 			rule := grpcRoute.Spec.Rules[i]
-			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames)) || isGRPCManagedRule(rule, canaryServiceObjName, nil) {
+			if rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames) {
 				continue
 			}
 			for j := range grpcRoute.Spec.Rules[i].BackendRefs {
@@ -164,10 +160,11 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 
 		// Upsert: remove all existing managed rules for this name, then append the new set.
-		// Primary: match by rule Name. Fallback: structural check for unnamed legacy rules.
+		// Match by rule Name only, so routes sharing a header name but with a different
+		// managed route Name are left untouched.
 		cleanedRules := make(GRPCRouteRuleList, 0, len(grpcRouteRuleList))
 		for _, rule := range grpcRouteRuleList {
-			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), map[string]bool{string(managedName): true})) || isGRPCManagedRule(rule, canaryServiceName, grpcHeaderRouteRuleList) {
+			if rule.Name != nil && isManagedRuleName(string(*rule.Name), map[string]bool{string(managedName): true}) {
 				continue
 			}
 			cleanedRules = append(cleanedRules, rule)
@@ -184,44 +181,6 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		}
 	}
 	return pluginTypes.RpcError{}
-}
-
-// isGRPCManagedRule reports whether the given rule was injected by this plugin.
-// A plugin-injected rule always has exactly one BackendRef pointing to the canary service.
-// If canaryHeaders is non-nil, the rule must also have at least one match whose header list
-// contains all of the specified canary header names — this distinguishes between multiple
-// managed routes that each inject rules with different header sets.
-func isGRPCManagedRule(rule gatewayv1.GRPCRouteRule, canaryService gatewayv1.ObjectName, canaryHeaders []gatewayv1.GRPCHeaderMatch) bool {
-	if len(rule.BackendRefs) != 1 || rule.BackendRefs[0].Name != canaryService {
-		return false
-	}
-	if canaryHeaders == nil {
-		return true
-	}
-	for _, match := range rule.Matches {
-		if grpcMatchContainsAllCanaryHeaders(match.Headers, canaryHeaders) {
-			return true
-		}
-	}
-	return false
-}
-
-// grpcMatchContainsAllCanaryHeaders returns true if matchHeaders contains a header entry
-// for every name present in canaryHeaders.
-func grpcMatchContainsAllCanaryHeaders(matchHeaders []gatewayv1.GRPCHeaderMatch, canaryHeaders []gatewayv1.GRPCHeaderMatch) bool {
-	for _, canary := range canaryHeaders {
-		found := false
-		for _, h := range matchHeaders {
-			if h.Name == canary.Name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatewayv1.GRPCHeaderMatch, pluginTypes.RpcError) {
@@ -257,7 +216,6 @@ func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 	ctx := context.TODO()
 	grpcRouteClient := r.GatewayAPIClientset.GatewayV1().GRPCRoutes(gatewayAPIConfig.Namespace)
 
-	canaryServiceName := gatewayv1.ObjectName(rollout.Spec.Strategy.Canary.CanaryService)
 	managedNames := managedRouteNamesSet(rollout)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -269,8 +227,8 @@ func (r *RpcPlugin) removeGRPCManagedRoutes(rollout *v1alpha1.Rollout, gatewayAP
 		newRules := make([]gatewayv1.GRPCRouteRule, 0, len(grpcRoute.Spec.Rules))
 		changed := false
 		for _, rule := range grpcRoute.Spec.Rules {
-			// Primary: remove by Name. Fallback: structural check for unnamed legacy rules.
-			if (rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames)) || isGRPCManagedRule(rule, canaryServiceName, nil) {
+			// Remove by Name.
+			if rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames) {
 				changed = true
 				continue
 			}

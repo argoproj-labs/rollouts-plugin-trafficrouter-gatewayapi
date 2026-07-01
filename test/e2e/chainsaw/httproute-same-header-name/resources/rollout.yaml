@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-same-header-name-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: httproute-same-header-name-canary-service
+      stableService: httproute-same-header-name-stable-service
+      trafficRouting:
+        managedRoutes:
+          - name: canary-route-1
+          - name: canary-route-2
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-same-header-name
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+        - setWeight: 30
+        # Both routes match the same header name (user-group) with different values —
+        # the exact scenario from issue #215. Both must coexist as separate rules.
+        - setHeaderRoute:
+            name: canary-route-1
+            match:
+              - headerName: user-group
+                headerValue:
+                  exact: qa
+        - setHeaderRoute:
+            name: canary-route-2
+            match:
+              - headerName: user-group
+                headerValue:
+                  exact: internal
+        - pause: {duration: 30s}   # auto-promotes — no promote command needed in tests
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: httproute-same-header-name
+  template:
+    metadata:
+      labels:
+        app: httproute-same-header-name
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
