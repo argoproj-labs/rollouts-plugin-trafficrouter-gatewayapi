@@ -1,0 +1,85 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-same-header-name
+  labels:
+    route-type: http
+    test-scope: headers
+spec:
+  description: >
+    Verifies header-based routing when two managed routes (setHeaderRoute) match the same
+    header name (user-group) but different values — the scenario from issue #215. Both
+    managed rules must coexist in the HTTPRoute rather than the second one overwriting
+    the first, and both must be removed once the rollout completes.
+  namespace: default
+  concurrent: true
+
+  steps:
+    - name: create-resources
+      description: Create the HTTPRoute and Rollout.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: Plugin initializes the HTTPRoute with 1 rule and canary weight 0.
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: >
+        Update the rollout image to start a canary
+        (setWeight:30 -> setHeaderRoute:canary-route-1 -> setHeaderRoute:canary-route-2 -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-same-header-name-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-both-header-routes-active
+      description: >
+        Key assertion for issue #215: after both setHeaderRoute steps run, canary-route-1
+        (user-group=qa) and canary-route-2 (user-group=internal) must both be present as
+        distinct rules — canary-route-2 must not overwrite canary-route-1.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-both-header-routes.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (30s pause auto-expires).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: >
+        Plugin must remove both managed rules (canary-route-1 and canary-route-2) after the
+        rollout completes. Only the original rule must remain, with canary weight reset to 0.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml

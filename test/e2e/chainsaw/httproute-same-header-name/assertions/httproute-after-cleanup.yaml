@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-same-header-name
+  namespace: default
+spec:
+  (length(rules)): 1
+  rules:
+    - backendRefs:
+        - name: httproute-same-header-name-stable-service
+        - name: httproute-same-header-name-canary-service
+          (weight): 0

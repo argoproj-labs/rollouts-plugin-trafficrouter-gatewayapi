@@ -1756,6 +1756,107 @@ func TestSetGRPCHeaderRouteTwoDistinctNamesAppendsBoth(t *testing.T) {
 	assert.Equal(t, "header-route-two", string(*updatedGRPC.Spec.Rules[2].Name))
 }
 
+// TestSetHTTPHeaderRouteSameHeaderNameDifferentValueAppendsBoth reproduces issue #215:
+// two managed header routes that match on the *same* header name but different values
+// must coexist as distinct rules, not overwrite each other.
+func TestSetHTTPHeaderRouteSameHeaderNameDifferentValueAppendsBoth(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	firstMatch := v1alpha1.StringMatch{Exact: "qa"}
+	firstHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-route-1",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &firstMatch},
+		},
+	}
+
+	secondMatch := v1alpha1.StringMatch{Exact: "internal"}
+	secondHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-route-2",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &secondMatch},
+		},
+	}
+
+	// Add the first managed route
+	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
+	assert.Empty(t, err.Error())
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	assert.Len(t, updatedHTTP.Spec.Rules, 2, "first call should add one managed rule")
+	assert.Equal(t, "canary-route-1", string(*updatedHTTP.Spec.Rules[1].Name))
+
+	// Add a second managed route matching the same header name but a different value —
+	// must be appended, not overwrite the first (issue #215).
+	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
+	assert.Empty(t, err.Error())
+	updatedHTTP, getErr = rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	assert.Len(t, updatedHTTP.Spec.Rules, 3, "second route sharing the header name must be appended, not replace the first")
+	assert.Equal(t, "canary-route-1", string(*updatedHTTP.Spec.Rules[1].Name))
+	assert.Equal(t, "canary-route-2", string(*updatedHTTP.Spec.Rules[2].Name))
+}
+
+// TestSetGRPCHeaderRouteSameHeaderNameDifferentValueAppendsBoth is the GRPCRoute equivalent
+// of TestSetHTTPHeaderRouteSameHeaderNameDifferentValueAppendsBoth for issue #215.
+func TestSetGRPCHeaderRouteSameHeaderNameDifferentValueAppendsBoth(t *testing.T) {
+	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
+	}
+
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+	})
+
+	firstMatch := v1alpha1.StringMatch{Exact: "qa"}
+	firstHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-route-1",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &firstMatch},
+		},
+	}
+
+	secondMatch := v1alpha1.StringMatch{Exact: "internal"}
+	secondHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-route-2",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &secondMatch},
+		},
+	}
+
+	// Add the first managed route
+	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
+	assert.Empty(t, err.Error())
+	updatedGRPC, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	assert.Len(t, updatedGRPC.Spec.Rules, 2, "first call should add one managed rule")
+	assert.Equal(t, "canary-route-1", string(*updatedGRPC.Spec.Rules[1].Name))
+
+	// Add a second managed route matching the same header name but a different value —
+	// must be appended, not overwrite the first (issue #215).
+	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
+	assert.Empty(t, err.Error())
+	updatedGRPC, getErr = rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	assert.Len(t, updatedGRPC.Spec.Rules, 3, "second route sharing the header name must be appended, not replace the first")
+	assert.Equal(t, "canary-route-1", string(*updatedGRPC.Spec.Rules[1].Name))
+	assert.Equal(t, "canary-route-2", string(*updatedGRPC.Spec.Rules[2].Name))
+}
+
 // TestGetRouteRuleOnlyReturnsRuleWithAllBackends verifies that getRouteRule only returns
 // a route rule when ALL requested backends are present. This is a regression test for the
 // bug where getRouteRule would return the first rule with any matching backend, even if
