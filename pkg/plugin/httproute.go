@@ -19,7 +19,6 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	restWeight := 100 - desiredWeight
-	managedNames := managedRouteNamesSet(rollout)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
@@ -27,26 +26,23 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			return err
 		}
 
-		canaryFound, stableFound := false, false
-		for i := range httpRoute.Spec.Rules {
-			// Skip plugin-injected header-routing rules: rule carries a Name matching a known managed route.
-			rule := httpRoute.Spec.Rules[i]
-			if rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames) {
-				continue
-			}
-			for j := range httpRoute.Spec.Rules[i].BackendRefs {
-				switch string(httpRoute.Spec.Rules[i].BackendRefs[j].Name) {
+		// Only rules containing BOTH the canary and stable BackendRefs are weight-split
+		// rules under this plugin's control. A rule referencing just one of them (e.g. a
+		// user-defined rule that happens to route solely to the canary service) is left
+		// untouched, regardless of its Name.
+		weightedRules, err := getAllRouteRules(HTTPRouteRuleList(httpRoute.Spec.Rules), canaryServiceName, stableServiceName)
+		if err != nil {
+			return err
+		}
+		for _, rule := range weightedRules {
+			for j := range rule.BackendRefs {
+				switch string(rule.BackendRefs[j].Name) {
 				case canaryServiceName:
-					httpRoute.Spec.Rules[i].BackendRefs[j].Weight = &desiredWeight
-					canaryFound = true
+					rule.BackendRefs[j].Weight = &desiredWeight
 				case stableServiceName:
-					httpRoute.Spec.Rules[i].BackendRefs[j].Weight = &restWeight
-					stableFound = true
+					rule.BackendRefs[j].Weight = &restWeight
 				}
 			}
-		}
-		if !canaryFound || !stableFound {
-			return errors.New(BackendRefWasNotFoundInHTTPRouteError)
 		}
 
 		err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)

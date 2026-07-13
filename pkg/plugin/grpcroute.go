@@ -19,7 +19,6 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
 	stableServiceName := rollout.Spec.Strategy.Canary.StableService
 	restWeight := 100 - desiredWeight
-	managedNames := managedRouteNamesSet(rollout)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grpcRoute, err := grpcRouteClient.Get(ctx, gatewayAPIConfig.GRPCRoute, metav1.GetOptions{})
@@ -27,26 +26,23 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			return err
 		}
 
-		canaryFound, stableFound := false, false
-		for i := range grpcRoute.Spec.Rules {
-			// Skip plugin-injected header-routing rules: rule carries a Name matching a known managed route.
-			rule := grpcRoute.Spec.Rules[i]
-			if rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames) {
-				continue
-			}
-			for j := range grpcRoute.Spec.Rules[i].BackendRefs {
-				switch string(grpcRoute.Spec.Rules[i].BackendRefs[j].Name) {
+		// Only rules containing BOTH the canary and stable BackendRefs are weight-split
+		// rules under this plugin's control. A rule referencing just one of them (e.g. a
+		// user-defined rule that happens to route solely to the canary service) is left
+		// untouched, regardless of its Name.
+		weightedRules, err := getAllRouteRules(GRPCRouteRuleList(grpcRoute.Spec.Rules), canaryServiceName, stableServiceName)
+		if err != nil {
+			return err
+		}
+		for _, rule := range weightedRules {
+			for j := range rule.BackendRefs {
+				switch string(rule.BackendRefs[j].Name) {
 				case canaryServiceName:
-					grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &desiredWeight
-					canaryFound = true
+					rule.BackendRefs[j].Weight = &desiredWeight
 				case stableServiceName:
-					grpcRoute.Spec.Rules[i].BackendRefs[j].Weight = &restWeight
-					stableFound = true
+					rule.BackendRefs[j].Weight = &restWeight
 				}
 			}
-		}
-		if !canaryFound || !stableFound {
-			return errors.New(BackendRefWasNotFoundInGRPCRouteError)
 		}
 
 		ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
