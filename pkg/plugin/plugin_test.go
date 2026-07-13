@@ -2170,14 +2170,17 @@ func TestSetGRPCHeaderRouteMultiRuleGRPCRoute(t *testing.T) {
 	assert.True(t, methods["MethodB"], "expected a managed header rule covering MethodB")
 }
 
-// TestRemoveManagedRoutesPreservesUnmanagedUserRule reproduces issue #217:
+// TestSetWeightPreservesUnmanagedUserRule reproduces issue #217:
 // https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/issues/217
 //
 // A user-defined HTTPRoute rule that isn't in managedRoutes but happens to send all of its
 // traffic to the canary service via a single BackendRef (e.g. a manual query-param-based
-// canary rule) gets misidentified as a plugin-injected rule by isHTTPManagedRule's structural
-// fallback check, and is deleted by RemoveManagedRoutes even though the plugin never created it.
-func TestRemoveManagedRoutesPreservesUnmanagedUserRule(t *testing.T) {
+// canary rule) must be left completely untouched by SetWeight: neither removed nor have its
+// BackendRef weight rewritten. SetWeight is exercised here (rather than calling
+// RemoveManagedRoutes directly) because it's the RPC method invoked on every reconcile —
+// including plain weight-based canaries with no header routing at all — so it's the entry
+// point that actually needs to guard against touching rules it doesn't own.
+func TestSetWeightPreservesUnmanagedUserRule(t *testing.T) {
 	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
 
 	userRuleName := gatewayv1.SectionName("query-param-canary")
@@ -2225,11 +2228,21 @@ func TestRemoveManagedRoutesPreservesUnmanagedUserRule(t *testing.T) {
 		HTTPRoute: mocks.HTTPRouteName,
 	})
 
-	err := rpcPluginImp.RemoveManagedRoutes(rollout)
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
 	assert.Empty(t, err.Error())
 
 	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
 	require.NoError(t, getErr)
+	require.Len(t, updatedHTTP.Spec.Rules, 2, "SetWeight must not remove the user-defined query-param-canary rule")
 
-	assert.Len(t, updatedHTTP.Spec.Rules, 2, "user-defined query-param-canary rule must not be removed by RemoveManagedRoutes")
+	var userRule *gatewayv1.HTTPRouteRule
+	for i := range updatedHTTP.Spec.Rules {
+		if updatedHTTP.Spec.Rules[i].Name != nil && string(*updatedHTTP.Spec.Rules[i].Name) == "query-param-canary" {
+			userRule = &updatedHTTP.Spec.Rules[i]
+		}
+	}
+	require.NotNil(t, userRule, "query-param-canary rule must still be present")
+	require.Len(t, userRule.BackendRefs, 1)
+	require.NotNil(t, userRule.BackendRefs[0].Weight)
+	assert.Equal(t, int32(100), *userRule.BackendRefs[0].Weight, "SetWeight must not rewrite the weight of a user-defined rule that isn't part of managedRoutes")
 }
