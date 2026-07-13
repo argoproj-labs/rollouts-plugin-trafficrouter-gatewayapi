@@ -2169,3 +2169,67 @@ func TestSetGRPCHeaderRouteMultiRuleGRPCRoute(t *testing.T) {
 	assert.True(t, methods["MethodA"], "expected a managed header rule covering MethodA")
 	assert.True(t, methods["MethodB"], "expected a managed header rule covering MethodB")
 }
+
+// TestRemoveManagedRoutesPreservesUnmanagedUserRule reproduces issue #217:
+// https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/issues/217
+//
+// A user-defined HTTPRoute rule that isn't in managedRoutes but happens to send all of its
+// traffic to the canary service via a single BackendRef (e.g. a manual query-param-based
+// canary rule) gets misidentified as a plugin-injected rule by isHTTPManagedRule's structural
+// fallback check, and is deleted by RemoveManagedRoutes even though the plugin never created it.
+func TestRemoveManagedRoutesPreservesUnmanagedUserRule(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	userRuleName := gatewayv1.SectionName("query-param-canary")
+	userQueryParamType := gatewayv1.QueryParamMatchExact
+	userPathMatchType := gatewayv1.PathMatchPathPrefix
+	userPathMatchValue := "/"
+	userPort := gatewayv1.PortNumber(80)
+	userWeight := int32(100)
+	httpRoute.Spec.Rules = append(httpRoute.Spec.Rules, gatewayv1.HTTPRouteRule{
+		Name: &userRuleName,
+		Matches: []gatewayv1.HTTPRouteMatch{
+			{
+				Path: &gatewayv1.HTTPPathMatch{
+					Type:  &userPathMatchType,
+					Value: &userPathMatchValue,
+				},
+				QueryParams: []gatewayv1.HTTPQueryParamMatch{
+					{
+						Type:  &userQueryParamType,
+						Name:  "canary",
+						Value: "true",
+					},
+				},
+			},
+		},
+		BackendRefs: []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.CanaryServiceName,
+						Port: &userPort,
+					},
+					Weight: &userWeight,
+				},
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	err := rpcPluginImp.RemoveManagedRoutes(rollout)
+	assert.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+
+	assert.Len(t, updatedHTTP.Spec.Rules, 2, "user-defined query-param-canary rule must not be removed by RemoveManagedRoutes")
+}
