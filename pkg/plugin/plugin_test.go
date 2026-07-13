@@ -2270,3 +2270,213 @@ func TestSetGRPCHeaderRouteMultiRuleGRPCRoute(t *testing.T) {
 	assert.True(t, methods["MethodA"], "expected a managed header rule covering MethodA")
 	assert.True(t, methods["MethodB"], "expected a managed header rule covering MethodB")
 }
+
+// TestSetWeightPreservesUnmanagedUserRule reproduces issue #217:
+// https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/issues/217
+//
+// A user-defined HTTPRoute rule that isn't in managedRoutes but happens to send all of its
+// traffic to the canary service via a single BackendRef (e.g. a manual query-param-based
+// canary rule) must be left completely untouched by SetWeight: neither removed nor have its
+// BackendRef weight rewritten. SetWeight is exercised here (rather than calling
+// RemoveManagedRoutes directly) because it's the RPC method invoked on every reconcile —
+// including plain weight-based canaries with no header routing at all — so it's the entry
+// point that actually needs to guard against touching rules it doesn't own.
+func TestSetWeightPreservesUnmanagedUserRule(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	userRuleName := gatewayv1.SectionName("query-param-canary")
+	userQueryParamType := gatewayv1.QueryParamMatchExact
+	userPathMatchType := gatewayv1.PathMatchPathPrefix
+	userPathMatchValue := "/"
+	userPort := gatewayv1.PortNumber(80)
+	userWeight := int32(100)
+	httpRoute.Spec.Rules = append(httpRoute.Spec.Rules, gatewayv1.HTTPRouteRule{
+		Name: &userRuleName,
+		Matches: []gatewayv1.HTTPRouteMatch{
+			{
+				Path: &gatewayv1.HTTPPathMatch{
+					Type:  &userPathMatchType,
+					Value: &userPathMatchValue,
+				},
+				QueryParams: []gatewayv1.HTTPQueryParamMatch{
+					{
+						Type:  &userQueryParamType,
+						Name:  "canary",
+						Value: "true",
+					},
+				},
+			},
+		},
+		BackendRefs: []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.CanaryServiceName,
+						Port: &userPort,
+					},
+					Weight: &userWeight,
+				},
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	assert.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedHTTP.Spec.Rules, 2, "SetWeight must not remove the user-defined query-param-canary rule")
+
+	var userRule *gatewayv1.HTTPRouteRule
+	for i := range updatedHTTP.Spec.Rules {
+		if updatedHTTP.Spec.Rules[i].Name != nil && string(*updatedHTTP.Spec.Rules[i].Name) == "query-param-canary" {
+			userRule = &updatedHTTP.Spec.Rules[i]
+		}
+	}
+	require.NotNil(t, userRule, "query-param-canary rule must still be present")
+	require.Len(t, userRule.BackendRefs, 1)
+	require.NotNil(t, userRule.BackendRefs[0].Weight)
+	assert.Equal(t, int32(100), *userRule.BackendRefs[0].Weight, "SetWeight must not rewrite the weight of a user-defined rule that isn't part of managedRoutes")
+}
+
+// TestSetWeightPreservesUnmanagedRuleWithExtraBackendRef covers a case the old
+// "single BackendRef pointing at the canary service" structural fallback could never protect:
+// a user-defined rule with a canary BackendRef *plus* an unrelated third BackendRef (e.g. a
+// mirror/logging service), and no stable BackendRef at all. Since this plugin now only weights
+// rules containing BOTH the canary and stable BackendRefs, such a rule must be left untouched
+// regardless of how many BackendRefs it has.
+func TestSetWeightPreservesUnmanagedRuleWithExtraBackendRef(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	userRuleName := gatewayv1.SectionName("canary-with-mirror")
+	userPort := gatewayv1.PortNumber(80)
+	canaryWeight := int32(100)
+	mirrorWeight := int32(0)
+	httpRoute.Spec.Rules = append(httpRoute.Spec.Rules, gatewayv1.HTTPRouteRule{
+		Name: &userRuleName,
+		BackendRefs: []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.CanaryServiceName,
+						Port: &userPort,
+					},
+					Weight: &canaryWeight,
+				},
+			},
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "mirror-service",
+						Port: &userPort,
+					},
+					Weight: &mirrorWeight,
+				},
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	assert.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedHTTP.Spec.Rules, 2, "SetWeight must not remove the user-defined canary-with-mirror rule")
+
+	var userRule *gatewayv1.HTTPRouteRule
+	for i := range updatedHTTP.Spec.Rules {
+		if updatedHTTP.Spec.Rules[i].Name != nil && string(*updatedHTTP.Spec.Rules[i].Name) == "canary-with-mirror" {
+			userRule = &updatedHTTP.Spec.Rules[i]
+		}
+	}
+	require.NotNil(t, userRule, "canary-with-mirror rule must still be present")
+	require.Len(t, userRule.BackendRefs, 2)
+	require.NotNil(t, userRule.BackendRefs[0].Weight)
+	assert.Equal(t, int32(100), *userRule.BackendRefs[0].Weight, "SetWeight must not rewrite the canary BackendRef's weight in a rule that lacks a stable BackendRef")
+	require.NotNil(t, userRule.BackendRefs[1].Weight)
+	assert.Equal(t, int32(0), *userRule.BackendRefs[1].Weight, "SetWeight must not touch the unrelated mirror BackendRef")
+}
+
+// TestSetHTTPHeaderRouteSameHeaderNameDifferentValuesCoexist reproduces issue #215:
+// https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/issues/215
+//
+// Two SetHeaderRoute calls using the same header name but different values and different
+// managed route Names must both coexist as separate rules. Matching solely by header name
+// (as the old structural fallback effectively did, since it only compared header names, not
+// values) would cause the second call to wrongly recognize the first managed rule as "the same
+// managed rule" and delete it.
+func TestSetHTTPHeaderRouteSameHeaderNameDifferentValuesCoexist(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	qaMatch := v1alpha1.StringMatch{Exact: "qa"}
+	firstHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-route-1",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &qaMatch},
+		},
+	}
+
+	internalMatch := v1alpha1.StringMatch{Exact: "internal"}
+	secondHeaderRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-route-2",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &internalMatch},
+		},
+	}
+
+	err := rpcPluginImp.SetHeaderRoute(rollout, &firstHeaderRouting)
+	assert.Empty(t, err.Error())
+
+	err = rpcPluginImp.SetHeaderRoute(rollout, &secondHeaderRouting)
+	assert.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedHTTP.Spec.Rules, 3, "both managed routes must coexist alongside the base weighted rule")
+
+	rulesByName := map[string]gatewayv1.HTTPRouteRule{}
+	for _, rule := range updatedHTTP.Spec.Rules {
+		if rule.Name != nil {
+			rulesByName[string(*rule.Name)] = rule
+		}
+	}
+
+	route1, ok := rulesByName["canary-route-1"]
+	require.True(t, ok, "canary-route-1 must not have been removed by the second SetHeaderRoute call")
+	require.Len(t, route1.Matches, 1)
+	require.Len(t, route1.Matches[0].Headers, 1)
+	assert.Equal(t, "qa", route1.Matches[0].Headers[0].Value)
+
+	route2, ok := rulesByName["canary-route-2"]
+	require.True(t, ok, "canary-route-2 must be present")
+	require.Len(t, route2.Matches, 1)
+	require.Len(t, route2.Matches[0].Headers, 1)
+	assert.Equal(t, "internal", route2.Matches[0].Headers[0].Value)
+}

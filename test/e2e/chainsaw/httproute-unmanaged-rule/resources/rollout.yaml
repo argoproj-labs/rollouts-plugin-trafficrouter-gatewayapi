@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-unmanaged-rule-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      canaryService: httproute-unmanaged-rule-canary-service
+      stableService: httproute-unmanaged-rule-stable-service
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: httproute-unmanaged-rule
+            namespace: default
+      steps:
+        - setWeight: 30
+        - pause: {duration: 30s}   # auto-promotes — no promote command needed in tests
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: httproute-unmanaged-rule
+  template:
+    metadata:
+      labels:
+        app: httproute-unmanaged-rule
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

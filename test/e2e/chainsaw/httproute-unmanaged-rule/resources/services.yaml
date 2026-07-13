@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-unmanaged-rule-stable-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-unmanaged-rule
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-unmanaged-rule-canary-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-unmanaged-rule
