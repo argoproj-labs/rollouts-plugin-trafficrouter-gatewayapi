@@ -21,6 +21,7 @@ For convenience we are including here a list of those actually tested with the p
 | [Contour](https://projectcontour.io/)     | 1.33.4 | 1.3.0 | 0.13.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/contour)    |
 | [Envoy Gateway](https://gateway.envoyproxy.io/)     | 1.7.2  |   1.4.1  | 0.13.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/envoygateway)    |
 | [Google Cloud](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api)     | N/A | 0.7.0      | 0.2.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/google-cloud)    |
+| [HAProxy Ingress](https://haproxy-ingress.github.io/)     | v0.17.0-alpha.2 | 1.5.1 | 0.16.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/haproxy)    |
 | [Istio](https://istio.io/)     | 1.29.1 | 1.4.0 | 0.11.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/istio)    |
 | [kgateway](https://kgateway.dev/)     | 2.2.2 | 1.4.0 | 0.11.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kgateway)    |
 | [Kong](https://docs.konghq.com/kubernetes-ingress-controller/latest/concepts/gateway-api/)     | 3.5.6  | 1.3.0    | 0.13.0 | [Example](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/tree/main/examples/kong)    |
