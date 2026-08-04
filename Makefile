@@ -52,11 +52,11 @@ lint:
 
 .PHONY: unit-tests
 unit-tests:
-	go test -v -count=1 ./pkg/...
+	go test -v -count=1 ./...
 
 .PHONY: coverage
 coverage:
-	go test -v -count=1 -coverprofile=coverage.out -covermode=atomic ./pkg/...
+	go test -v -count=1 -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 
 .PHONY: setup-e2e-cluster
