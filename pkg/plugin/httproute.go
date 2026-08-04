@@ -47,7 +47,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 
 		err = HandleExperiment(ctx, r.Clientset, r.GatewayAPIClientset, r.LogCtx, rollout, httpRoute, additionalDestinations)
 		if err != nil {
-			r.LogCtx.Error(err, "Failed to handle experiment services")
+			r.LogCtx.Error("Failed to handle experiment services", "error", err)
 		}
 
 		ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)

@@ -3,7 +3,6 @@ package plugin
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -34,11 +33,11 @@ func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 
 	// Configure command-line overrides for the Kubernetes client:
 	if r.CommandLineOpts.KubeClientQPS != 0 {
-		log.Infof("KubeClientQPS set to: %f", r.CommandLineOpts.KubeClientQPS)
+		log.Info("KubeClientQPS set to", "qps", r.CommandLineOpts.KubeClientQPS)
 		kubeConfig.QPS = r.CommandLineOpts.KubeClientQPS
 	}
 	if r.CommandLineOpts.KubeClientBurst != 0 {
-		log.Infof("KubeClientBurst set to: %d", r.CommandLineOpts.KubeClientBurst)
+		log.Info("KubeClientBurst set to", "burst", r.CommandLineOpts.KubeClientBurst)
 		kubeConfig.Burst = r.CommandLineOpts.KubeClientBurst
 	}
 
@@ -77,7 +76,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 	}
 	var rpcError pluginTypes.RpcError
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		r.LogCtx.Info("[SetWeight] plugin controls HTTPRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.HTTPRoute = route.Name
 			return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
@@ -87,7 +86,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		}
 	}
 	if gatewayAPIConfig.GRPCRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+		r.LogCtx.Info("[SetWeight] plugin controls GRPCRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.GRPCRoute = route.Name
 			return r.setGRPCRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
@@ -97,7 +96,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		}
 	}
 	if gatewayAPIConfig.TCPRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
+		r.LogCtx.Info("[SetWeight] plugin controls TCPRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.TCPRoute = route.Name
 			return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
@@ -107,7 +106,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		}
 	}
 	if gatewayAPIConfig.TLSRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TLSRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes)))
+		r.LogCtx.Info("[SetWeight] plugin controls TLSRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TLSRoutes, func(route TLSRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.TLSRoute = route.Name
 			return r.setTLSRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
@@ -124,7 +123,7 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 		}
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		r.LogCtx.Info("[SetHeaderRoute] plugin controls HTTPRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
@@ -137,7 +136,7 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 		}
 	}
 	if gatewayAPIConfig.GRPCRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[SetHeaderRoute] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+		r.LogCtx.Info("[SetHeaderRoute] plugin controls GRPCRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
@@ -168,7 +167,7 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 		}
 	}
 	if gatewayAPIConfig.HTTPRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		r.LogCtx.Info("[RemoveManagedRoutes] plugin controls HTTPRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
@@ -181,7 +180,7 @@ func (r *RpcPlugin) RemoveManagedRoutes(rollout *v1alpha1.Rollout) pluginTypes.R
 		}
 	}
 	if gatewayAPIConfig.GRPCRoutes != nil {
-		r.LogCtx.Info(fmt.Sprintf("[RemoveManagedRoutes] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
+		r.LogCtx.Info("[RemoveManagedRoutes] plugin controls GRPCRoutes", "plugin", PluginName, "routes", getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes))
 		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
 			if !route.UseHeaderRoutes {
 				return pluginTypes.RpcError{}
@@ -262,7 +261,7 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 		}
 
 		if len(httpRouteList.Items) > 0 {
-			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d HTTPRoutes via selector", len(httpRouteList.Items)))
+			r.LogCtx.Info("[discoverRoutesBySelector] discovered HTTPRoutes via selector", "count", len(httpRouteList.Items))
 		}
 	}
 
@@ -288,7 +287,7 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 		}
 
 		if len(grpcRouteList.Items) > 0 {
-			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d GRPCRoutes via selector", len(grpcRouteList.Items)))
+			r.LogCtx.Info("[discoverRoutesBySelector] discovered GRPCRoutes via selector", "count", len(grpcRouteList.Items))
 		}
 	}
 
@@ -314,7 +313,7 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 		}
 
 		if len(tcpRouteList.Items) > 0 {
-			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d TCPRoutes via selector", len(tcpRouteList.Items)))
+			r.LogCtx.Info("[discoverRoutesBySelector] discovered TCPRoutes via selector", "count", len(tcpRouteList.Items))
 		}
 	}
 
@@ -340,7 +339,7 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 		}
 
 		if len(tlsRouteList.Items) > 0 {
-			r.LogCtx.Info(fmt.Sprintf("[discoverRoutesBySelector] discovered %d TLSRoutes via selector", len(tlsRouteList.Items)))
+			r.LogCtx.Info("[discoverRoutesBySelector] discovered TLSRoutes via selector", "count", len(tlsRouteList.Items))
 		}
 	}
 

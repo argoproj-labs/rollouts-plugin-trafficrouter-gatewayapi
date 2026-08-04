@@ -1,7 +1,7 @@
 package plugin
 
 import (
-	"github.com/sirupsen/logrus"
+	hclog "github.com/hashicorp/go-hclog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -18,7 +18,7 @@ type RpcPlugin struct {
 	CommandLineOpts     CommandLineOpts
 	GatewayAPIClientset gatewayAPIClientset.Interface
 	Clientset           *kubernetes.Clientset
-	LogCtx              *logrus.Entry
+	LogCtx              hclog.Logger
 }
 
 type GatewayAPITrafficRouting struct {
