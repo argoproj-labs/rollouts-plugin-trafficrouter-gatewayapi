@@ -91,6 +91,14 @@ To run unit tests:
 make unit-tests
 ```
 
+To also measure coverage, which writes `coverage.out` and a browsable `coverage.html`:
+```bash
+make coverage
+```
+
+CI uploads the unit test coverage profile to [Codecov](https://codecov.io/gh/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi),
+so pull requests get a coverage report as a comment. New code is expected to come with tests.
+
 ## Running E2E tests
 
 The e2e tests need a Kubernetes cluster with Argo Rollouts and Traefik installed. 

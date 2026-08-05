@@ -1,6 +1,7 @@
 **Code:**
 [![Go Report Card](https://goreportcard.com/badge/github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi)](https://goreportcard.com/report/github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi)
 [![Gateway API plugin CI](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/actions/workflows/ci.yaml/badge.svg)](https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/branch/main/graph/badge.svg)](https://codecov.io/gh/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi)
 
 **Social:**
 [![Twitter Follow](https://img.shields.io/twitter/follow/argoproj?style=social)](https://twitter.com/argoproj)

@@ -1,0 +1,20 @@
+flags:
+  unit-tests:
+    carryforward: true
+coverage:
+  status:
+    # allow test coverage to drop by 0.1%, assume that it's typically due to CI problems
+    patch:
+      default:
+        threshold: 0.1
+    project:
+      default:
+        threshold: 0.1
+ignore:
+  - '**/*_test.go'
+  - '**/mocks/*'
+  - 'main.go'
+  - 'test'
+  - 'examples'
+  - 'docs'
+  - 'vendor/.*'
