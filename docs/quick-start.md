@@ -270,26 +270,27 @@ kubectl get httproute -o yaml
 
 In the response you should see the following information about the weights for each backing service.
 
-!!! info
-    While the canary is running, the plugin adds the label `rollouts.argoproj.io/gatewayapi-canary=in-progress` to every managed
-    Gateway API route so that GitOps tools such as Argo CD can be configured to ignore those temporary changes. The label is
-    removed automatically once the stable service goes back to 100% weight. Use `disableInProgressLabel`, `inProgressLabelKey`
-    or `inProgressLabelValue` if you need to adjust this behaviour.
 
-    **Argo CD example (Helm chart values)**
+!!! warning "Argo CD users"
+    Configure Argo CD to ignore the weights that the plugin writes. 
 
     ```yaml
-    configs:
-      cm:
-        resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
+    spec:
+      ignoreDifferences:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
           jqPathExpressions:
-            - select(.metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress") | .spec.rules
+            - .spec.rules[].backendRefs[].weight
     ```
 
-    Apply the same snippet to `GRPCRoute`, `TCPRoute` and `TLSRoute` kinds if you manage them. If you configure `resource.customizations`
-    directly inside an Application manifest rather than Helm values, reuse the same structure under `spec.source.plugin` or
-    `spec.source.helm.values`.
+ See
+    [Working with GitOps controllers](features/multiple-routes.md#working-with-gitops-controllers) for the details.
 
+!!! info
+    While the canary is running, the plugin adds the label `rollouts.argoproj.io/gatewayapi-canary=in-progress` to every managed
+    Gateway API route. The label is removed automatically once the stable service goes back to 100% weight. Use
+    `disableInProgressLabel`, `inProgressLabelKey` or `inProgressLabelValue` if you need to adjust this behaviour. Use this label for listing or choosing canaries that are running right now.
+    
 ```yaml
 [...snip...]
   spec:
