@@ -115,12 +115,6 @@ If you now start a canary deployment both routes will change to 10%, 50% and 100
 GitOps tools such as Argo CD continuously reconcile Gateway API resources and can revert the weight changes that occur while a
 canary is progressing. Configure your GitOps policy to ignore those weights.
 
-The plugin also adds the label `rollouts.argoproj.io/gatewayapi-canary=in-progress` to every
-HTTPRoute/GRPCRoute/TCPRoute/TLSRoute it mutates, and removes it as soon as the stable service returns to 100% weight. This
-label was added so that GitOps controllers could key an "ignore this resource" rule off it. **It cannot do that with Argo CD**
-— see [why the in-progress label does not work](#why-the-in-progress-label-does-not-work) below. It is still emitted for
-backwards compatibility; if you have no other use for it, set `disableInProgressLabel: true`. The key and value can be changed
-with `inProgressLabelKey` and `inProgressLabelValue`.
 
 ### Argo CD `ignoreDifferences`
 
@@ -153,49 +147,6 @@ Duplicate the block for `GRPCRoute`, `TCPRoute` and `TLSRoute` if you manage tho
 This ignores only the weight values, which the plugin owns. Everything else about your rules — matches, backendRef names,
 hostnames — stays under Argo CD's control.
 
-Two things to watch for:
-
-- **Write the weights explicitly in the manifests you commit.** If git omits `backendRefs[].weight`, the API server defaults it
-  to `1` and Argo CD reports a permanent `OutOfSync` that has nothing to do with the canary. The same applies to
-  `parentRefs[].group`/`kind` and `backendRefs[].group`.
-- **If you also use header-based routing**, the plugin injects whole rules rather than editing weights, so you need the
-  additional rule-name expression documented in [header-based routing](header-based-routing.md).
-
-### Why the in-progress label does not work
-
-Keying the ignore off the in-progress label is what the label was originally added for, and it is what earlier versions of this
-documentation recommended:
-
-```yaml
-# Do not use this
-jqPathExpressions:
-  - select(.metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress") | .spec.rules
-```
-
-Argo CD evaluates `jqPathExpressions` separately against the live object and the desired (git) object. The plugin applies the
-label at runtime, so it exists only on the live object:
-
-| | label present | `select(...)` matches | `.spec.rules` removed |
-|---|---|---|---|
-| live | yes | yes | yes |
-| desired (git) | no | no | no |
-
-Argo CD therefore compares a rules-less live object against a rules-present desired object, and reports a difference that no
-sync can resolve — even when the two are otherwise identical.
-
-The same mismatch applies when Argo CD builds the object to apply, so nothing protects the weights at apply time either. A sync
-landing while a canary is running writes the git weights back over the ones the plugin set. The Rollout continues to report its
-intended weight while the canary actually receives no traffic, and the plugin does not restore the weights because it only
-writes to the route during a Rollout reconcile. `ServerSideApply=true` and `RespectIgnoreDifferences=true` do not prevent this.
-
-Any expression that keys on a live-only field has this problem, so customising `inProgressLabelKey` or `inProgressLabelValue`
-does not help. The label is applied by the plugin at runtime and by definition never appears in the manifests you commit, so
-there is no way to make the two sides of the comparison agree. Use the weight expression above instead.
-
-!!! note
-    `managedFieldsManagers: [gatewayAPI]` looks like an appealing alternative, and it does keep the Application in sync. Avoid
-    it anyway: the plugin mutates routes with a full-object update, so it owns the whole of `.spec.rules`, and Argo CD would
-    stop reporting drift in your routing rules entirely — permanently, not just during a canary.
 
 ## Automatic Route Discovery with Label Selectors
 
