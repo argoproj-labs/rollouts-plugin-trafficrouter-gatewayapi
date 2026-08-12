@@ -80,6 +80,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.HTTPRoute = route.Name
+			gatewayAPIConfig.HTTPRouteRuleName = route.RuleName
 			return r.setHTTPRouteWeight(rollout, desiredWeight, additionalDestinations, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
@@ -90,6 +91,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls GRPCRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.GRPCRoutes)))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.GRPCRoutes, func(route GRPCRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.GRPCRoute = route.Name
+			gatewayAPIConfig.GRPCRouteRuleName = route.RuleName
 			return r.setGRPCRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
@@ -100,6 +102,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TCPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TCPRoutes)))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TCPRoutes, func(route TCPRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.TCPRoute = route.Name
+			gatewayAPIConfig.TCPRouteRuleName = route.RuleName
 			return r.setTCPRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
@@ -110,6 +113,7 @@ func (r *RpcPlugin) SetWeight(rollout *v1alpha1.Rollout, desiredWeight int32, ad
 		r.LogCtx.Info(fmt.Sprintf("[SetWeight] plugin %q controls TLSRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.TLSRoutes)))
 		rpcError = forEachGatewayAPIRoute(gatewayAPIConfig.TLSRoutes, func(route TLSRoute) pluginTypes.RpcError {
 			gatewayAPIConfig.TLSRoute = route.Name
+			gatewayAPIConfig.TLSRouteRuleName = route.RuleName
 			return r.setTLSRouteWeight(rollout, desiredWeight, gatewayAPIConfig)
 		})
 	}
@@ -130,6 +134,7 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 				return pluginTypes.RpcError{}
 			}
 			gatewayAPIConfig.HTTPRoute = route.Name
+			gatewayAPIConfig.HTTPRouteRuleName = route.RuleName
 			return r.setHTTPHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
@@ -143,6 +148,7 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 				return pluginTypes.RpcError{}
 			}
 			gatewayAPIConfig.GRPCRoute = route.Name
+			gatewayAPIConfig.GRPCRouteRuleName = route.RuleName
 			return r.setGRPCHeaderRoute(rollout, headerRouting, gatewayAPIConfig)
 		})
 		if rpcError.HasError() {
@@ -352,24 +358,28 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 		gatewayAPIConfig.HTTPRoutes = append(gatewayAPIConfig.HTTPRoutes, HTTPRoute{
 			Name:            gatewayAPIConfig.HTTPRoute,
 			UseHeaderRoutes: true,
+			RuleName:        gatewayAPIConfig.HTTPRouteRuleName,
 		})
 	}
 	if gatewayAPIConfig.GRPCRoute != "" {
 		gatewayAPIConfig.GRPCRoutes = append(gatewayAPIConfig.GRPCRoutes, GRPCRoute{
 			Name:            gatewayAPIConfig.GRPCRoute,
 			UseHeaderRoutes: true,
+			RuleName:        gatewayAPIConfig.GRPCRouteRuleName,
 		})
 	}
 	if gatewayAPIConfig.TCPRoute != "" {
 		gatewayAPIConfig.TCPRoutes = append(gatewayAPIConfig.TCPRoutes, TCPRoute{
 			Name:            gatewayAPIConfig.TCPRoute,
 			UseHeaderRoutes: true,
+			RuleName:        gatewayAPIConfig.TCPRouteRuleName,
 		})
 	}
 	if gatewayAPIConfig.TLSRoute != "" {
 		gatewayAPIConfig.TLSRoutes = append(gatewayAPIConfig.TLSRoutes, TLSRoute{
 			Name:            gatewayAPIConfig.TLSRoute,
 			UseHeaderRoutes: true,
+			RuleName:        gatewayAPIConfig.TLSRouteRuleName,
 		})
 	}
 }
@@ -458,6 +468,22 @@ func getAllRouteRules[BackendRef GatewayAPIBackendRef, RouteRule GatewayAPIRoute
 		return nil, routeRuleList.Error()
 	}
 	return result, nil
+}
+
+// filterRulesByName restricts rules to the one with the given Gateway API rule Name. An
+// empty ruleName is a no-op, returning rules unchanged, so routes with a single managed
+// rule (the common case) are unaffected.
+func filterRulesByName[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]](rules []T2, ruleName string) []T2 {
+	if ruleName == "" {
+		return rules
+	}
+	filtered := make([]T2, 0, len(rules))
+	for _, rule := range rules {
+		if rule.GetRuleName() == ruleName {
+			filtered = append(filtered, rule)
+		}
+	}
+	return filtered
 }
 
 func getBackendRefs[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1], T3 GatewayAPIRouteRuleList[T1, T2]](backendRefName string, routeRuleList T3) ([]T1, error) {

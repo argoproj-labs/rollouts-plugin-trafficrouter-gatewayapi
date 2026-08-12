@@ -10,4 +10,8 @@ const (
 	BackendRefWasNotFoundInTLSRouteError     = "backendRef was not found in tlsRoute"
 	BackendRefListWasNotFoundInTCPRouteError = "backendRef list was not found in tcpRoute"
 	BackendRefListWasNotFoundInTLSRouteError = "backendRef list was not found in tlsRoute"
+	RuleNameNotFoundInHTTPRouteError         = "the configured ruleName was not found among rules containing the canary and stable backendRefs in httpRoute"
+	RuleNameNotFoundInGRPCRouteError         = "the configured ruleName was not found among rules containing the canary and stable backendRefs in grpcRoute"
+	RuleNameNotFoundInTCPRouteError          = "the configured ruleName was not found among the rules in tcpRoute"
+	RuleNameNotFoundInTLSRouteError          = "the configured ruleName was not found among the rules in tlsRoute"
 )
