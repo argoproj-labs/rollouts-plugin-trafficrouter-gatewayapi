@@ -190,3 +190,17 @@ using the `args` block of the plugin configuration:
 ```
 
 Notice that this setting applies **only** to the plugin process. The main Argo Rollouts controller is not affected (or any other additional plugins you might have already).
+
+### Custom kubeconfig
+
+By default, the plugin uses the standard Kubernetes client configuration discovery (in-cluster config or `~/.kube/config`). To specify a custom kubeconfig file path, use the `--kubeconfig` flag:
+
+```yaml
+  trafficRouterPlugins: |-
+    - name: "argoproj-labs/gatewayAPI"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/vX.X.X/gatewayapi-plugin-linux-amd64"
+      args:
+      - "-kubeconfig=/path/to/kubeconfig"
+```
+
+This is useful when you need to target a different cluster than the one where Argo Rollouts is running.
