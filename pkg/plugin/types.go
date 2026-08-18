@@ -12,6 +12,7 @@ import (
 type CommandLineOpts struct {
 	KubeClientQPS   float32
 	KubeClientBurst int
+	KubeConfigPath  string
 }
 
 type RpcPlugin struct {

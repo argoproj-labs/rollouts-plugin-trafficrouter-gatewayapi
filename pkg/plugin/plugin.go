@@ -25,7 +25,10 @@ const (
 func (r *RpcPlugin) InitPlugin() pluginTypes.RpcError {
 	log := r.LogCtx
 
-	kubeConfig, err := utils.GetKubeConfig()
+	if r.CommandLineOpts.KubeConfigPath != "" {
+		log.Infof("KubeConfigPath set to: %s", r.CommandLineOpts.KubeConfigPath)
+	}
+	kubeConfig, err := utils.GetKubeConfig(r.CommandLineOpts.KubeConfigPath)
 	if err != nil {
 		return pluginTypes.RpcError{
 			ErrorString: err.Error(),

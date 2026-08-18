@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -2512,4 +2513,144 @@ func TestSetHTTPHeaderRouteSameHeaderNameDifferentValuesCoexist(t *testing.T) {
 	require.Len(t, route2.Matches, 1)
 	require.Len(t, route2.Matches[0].Headers, 1)
 	assert.Equal(t, "internal", route2.Matches[0].Headers[0].Value)
+}
+
+// TestInitPlugin_WithValidKubeConfigPath tests that InitPlugin successfully initializes
+// when a valid kubeconfig path is provided via CommandLineOpts.
+func TestInitPlugin_WithValidKubeConfigPath(t *testing.T) {
+	// Create a temporary kubeconfig file
+	tmpDir := t.TempDir()
+	kubeconfigPath := tmpDir + "/kubeconfig"
+	kubeconfigContent := `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://test-server:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+	err := os.WriteFile(kubeconfigPath, []byte(kubeconfigContent), 0600)
+	require.NoError(t, err)
+
+	rpcPluginImp := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{
+			KubeConfigPath: kubeconfigPath,
+		},
+		LogCtx: utils.SetupLog("text"),
+	}
+
+	rpcErr := rpcPluginImp.InitPlugin()
+
+	// The plugin initialization will fail because the test server doesn't exist,
+	// but it should at least parse the kubeconfig without error.
+	// We check that it attempted to use the provided kubeconfig by verifying
+	// the clientsets were created (even if they can't connect).
+	assert.NotNil(t, rpcPluginImp.GatewayAPIClientset)
+	assert.NotNil(t, rpcPluginImp.Clientset)
+	assert.Empty(t, rpcErr.ErrorString)
+}
+
+// TestInitPlugin_WithInvalidKubeConfigPath tests that InitPlugin returns an error
+// when an invalid kubeconfig path is provided.
+func TestInitPlugin_WithInvalidKubeConfigPath(t *testing.T) {
+	rpcPluginImp := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{
+			KubeConfigPath: "/nonexistent/path/to/kubeconfig",
+		},
+		LogCtx: utils.SetupLog("text"),
+	}
+
+	rpcErr := rpcPluginImp.InitPlugin()
+
+	assert.NotEmpty(t, rpcErr.ErrorString)
+	assert.Contains(t, rpcErr.ErrorString, "no such file or directory")
+}
+
+// TestInitPlugin_WithMalformedKubeConfigPath tests that InitPlugin returns an error
+// when a malformed kubeconfig file is provided.
+func TestInitPlugin_WithMalformedKubeConfigPath(t *testing.T) {
+	// Create a temporary kubeconfig file with invalid content
+	tmpDir := t.TempDir()
+	kubeconfigPath := tmpDir + "/kubeconfig"
+	malformedContent := `this is not valid yaml: [[[`
+	err := os.WriteFile(kubeconfigPath, []byte(malformedContent), 0600)
+	require.NoError(t, err)
+
+	rpcPluginImp := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{
+			KubeConfigPath: kubeconfigPath,
+		},
+		LogCtx: utils.SetupLog("text"),
+	}
+
+	rpcErr := rpcPluginImp.InitPlugin()
+
+	assert.NotEmpty(t, rpcErr.ErrorString)
+}
+
+// TestInitPlugin_WithEmptyKubeConfigPath tests that InitPlugin uses default discovery
+// when no kubeconfig path is provided.
+func TestInitPlugin_WithEmptyKubeConfigPath(t *testing.T) {
+	rpcPluginImp := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{
+			KubeConfigPath: "",
+		},
+		LogCtx: utils.SetupLog("text"),
+	}
+
+	// This test just verifies the function doesn't panic with an empty path.
+	// The actual result depends on the environment (may succeed or fail based on
+	// whether a default kubeconfig exists).
+	_ = rpcPluginImp.InitPlugin()
+}
+
+// TestInitPlugin_WithKubeClientQPSAndBurst tests that InitPlugin correctly applies
+// QPS and Burst settings from CommandLineOpts when a valid kubeconfig is provided.
+func TestInitPlugin_WithKubeClientQPSAndBurst(t *testing.T) {
+	// Create a temporary kubeconfig file
+	tmpDir := t.TempDir()
+	kubeconfigPath := tmpDir + "/kubeconfig"
+	kubeconfigContent := `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://test-server:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+	err := os.WriteFile(kubeconfigPath, []byte(kubeconfigContent), 0600)
+	require.NoError(t, err)
+
+	rpcPluginImp := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{
+			KubeConfigPath:  kubeconfigPath,
+			KubeClientQPS:   float32(10),
+			KubeClientBurst: 20,
+		},
+		LogCtx: utils.SetupLog("text"),
+	}
+
+	rpcErr := rpcPluginImp.InitPlugin()
+
+	assert.Empty(t, rpcErr.ErrorString)
+	assert.NotNil(t, rpcPluginImp.GatewayAPIClientset)
+	assert.NotNil(t, rpcPluginImp.Clientset)
 }

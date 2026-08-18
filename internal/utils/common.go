@@ -9,9 +9,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func GetKubeConfig() (*rest.Config, error) {
+func GetKubeConfig(kubeConfigPath string) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	// if you want to change the loading rules (which files in which order), you can do so here
+	if kubeConfigPath != "" {
+		loadingRules.ExplicitPath = kubeConfigPath
+	}
 	configOverrides := &clientcmd.ConfigOverrides{}
 	// if you want to change override values or bind them to flags, there are methods to help you
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)

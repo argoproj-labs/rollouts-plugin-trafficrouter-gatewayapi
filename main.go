@@ -25,6 +25,7 @@ func main() {
 	kubeClientQPS := flag.Int("kubeClientQPS", 5, "The QPS to use for the Kubernetes client.")
 	kubeClientBurst := flag.Int("kubeClientBurst", 10, "The Burst to use for the Kubernetes client.")
 	logFormat := flag.String("logformat", "text", "Set the logging format. One of: text|json")
+	kubeconfig := flag.String("kubeconfig", "", "Path to kubeconfig file. If not set, uses default discovery.")
 	flag.Parse()
 
 	// Create the plugin implementation, injecting command line options:
@@ -32,6 +33,7 @@ func main() {
 		CommandLineOpts: plugin.CommandLineOpts{
 			KubeClientQPS:   float32(*kubeClientQPS),
 			KubeClientBurst: *kubeClientBurst,
+			KubeConfigPath:  *kubeconfig,
 		},
 		LogCtx: utils.SetupLog(*logFormat),
 	}
