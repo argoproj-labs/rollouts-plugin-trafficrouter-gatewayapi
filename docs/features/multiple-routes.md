@@ -112,29 +112,41 @@ If you now start a canary deployment both routes will change to 10%, 50% and 100
 
 ## Working with GitOps controllers
 
-GitOps tools such as Argo CD continuously reconcile Gateway API resources and can revert the temporary weight changes that occur
-while a canary is progressing. The plugin automatically adds the label
-`rollouts.argoproj.io/gatewayapi-canary=in-progress` to every HTTPRoute/GRPCRoute/TCPRoute/TLSRoute it mutates so that you can
-configure your GitOps policy to ignore those resources during a rollout. The label disappears as soon as the stable service
-returns to 100% weight. You can customise the key/value or disable the feature altogether with the
-`inProgressLabelKey`, `inProgressLabelValue` and `disableInProgressLabel` fields under the plugin configuration.
+GitOps tools such as Argo CD continuously reconcile Gateway API resources and can revert the weight changes that occur while a
+canary is progressing. Configure your GitOps policy to ignore those weights.
+
 
 ### Argo CD `ignoreDifferences`
 
-When you use Argo CD (either through the Application CRD or its Helm chart), add the following snippet so that Argo CD skips the
-temporary rule edits while the `rollouts.argoproj.io/gatewayapi-canary` label is present:
+Ignore the weights directly. The expression is unconditional, so Argo CD evaluates it identically against the live object and
+the desired one.
+
+On an Argo CD Application:
+
+```yaml
+spec:
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jqPathExpressions:
+        - .spec.rules[].backendRefs[].weight
+```
+
+Or globally, through the Argo CD Helm chart:
 
 ```yaml
 configs:
   cm:
     resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
       jqPathExpressions:
-        - select(.metadata.labels["rollouts.argoproj.io/gatewayapi-canary"] == "in-progress") | .spec.rules
+        - .spec.rules[].backendRefs[].weight
 ```
 
-Duplicate the block for `GRPCRoute`, `TCPRoute` and `TLSRoute` if you manage those kinds as well. If you have customised the
-label key or value on the plugin, update the `jqPathExpressions` condition to match your configuration. The same structure applies
-when you configure `resource.customizations` directly on an Application manifest (outside of Helm).
+Duplicate the block for `GRPCRoute`, `TCPRoute` and `TLSRoute` if you manage those kinds as well.
+
+This ignores only the weight values, which the plugin owns. Everything else about your rules — matches, backendRef names,
+hostnames — stays under Argo CD's control.
+
 
 ## Automatic Route Discovery with Label Selectors
 

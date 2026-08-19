@@ -120,9 +120,11 @@ These smart rules will be created by Argo Rollouts and will be destroyed automat
       kind: HTTPRoute
       jqPathExpressions:
       - .spec.rules[] | select(.name == "canary-route1")
+      - .spec.rules[].backendRefs[].weight
     ```
 
-    Replace `canary-route1` with the managed route name(s) you defined in the Rollout's `managedRoutes` block. Alternatively you can ignore the whole resource using the [in-progress label](../quick-start.md#daily-task-perform-a-canary).
+    Replace `canary-route1` with the managed route name(s) you defined in the Rollout's `managedRoutes` block. Add one expression per managed route name.
+
 
 ## Using multiple routes with headers
 
