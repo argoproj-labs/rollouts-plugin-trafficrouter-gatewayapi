@@ -193,7 +193,7 @@ Notice that this setting applies **only** to the plugin process. The main Argo R
 
 ### Custom kubeconfig
 
-By default, the plugin uses the standard Kubernetes client configuration discovery. To specify a custom kubeconfig file path, use the `--kubeconfig` flag:
+By default, the plugin uses the standard Kubernetes client configuration discovery. To specify a custom kubeconfig file path, use the `-kubeconfig` flag:
 
 ```yaml
   trafficRouterPlugins: |-
