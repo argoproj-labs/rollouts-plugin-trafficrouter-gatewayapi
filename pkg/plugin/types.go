@@ -13,6 +13,7 @@ type CommandLineOpts struct {
 	KubeClientQPS   float32
 	KubeClientBurst int
 	KubeConfigPath  string
+	PluginAlias     string
 }
 
 type RpcPlugin struct {

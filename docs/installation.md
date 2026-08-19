@@ -204,3 +204,27 @@ By default, the plugin uses the standard Kubernetes client configuration discove
 ```
 
 This is useful when you need to target a different cluster than the one where Argo Rollouts is running.
+
+### Custom plugin alias
+
+By default, the plugin expects its configuration in the Rollout to be under `argoproj-labs/gatewayAPI`. If you need to use a different name (alias) in your Rollout configuration, use the `-pluginAlias` flag:
+
+```yaml
+  trafficRouterPlugins: |-
+    - name: "my-org/gatewayAPI"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/vX.X.X/gatewayapi-plugin-linux-amd64"
+      args:
+      - "-pluginAlias=my-org/gatewayAPI"
+```
+
+Then in your Rollout, use the same name:
+
+```yaml
+spec:
+  strategy:
+    canary:
+      trafficRouting:
+        plugins:
+          my-org/gatewayAPI:
+            httpRoute: my-route
+```

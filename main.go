@@ -26,6 +26,7 @@ func main() {
 	kubeClientBurst := flag.Int("kubeClientBurst", 10, "The Burst to use for the Kubernetes client.")
 	logFormat := flag.String("logformat", "text", "Set the logging format. One of: text|json")
 	kubeconfig := flag.String("kubeconfig", "", "Path to kubeconfig file. If not set, uses default discovery.")
+	pluginAlias := flag.String("pluginAlias", "", "Alias for the plugin name used in the Rollout configuration. Defaults to argoproj-labs/gatewayAPI.")
 	flag.Parse()
 
 	// Create the plugin implementation, injecting command line options:
@@ -34,6 +35,7 @@ func main() {
 			KubeClientQPS:   float32(*kubeClientQPS),
 			KubeClientBurst: *kubeClientBurst,
 			KubeConfigPath:  *kubeconfig,
+			PluginAlias:     *pluginAlias,
 		},
 		LogCtx: utils.SetupLog(*logFormat),
 	}

@@ -749,7 +749,7 @@ func TestCombinedSelectorAndExplicitRoute(t *testing.T) {
 	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config)
 
 	// Parse config to verify both are preserved
-	parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+	parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout, PluginName)
 	require.NoError(t, err)
 	assert.NotNil(t, parsedConfig.HTTPRouteSelector)
 	assert.Equal(t, "explicit-route", parsedConfig.HTTPRoute)
@@ -770,7 +770,7 @@ func TestNamespaceDefaulting(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
 
 		// Parse the config - this is where namespace defaulting should happen
-		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout, PluginName)
 
 		require.NoError(t, err)
 		// Before the fix, this would be empty string. After the fix, it should default to rollout's namespace.
@@ -788,7 +788,7 @@ func TestNamespaceDefaulting(t *testing.T) {
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
 
 		// Parse the config
-		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout, PluginName)
 
 		require.NoError(t, err)
 		// Should use the explicitly specified namespace, not the rollout's namespace
@@ -804,7 +804,7 @@ func TestNamespaceDefaulting(t *testing.T) {
 		rolloutNamespace := "another-namespace"
 		rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, config, rolloutNamespace)
 
-		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout)
+		parsedConfig, err := getGatewayAPITrafficRoutingConfig(rollout, PluginName)
 
 		require.NoError(t, err)
 		assert.Equal(t, rolloutNamespace, parsedConfig.Namespace, "Empty namespace should default to rollout's namespace")
@@ -2653,4 +2653,81 @@ users:
 	assert.Empty(t, rpcErr.ErrorString)
 	assert.NotNil(t, rpcPluginImp.GatewayAPIClientset)
 	assert.NotNil(t, rpcPluginImp.Clientset)
+}
+
+// TestGetPluginName_DefaultPluginName tests that getPluginName returns the default
+// PluginName constant when no alias is configured.
+func TestGetPluginName_DefaultPluginName(t *testing.T) {
+	rpcPlugin := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{},
+	}
+
+	result := rpcPlugin.getPluginName()
+
+	assert.Equal(t, PluginName, result)
+}
+
+// TestGetPluginName_WithAlias tests that getPluginName returns the configured alias
+// when PluginAlias is set.
+func TestGetPluginName_WithAlias(t *testing.T) {
+	customAlias := "my-org/gatewayAPI"
+	rpcPlugin := &RpcPlugin{
+		CommandLineOpts: CommandLineOpts{
+			PluginAlias: customAlias,
+		},
+	}
+
+	result := rpcPlugin.getPluginName()
+
+	assert.Equal(t, customAlias, result)
+}
+
+// TestSetWeight_WithPluginAlias tests that SetWeight works correctly when using
+// a custom plugin alias.
+func TestSetWeight_WithPluginAlias(t *testing.T) {
+	customAlias := "my-org/gatewayAPI"
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(&mocks.HTTPRouteObj),
+		CommandLineOpts: CommandLineOpts{
+			PluginAlias: customAlias,
+		},
+	}
+
+	// Create rollout with custom alias as the plugin key
+	var desiredWeight int32 = 30
+	config := &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	}
+	encodedConfig, err := json.Marshal(config)
+	require.NoError(t, err)
+
+	rollout := &v1alpha1.Rollout{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rollout",
+			Namespace: mocks.RolloutNamespace,
+		},
+		Spec: v1alpha1.RolloutSpec{
+			Strategy: v1alpha1.RolloutStrategy{
+				Canary: &v1alpha1.CanaryStrategy{
+					StableService: mocks.StableServiceName,
+					CanaryService: mocks.CanaryServiceName,
+					TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+						Plugins: map[string]json.RawMessage{
+							customAlias: encodedConfig, // Use custom alias as key
+						},
+					},
+				},
+			},
+		},
+	}
+
+	rpcErr := rpcPluginImp.SetWeight(rollout, desiredWeight, []v1alpha1.WeightDestination{})
+
+	assert.Empty(t, rpcErr.ErrorString)
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	assert.Equal(t, 100-desiredWeight, *(updatedHTTP.Spec.Rules[0].BackendRefs[0].Weight))
+	assert.Equal(t, desiredWeight, *(updatedHTTP.Spec.Rules[0].BackendRefs[1].Weight))
 }
