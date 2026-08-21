@@ -153,6 +153,25 @@ func (r *RpcPlugin) SetHeaderRoute(rollout *v1alpha1.Rollout, headerRouting *v1a
 }
 
 func (r *RpcPlugin) SetMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute) pluginTypes.RpcError {
+	gatewayAPIConfig, err := r.getGatewayAPIConfigWithDiscovery(rollout)
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	if gatewayAPIConfig.HTTPRoutes != nil {
+		r.LogCtx.Info(fmt.Sprintf("[SetMirrorRoute] plugin %q controls HTTPRoutes: %v", PluginName, getGatewayAPIRouteNameList(gatewayAPIConfig.HTTPRoutes)))
+		rpcError := forEachGatewayAPIRoute(gatewayAPIConfig.HTTPRoutes, func(route HTTPRoute) pluginTypes.RpcError {
+			if !route.UseHeaderRoutes {
+				return pluginTypes.RpcError{}
+			}
+			gatewayAPIConfig.HTTPRoute = route.Name
+			return r.setHTTPMirrorRoute(rollout, setMirrorRoute, gatewayAPIConfig)
+		})
+		if rpcError.HasError() {
+			return rpcError
+		}
+	}
 	return pluginTypes.RpcError{}
 }
 
