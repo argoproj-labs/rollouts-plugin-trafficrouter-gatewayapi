@@ -79,7 +79,7 @@ func TestGetKubeConfig_WithEmptyPath(t *testing.T) {
 func TestGetKubeConfig_WithInvalidPath(t *testing.T) {
 	config, err := GetKubeConfig("/nonexistent/path/to/kubeconfig")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, config)
 }
 
@@ -93,7 +93,7 @@ func TestGetKubeConfig_WithMalformedKubeconfig(t *testing.T) {
 
 	config, err := GetKubeConfig(kubeconfigPath)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, config)
 }
 
@@ -107,7 +107,7 @@ func TestGetKubeConfig_WithEmptyKubeconfig(t *testing.T) {
 	config, err := GetKubeConfig(kubeconfigPath)
 
 	// Empty kubeconfig should result in an error (no context set)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, config)
 }
 
@@ -129,6 +129,6 @@ users: []
 
 	config, err := GetKubeConfig(kubeconfigPath)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, config)
 }
