@@ -226,7 +226,7 @@ func (r *RpcPlugin) setHTTPMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute
 // setHTTPMirrorRouteAsFilter adds/removes a RequestMirror filter on the existing
 // weighted rules. Both weighted routing and mirroring apply to the same traffic.
 func (r *RpcPlugin) setHTTPMirrorRouteAsFilter(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
-	if setMirrorRoute.Match == nil || len(setMirrorRoute.Match) == 0 {
+	if len(setMirrorRoute.Match) == 0 {
 		return r.removeHTTPMirrorFilter(rollout, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
@@ -303,7 +303,7 @@ func (r *RpcPlugin) removeHTTPMirrorFilter(rollout *v1alpha1.Rollout, gatewayAPI
 // criteria and a RequestMirror filter. Traffic matching the rule goes to stable
 // and is mirrored to canary; other traffic follows the normal weighted rules.
 func (r *RpcPlugin) setHTTPMirrorRouteAsRule(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
-	if setMirrorRoute.Match == nil || len(setMirrorRoute.Match) == 0 {
+	if len(setMirrorRoute.Match) == 0 {
 		return r.removeHTTPMirrorRule(setMirrorRoute.Name, gatewayAPIConfig)
 	}
 	ctx := context.TODO()
