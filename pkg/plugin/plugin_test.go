@@ -2513,3 +2513,68 @@ func TestSetHTTPHeaderRouteSameHeaderNameDifferentValuesCoexist(t *testing.T) {
 	require.Len(t, route2.Matches[0].Headers, 1)
 	assert.Equal(t, "internal", route2.Matches[0].Headers[0].Value)
 }
+
+// TestSetHTTPRouteWeightSkipsUnchangedUpdate reproduces issue #230:
+// https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/issues/230
+func TestSetHTTPRouteWeightSkipsUnchangedUpdate(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+	gatewayClient := gwFake.NewSimpleClientset(httpRoute)
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gatewayClient,
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	require.Empty(t, err.Error())
+
+	countUpdates := func() int {
+		updates := 0
+		for _, action := range gatewayClient.Actions() {
+			if action.GetVerb() == "update" && action.GetResource().Resource == "httproutes" {
+				updates++
+			}
+		}
+		return updates
+	}
+	require.Equal(t, 1, countUpdates(), "the initial weight and label change must update the HTTPRoute")
+
+	err = rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	require.Empty(t, err.Error())
+	require.Equal(t, 1, countUpdates(), "an unchanged desired state must not update the HTTPRoute again")
+}
+
+func TestSetHTTPRouteWeightUpdatesChangedLabelWhenWeightsAreUnchanged(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+	stableWeight := int32(70)
+	canaryWeight := int32(30)
+	httpRoute.Spec.Rules[0].BackendRefs[0].Weight = &stableWeight
+	httpRoute.Spec.Rules[0].BackendRefs[1].Weight = &canaryWeight
+	gatewayClient := gwFake.NewSimpleClientset(httpRoute)
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gatewayClient,
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	require.Empty(t, err.Error())
+
+	updates := 0
+	for _, action := range gatewayClient.Actions() {
+		if action.GetVerb() == "update" && action.GetResource().Resource == "httproutes" {
+			updates++
+		}
+	}
+	require.Equal(t, 1, updates, "a changed in-progress label must update the HTTPRoute")
+
+	updatedHTTPRoute, getErr := gatewayClient.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Equal(t, defaults.InProgressLabelValue, updatedHTTPRoute.Labels[defaults.InProgressLabelKey])
+}

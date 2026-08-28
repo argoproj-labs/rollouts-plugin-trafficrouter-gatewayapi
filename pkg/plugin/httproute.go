@@ -8,6 +8,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/argoproj/argo-rollouts/utils/weightutil"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -26,6 +27,7 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		if err != nil {
 			return err
 		}
+		originalSpec := httpRoute.Spec.DeepCopy()
 
 		// Only rules containing BOTH the canary and stable BackendRefs are weight-split
 		// rules under this plugin's control. A rule referencing just one of them (e.g. a
@@ -51,7 +53,11 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			r.LogCtx.Error(err, "Failed to handle experiment services")
 		}
 
-		ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)
+		labelModified := ensureInProgressLabel(httpRoute, desiredWeight, gatewayAPIConfig)
+
+		if apiequality.Semantic.DeepEqual(originalSpec, &httpRoute.Spec) && !labelModified {
+			return nil
+		}
 
 		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
 		return err
