@@ -35,6 +35,10 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		if err != nil {
 			return err
 		}
+		weightedRules = filterRulesByName(weightedRules, gatewayAPIConfig.GRPCRouteRuleName)
+		if len(weightedRules) == 0 {
+			return errors.New(RuleNameNotFoundInGRPCRouteError)
+		}
 		for _, rule := range weightedRules {
 			for j := range rule.BackendRefs {
 				switch string(rule.BackendRefs[j].Name) {
@@ -88,6 +92,10 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		sourceRules, err := getAllRouteRules(grpcRouteRuleList, backendRefNameList...)
 		if err != nil {
 			return err
+		}
+		sourceRules = filterRulesByName(sourceRules, gatewayAPIConfig.GRPCRouteRuleName)
+		if len(sourceRules) == 0 {
+			return errors.New(RuleNameNotFoundInGRPCRouteError)
 		}
 
 		// Build one managed header rule per source rule so that the canary header
@@ -278,6 +286,13 @@ func (r GRPCRouteRuleList) Iterator() (GatewayAPIRouteRuleListIterator[*GRPCBack
 
 func (r GRPCRouteRuleList) Error() error {
 	return errors.New(BackendRefWasNotFoundInGRPCRouteError)
+}
+
+func (r *GRPCRouteRule) GetRuleName() string {
+	if r.Name == nil {
+		return ""
+	}
+	return string(*r.Name)
 }
 
 func (r *GRPCBackendRef) GetName() string {

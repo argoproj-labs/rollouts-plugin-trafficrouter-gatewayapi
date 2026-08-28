@@ -26,6 +26,18 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		}
 
 		routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
+		if gatewayAPIConfig.TCPRouteRuleName != "" {
+			filtered := make(TCPRouteRuleList, 0, len(routeRuleList))
+			for _, rule := range routeRuleList {
+				if rule.Name != nil && string(*rule.Name) == gatewayAPIConfig.TCPRouteRuleName {
+					filtered = append(filtered, rule)
+				}
+			}
+			if len(filtered) == 0 {
+				return errors.New(RuleNameNotFoundInTCPRouteError)
+			}
+			routeRuleList = filtered
+		}
 		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
 		if err != nil {
 			return err
@@ -93,4 +105,11 @@ func (r *TCPBackendRef) GetName() string {
 
 func (r TCPRoute) GetName() string {
 	return r.Name
+}
+
+func (r *TCPRouteRule) GetRuleName() string {
+	if r.Name == nil {
+		return ""
+	}
+	return string(*r.Name)
 }

@@ -25,15 +25,31 @@ type GatewayAPITrafficRouting struct {
 	// HTTPRoute refers to the name of the HTTPRoute used to route traffic to the
 	// service
 	HTTPRoute string `json:"httpRoute,omitempty"`
+	// HTTPRouteRuleName restricts weight/header management for the singular HTTPRoute
+	// above to the rule with this Name, instead of every rule containing both the
+	// canary and stable BackendRefs
+	HTTPRouteRuleName string `json:"httpRouteRuleName,omitempty"`
 	// GRPCRoute refers to the name of the GRPCRoute used to route traffic to the
 	// service
 	GRPCRoute string `json:"grpcRoute,omitempty"`
+	// GRPCRouteRuleName restricts weight/header management for the singular GRPCRoute
+	// above to the rule with this Name, instead of every rule containing both the
+	// canary and stable BackendRefs
+	GRPCRouteRuleName string `json:"grpcRouteRuleName,omitempty"`
 	// TCPRoute refers to the name of the TCPRoute used to route traffic to the
 	// service
 	TCPRoute string `json:"tcpRoute,omitempty"`
+	// TCPRouteRuleName restricts weight management for the singular TCPRoute above to
+	// the rule with this Name, instead of searching every rule for the canary/stable
+	// BackendRefs
+	TCPRouteRuleName string `json:"tcpRouteRuleName,omitempty"`
 	// TLSRoute refers to the name of the TLSRoute used to route traffic to the
 	// service
 	TLSRoute string `json:"tlsRoute,omitempty"`
+	// TLSRouteRuleName restricts weight management for the singular TLSRoute above to
+	// the rule with this Name, instead of searching every rule for the canary/stable
+	// BackendRefs
+	TLSRouteRuleName string `json:"tlsRouteRuleName,omitempty"`
 	// Namespace refers to the namespace of the specified resource
 	Namespace string `json:"namespace,omitempty"`
 	// HTTPRoutes refer to names of HTTPRoute resources used to route traffic to the
@@ -70,6 +86,9 @@ type HTTPRoute struct {
 	// UseHeaderRoutes defines header routes will be added to this route or not
 	// during setHeaderRoute step
 	UseHeaderRoutes bool `json:"useHeaderRoutes,omitempty"`
+	// RuleName restricts weight/header management to the rule with this Name,
+	// instead of every rule containing both the canary and stable BackendRefs
+	RuleName string `json:"ruleName,omitempty"`
 }
 
 type TCPRoute struct {
@@ -78,6 +97,9 @@ type TCPRoute struct {
 	// UseHeaderRoutes indicates header routes will be added to this route or not
 	// during setHeaderRoute step
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+	// RuleName restricts weight management to the rule with this Name, instead of
+	// searching every rule for the canary/stable BackendRefs
+	RuleName string `json:"ruleName,omitempty"`
 }
 
 type GRPCRoute struct {
@@ -86,6 +108,9 @@ type GRPCRoute struct {
 	// UseHeaderRoutes indicates header routes will be added to this route or not
 	// during setHeaderRoute step
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+	// RuleName restricts weight/header management to the rule with this Name,
+	// instead of every rule containing both the canary and stable BackendRefs
+	RuleName string `json:"ruleName,omitempty"`
 }
 
 type TLSRoute struct {
@@ -94,6 +119,9 @@ type TLSRoute struct {
 	// UseHeaderRoutes indicates header routes will be added to this route or not
 	// during setHeaderRoute step
 	UseHeaderRoutes bool `json:"useHeaderRoutes"`
+	// RuleName restricts weight management to the rule with this Name, instead of
+	// searching every rule for the canary/stable BackendRefs
+	RuleName string `json:"ruleName,omitempty"`
 }
 
 type HTTPRouteRule gatewayv1.HTTPRouteRule
@@ -128,6 +156,7 @@ type GatewayAPIRoute interface {
 type GatewayAPIRouteRule[T1 GatewayAPIBackendRef] interface {
 	*HTTPRouteRule | *GRPCRouteRule | *TCPRouteRule | *TLSRouteRule
 	Iterator() (GatewayAPIRouteRuleIterator[T1], bool)
+	GetRuleName() string
 }
 
 type GatewayAPIRouteRuleList[T1 GatewayAPIBackendRef, T2 GatewayAPIRouteRule[T1]] interface {

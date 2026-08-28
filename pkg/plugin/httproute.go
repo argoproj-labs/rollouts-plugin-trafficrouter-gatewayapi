@@ -35,6 +35,10 @@ func (r *RpcPlugin) setHTTPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		if err != nil {
 			return err
 		}
+		weightedRules = filterRulesByName(weightedRules, gatewayAPIConfig.HTTPRouteRuleName)
+		if len(weightedRules) == 0 {
+			return errors.New(RuleNameNotFoundInHTTPRouteError)
+		}
 		for _, rule := range weightedRules {
 			for j := range rule.BackendRefs {
 				switch string(rule.BackendRefs[j].Name) {
@@ -93,6 +97,10 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 		sourceRules, err := getAllRouteRules(httpRouteRuleList, backendRefNameList...)
 		if err != nil {
 			return err
+		}
+		sourceRules = filterRulesByName(sourceRules, gatewayAPIConfig.HTTPRouteRuleName)
+		if len(sourceRules) == 0 {
+			return errors.New(RuleNameNotFoundInHTTPRouteError)
 		}
 
 		// Build one managed header rule per source rule so that the canary header
@@ -285,6 +293,13 @@ func (r HTTPRouteRuleList) Iterator() (GatewayAPIRouteRuleListIterator[*HTTPBack
 
 func (r HTTPRouteRuleList) Error() error {
 	return errors.New(BackendRefWasNotFoundInHTTPRouteError)
+}
+
+func (r *HTTPRouteRule) GetRuleName() string {
+	if r.Name == nil {
+		return ""
+	}
+	return string(*r.Name)
 }
 
 func (r *HTTPBackendRef) GetName() string {

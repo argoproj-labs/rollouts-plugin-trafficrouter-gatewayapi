@@ -26,6 +26,18 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		}
 
 		routeRuleList := TLSRouteRuleList(tlsRoute.Spec.Rules)
+		if gatewayAPIConfig.TLSRouteRuleName != "" {
+			filtered := make(TLSRouteRuleList, 0, len(routeRuleList))
+			for _, rule := range routeRuleList {
+				if rule.Name != nil && string(*rule.Name) == gatewayAPIConfig.TLSRouteRuleName {
+					filtered = append(filtered, rule)
+				}
+			}
+			if len(filtered) == 0 {
+				return errors.New(RuleNameNotFoundInTLSRouteError)
+			}
+			routeRuleList = filtered
+		}
 		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
 		if err != nil {
 			return err
@@ -93,4 +105,11 @@ func (r *TLSBackendRef) GetName() string {
 
 func (r TLSRoute) GetName() string {
 	return r.Name
+}
+
+func (r *TLSRouteRule) GetRuleName() string {
+	if r.Name == nil {
+		return ""
+	}
+	return string(*r.Name)
 }

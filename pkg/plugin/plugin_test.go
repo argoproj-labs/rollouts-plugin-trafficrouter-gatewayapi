@@ -18,6 +18,7 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
 
 	goPlugin "github.com/hashicorp/go-plugin"
@@ -2512,4 +2513,342 @@ func TestSetHTTPHeaderRouteSameHeaderNameDifferentValuesCoexist(t *testing.T) {
 	require.Len(t, route2.Matches, 1)
 	require.Len(t, route2.Matches[0].Headers, 1)
 	assert.Equal(t, "internal", route2.Matches[0].Headers[0].Value)
+}
+
+// TestSetWeightWithRuleNameOnlyUpdatesNamedRule covers the motivating case for the ruleName
+// option: an HTTPRoute has a "live" rule that carries the canary/stable split plus a third,
+// unrelated static backend (e.g. a fixed 5% side-tap to a discovery service), and a second,
+// otherwise-unreachable "argo" rule that shares the same stable/canary backend names purely so
+// the plugin has a rule it can freely rewrite. Without ruleName both rules would be matched and
+// rewritten by getAllRouteRules; with ruleName set, only the named rule may change.
+func TestSetWeightWithRuleNameOnlyUpdatesNamedRule(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	discoveryPort := gatewayv1.PortNumber(80)
+	discoveryWeight := int32(5)
+	httpRoute.Spec.Rules[0].BackendRefs = append(httpRoute.Spec.Rules[0].BackendRefs, gatewayv1.HTTPBackendRef{
+		BackendRef: gatewayv1.BackendRef{
+			BackendObjectReference: gatewayv1.BackendObjectReference{
+				Name: "discovery-service",
+				Port: &discoveryPort,
+			},
+			Weight: &discoveryWeight,
+		},
+	})
+
+	argoRuleName := gatewayv1.SectionName("argo")
+	argoPort := gatewayv1.PortNumber(80)
+	argoStableWeight := int32(100)
+	argoCanaryWeight := int32(0)
+	httpRoute.Spec.Rules = append(httpRoute.Spec.Rules, gatewayv1.HTTPRouteRule{
+		Name: &argoRuleName,
+		BackendRefs: []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.StableServiceName,
+						Port: &argoPort,
+					},
+					Weight: &argoStableWeight,
+				},
+			},
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.CanaryServiceName,
+						Port: &argoPort,
+					},
+					Weight: &argoCanaryWeight,
+				},
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace:         mocks.RolloutNamespace,
+		HTTPRoute:         mocks.HTTPRouteName,
+		HTTPRouteRuleName: "argo",
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	assert.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedHTTP.Spec.Rules, 2)
+
+	liveRule := updatedHTTP.Spec.Rules[0]
+	require.Len(t, liveRule.BackendRefs, 3, "the live rule's backends must not be added to or removed")
+	assert.Equal(t, int32(100), *liveRule.BackendRefs[0].Weight, "ruleName must protect the live rule's stable weight")
+	assert.Equal(t, int32(0), *liveRule.BackendRefs[1].Weight, "ruleName must protect the live rule's canary weight")
+	assert.Equal(t, int32(5), *liveRule.BackendRefs[2].Weight, "ruleName must protect the live rule's discovery weight")
+
+	argoRule := updatedHTTP.Spec.Rules[1]
+	require.NotNil(t, argoRule.Name)
+	assert.Equal(t, "argo", string(*argoRule.Name))
+	assert.Equal(t, int32(70), *argoRule.BackendRefs[0].Weight, "the named rule's stable weight must be updated")
+	assert.Equal(t, int32(30), *argoRule.BackendRefs[1].Weight, "the named rule's canary weight must be updated")
+}
+
+// TestSetWeightRuleNameNotFoundReturnsError covers the list ("httpRoutes") config form and
+// verifies that a ruleName which matches no rule containing both the canary and stable
+// BackendRefs surfaces a clear error rather than silently doing nothing.
+func TestSetWeightRuleNameNotFoundReturnsError(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoutes: []HTTPRoute{
+			{Name: mocks.HTTPRouteName, RuleName: "does-not-exist"},
+		},
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 30, []v1alpha1.WeightDestination{})
+	assert.Equal(t, RuleNameNotFoundInHTTPRouteError, err.ErrorString)
+}
+
+// TestSetHTTPHeaderRouteWithRuleNameUsesOnlyNamedSourceRule verifies that header-route rules
+// are generated only from the pinned rule when multiple rules contain the canary/stable
+// BackendRefs, mirroring the SetWeight guarantee for the SetHeaderRoute path.
+func TestSetHTTPHeaderRouteWithRuleNameUsesOnlyNamedSourceRule(t *testing.T) {
+	httpRoute := mocks.CreateHTTPRouteWithLabels(mocks.HTTPRouteName, nil)
+
+	argoRuleName := gatewayv1.SectionName("argo")
+	argoPort := gatewayv1.PortNumber(80)
+	argoStableWeight := int32(100)
+	argoCanaryWeight := int32(0)
+	httpRoute.Spec.Rules = append(httpRoute.Spec.Rules, gatewayv1.HTTPRouteRule{
+		Name: &argoRuleName,
+		BackendRefs: []gatewayv1.HTTPBackendRef{
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.StableServiceName,
+						Port: &argoPort,
+					},
+					Weight: &argoStableWeight,
+				},
+			},
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.CanaryServiceName,
+						Port: &argoPort,
+					},
+					Weight: &argoCanaryWeight,
+				},
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace:         mocks.RolloutNamespace,
+		HTTPRoute:         mocks.HTTPRouteName,
+		HTTPRouteRuleName: "argo",
+	})
+
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: "canary-header",
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "user-group", HeaderValue: &v1alpha1.StringMatch{Exact: "internal"}},
+		},
+	}
+
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	assert.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	// original unnamed rule + "argo" rule + exactly one generated header rule
+	require.Len(t, updatedHTTP.Spec.Rules, 3, "only one header rule must be generated, from the named source rule")
+
+	var headerRule *gatewayv1.HTTPRouteRule
+	for i := range updatedHTTP.Spec.Rules {
+		if updatedHTTP.Spec.Rules[i].Name != nil && string(*updatedHTTP.Spec.Rules[i].Name) == "canary-header" {
+			headerRule = &updatedHTTP.Spec.Rules[i]
+		}
+	}
+	require.NotNil(t, headerRule, "canary-header rule must have been generated from the argo rule")
+}
+
+// TestSetGRPCRouteWeightWithRuleName mirrors TestSetWeightWithRuleNameOnlyUpdatesNamedRule for
+// GRPCRoute: two rules share the stable/canary BackendRefs, and ruleName must restrict weight
+// changes to the named one.
+func TestSetGRPCRouteWeightWithRuleName(t *testing.T) {
+	grpcRoute := mocks.CreateGRPCRouteWithLabels(mocks.GRPCRouteName, nil)
+
+	argoRuleName := gatewayv1.SectionName("argo")
+	argoPort := gatewayv1.PortNumber(80)
+	argoStableWeight := int32(100)
+	argoCanaryWeight := int32(0)
+	grpcRoute.Spec.Rules = append(grpcRoute.Spec.Rules, gatewayv1.GRPCRouteRule{
+		Name: &argoRuleName,
+		BackendRefs: []gatewayv1.GRPCBackendRef{
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.StableServiceName,
+						Port: &argoPort,
+					},
+					Weight: &argoStableWeight,
+				},
+			},
+			{
+				BackendRef: gatewayv1.BackendRef{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: mocks.CanaryServiceName,
+						Port: &argoPort,
+					},
+					Weight: &argoCanaryWeight,
+				},
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace:         mocks.RolloutNamespace,
+		GRPCRoute:         mocks.GRPCRouteName,
+		GRPCRouteRuleName: "argo",
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 40, []v1alpha1.WeightDestination{})
+	assert.Empty(t, err.Error())
+
+	updatedGRPC, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedGRPC.Spec.Rules, 2)
+
+	baseRule := updatedGRPC.Spec.Rules[0]
+	assert.Equal(t, int32(100), *baseRule.BackendRefs[0].Weight, "ruleName must protect the base rule's stable weight")
+	assert.Equal(t, int32(0), *baseRule.BackendRefs[1].Weight, "ruleName must protect the base rule's canary weight")
+
+	argoRule := updatedGRPC.Spec.Rules[1]
+	assert.Equal(t, int32(60), *argoRule.BackendRefs[0].Weight)
+	assert.Equal(t, int32(40), *argoRule.BackendRefs[1].Weight)
+}
+
+// TestSetTCPRouteWeightWithRuleName covers the flat, non-rule-grouped TCPRoute weighting path:
+// ruleName must restrict getBackendRefs to the named rule instead of matching stable/canary
+// BackendRefs anywhere on the route.
+func TestSetTCPRouteWeightWithRuleName(t *testing.T) {
+	tcpRoute := mocks.CreateTCPRouteWithLabels(mocks.TCPRouteName, nil)
+
+	argoRuleName := gatewayv1.SectionName("argo")
+	argoPort := gatewayv1.PortNumber(80)
+	argoStableWeight := int32(100)
+	argoCanaryWeight := int32(0)
+	tcpRoute.Spec.Rules = append(tcpRoute.Spec.Rules, v1alpha2.TCPRouteRule{
+		Name: &argoRuleName,
+		BackendRefs: []v1alpha2.BackendRef{
+			{
+				BackendObjectReference: v1alpha2.BackendObjectReference{
+					Name: mocks.StableServiceName,
+					Port: &argoPort,
+				},
+				Weight: &argoStableWeight,
+			},
+			{
+				BackendObjectReference: v1alpha2.BackendObjectReference{
+					Name: mocks.CanaryServiceName,
+					Port: &argoPort,
+				},
+				Weight: &argoCanaryWeight,
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(tcpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace:        mocks.RolloutNamespace,
+		TCPRoute:         mocks.TCPRouteName,
+		TCPRouteRuleName: "argo",
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 25, []v1alpha1.WeightDestination{})
+	assert.Empty(t, err.Error())
+
+	updatedTCP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.TCPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedTCP.Spec.Rules, 2)
+
+	baseRule := updatedTCP.Spec.Rules[0]
+	assert.Equal(t, int32(100), *baseRule.BackendRefs[0].Weight, "ruleName must protect the base rule's stable weight")
+	assert.Equal(t, int32(0), *baseRule.BackendRefs[1].Weight, "ruleName must protect the base rule's canary weight")
+
+	argoRule := updatedTCP.Spec.Rules[1]
+	assert.Equal(t, int32(75), *argoRule.BackendRefs[0].Weight)
+	assert.Equal(t, int32(25), *argoRule.BackendRefs[1].Weight)
+}
+
+// TestSetTLSRouteWeightWithRuleName mirrors TestSetTCPRouteWeightWithRuleName for TLSRoute.
+func TestSetTLSRouteWeightWithRuleName(t *testing.T) {
+	tlsRoute := mocks.CreateTLSRouteWithLabels(mocks.TLSRouteName, nil)
+
+	argoRuleName := gatewayv1.SectionName("argo")
+	argoPort := gatewayv1.PortNumber(80)
+	argoStableWeight := int32(100)
+	argoCanaryWeight := int32(0)
+	tlsRoute.Spec.Rules = append(tlsRoute.Spec.Rules, v1alpha2.TLSRouteRule{
+		Name: &argoRuleName,
+		BackendRefs: []v1alpha2.BackendRef{
+			{
+				BackendObjectReference: v1alpha2.BackendObjectReference{
+					Name: mocks.StableServiceName,
+					Port: &argoPort,
+				},
+				Weight: &argoStableWeight,
+			},
+			{
+				BackendObjectReference: v1alpha2.BackendObjectReference{
+					Name: mocks.CanaryServiceName,
+					Port: &argoPort,
+				},
+				Weight: &argoCanaryWeight,
+			},
+		},
+	})
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(tlsRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace:        mocks.RolloutNamespace,
+		TLSRoute:         mocks.TLSRouteName,
+		TLSRouteRuleName: "argo",
+	})
+
+	err := rpcPluginImp.SetWeight(rollout, 10, []v1alpha1.WeightDestination{})
+	assert.Empty(t, err.Error())
+
+	updatedTLS, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.TLSRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedTLS.Spec.Rules, 2)
+
+	baseRule := updatedTLS.Spec.Rules[0]
+	assert.Equal(t, int32(100), *baseRule.BackendRefs[0].Weight, "ruleName must protect the base rule's stable weight")
+	assert.Equal(t, int32(0), *baseRule.BackendRefs[1].Weight, "ruleName must protect the base rule's canary weight")
+
+	argoRule := updatedTLS.Spec.Rules[1]
+	assert.Equal(t, int32(90), *argoRule.BackendRefs[0].Weight)
+	assert.Equal(t, int32(10), *argoRule.BackendRefs[1].Weight)
 }
