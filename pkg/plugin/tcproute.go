@@ -7,6 +7,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/argoproj/argo-rollouts/utils/weightutil"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
@@ -24,6 +25,7 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		if err != nil {
 			return err
 		}
+		originalSpec := tcpRoute.Spec.DeepCopy()
 
 		routeRuleList := TCPRouteRuleList(tcpRoute.Spec.Rules)
 		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
@@ -41,7 +43,11 @@ func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 			ref.Weight = &restWeight
 		}
 
-		ensureInProgressLabel(tcpRoute, desiredWeight, gatewayAPIConfig)
+		labelModified := ensureInProgressLabel(tcpRoute, desiredWeight, gatewayAPIConfig)
+
+		if apiequality.Semantic.DeepEqual(originalSpec, &tcpRoute.Spec) && !labelModified {
+			return nil
+		}
 
 		_, err = tcpRouteClient.Update(ctx, tcpRoute, metav1.UpdateOptions{})
 		return err

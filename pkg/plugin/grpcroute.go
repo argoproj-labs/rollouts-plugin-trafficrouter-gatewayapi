@@ -8,6 +8,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/argoproj/argo-rollouts/utils/weightutil"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -26,6 +27,7 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 		if err != nil {
 			return err
 		}
+		originalSpec := grpcRoute.Spec.DeepCopy()
 
 		// Only rules containing BOTH the canary and stable BackendRefs are weight-split
 		// rules under this plugin's control. A rule referencing just one of them (e.g. a
@@ -46,7 +48,11 @@ func (r *RpcPlugin) setGRPCRouteWeight(rollout *v1alpha1.Rollout, desiredWeight 
 			}
 		}
 
-		ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
+		labelModified := ensureInProgressLabel(grpcRoute, desiredWeight, gatewayAPIConfig)
+
+		if apiequality.Semantic.DeepEqual(originalSpec, &grpcRoute.Spec) && !labelModified {
+			return nil
+		}
 
 		_, err = grpcRouteClient.Update(ctx, grpcRoute, metav1.UpdateOptions{})
 		return err

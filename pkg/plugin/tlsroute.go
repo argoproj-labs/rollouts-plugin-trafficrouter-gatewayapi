@@ -7,6 +7,7 @@ import (
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	pluginTypes "github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"github.com/argoproj/argo-rollouts/utils/weightutil"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
@@ -24,6 +25,7 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 		if err != nil {
 			return err
 		}
+		originalSpec := tlsRoute.Spec.DeepCopy()
 
 		routeRuleList := TLSRouteRuleList(tlsRoute.Spec.Rules)
 		canaryBackendRefs, err := getBackendRefs(canaryServiceName, routeRuleList)
@@ -41,7 +43,11 @@ func (r *RpcPlugin) setTLSRouteWeight(rollout *v1alpha1.Rollout, desiredWeight i
 			ref.Weight = &restWeight
 		}
 
-		ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
+		labelModified := ensureInProgressLabel(tlsRoute, desiredWeight, gatewayAPIConfig)
+
+		if apiequality.Semantic.DeepEqual(originalSpec, &tlsRoute.Spec) && !labelModified {
+			return nil
+		}
 
 		_, err = tlsRouteClient.Update(ctx, tlsRoute, metav1.UpdateOptions{})
 		return err
