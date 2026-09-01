@@ -11,6 +11,15 @@ on:
   push:
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
+  # Build (but don't push) the image on PRs that could affect it, so a broken
+  # Dockerfile/go.mod mismatch is caught before merge instead of at release time.
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - '**.go'
 
 env:
   # Use docker.io for Docker Hub if empty
