@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httproute-pingpong-header
+  namespace: default
+spec:
+  (length(rules)): 2
+  rules:
+    - backendRefs:
+        - name: httproute-pingpong-header-ping-service
+          (weight): 70
+        - name: httproute-pingpong-header-pong-service
+          (weight): 30
+    - name: canary-route1
+      matches:
+        - headers:
+            - name: X-Test
+              type: Exact
+              value: test
+      backendRefs:
+        - name: httproute-pingpong-header-pong-service

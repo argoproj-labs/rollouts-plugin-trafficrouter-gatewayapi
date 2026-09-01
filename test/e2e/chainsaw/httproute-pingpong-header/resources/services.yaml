@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-pingpong-header-ping-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-pingpong-header
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httproute-pingpong-header-pong-service
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: httproute-pingpong-header

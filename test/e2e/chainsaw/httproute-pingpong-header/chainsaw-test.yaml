@@ -1,0 +1,89 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-pingpong-header
+  labels:
+    route-type: http
+    test-scope: pingpong
+spec:
+  description: >
+    Verifies ping-pong traffic routing combined with header-based routing on a single
+    HTTPRoute. The plugin must resolve stable/canary purely from strategy.canary.pingPong
+    (no canaryService/stableService), inject a header-match rule (X-Test: test) pointing
+    at the current pingPong canary service during the rollout, remove it once the
+    rollout completes, and the stable/canary roles must swap between the ping and pong
+    services on each successful promotion.
+  # Uses 'default' namespace so the gateway (traefik-gateway) is accessible.
+  namespace: default
+  concurrent: true
+
+  steps:
+    - name: create-resources
+      description: Create the HTTPRoute and Rollout. The rollout uses pause:{duration:30s} so it self-promotes.
+      try:
+        - apply:
+            file: resources/services.yaml
+        - apply:
+            file: resources/httproute.yaml
+        - apply:
+            file: resources/rollout.yaml
+
+    - name: assert-initial-state
+      description: >
+        First reconcile promotes the initial revision as stable, which flips
+        pingPong so "ping" is stable (weight 100, implicit) and "pong" is canary (weight 0).
+      try:
+        - assert:
+            timeout: 30s
+            file: assertions/httproute-initial.yaml
+
+    - name: wait-for-initial-healthy
+      description: Wait for the initial rollout to reach Healthy before triggering a canary.
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: trigger-canary
+      description: Update the rollout image to start a canary (setWeight:30 -> setHeaderRoute -> pause:30s).
+      try:
+        - patch:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Rollout
+              metadata:
+                name: httproute-pingpong-header-rollout
+                namespace: default
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: rollouts-demo
+                        image: argoproj/rollouts-demo:green
+
+    - name: assert-header-routing-active
+      description: >
+        Plugin must split weight 70/30 between the current pingPong stable/canary
+        services ("ping" stays stable, "pong" is canary here) and add a header-match
+        rule (X-Test:test) pointing at the canary ("pong") service.
+      try:
+        - assert:
+            timeout: 2m
+            file: assertions/httproute-with-header-route.yaml
+
+    - name: assert-rollout-healthy
+      description: Wait for the canary to complete (30s pause auto-expires).
+      try:
+        - assert:
+            timeout: 5m
+            file: assertions/rollout-healthy.yaml
+
+    - name: assert-cleanup
+      description: >
+        Plugin must remove the header-match rule and reset canary weight to 0. Since
+        this promotion swapped the pingPong roles, "pong" is now stable and "ping"
+        is the (weight 0) canary — the mirror image of the initial state.
+      try:
+        - assert:
+            timeout: 60s
+            file: assertions/httproute-after-cleanup.yaml

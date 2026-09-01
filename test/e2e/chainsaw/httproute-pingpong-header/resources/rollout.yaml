@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: httproute-pingpong-header-rollout
+  namespace: default
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      pingPong:
+        pingService: httproute-pingpong-header-ping-service
+        pongService: httproute-pingpong-header-pong-service
+      trafficRouting:
+        managedRoutes:
+          - name: canary-route1
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoutes:
+              - name: httproute-pingpong-header
+                useHeaderRoutes: true
+            namespace: default
+      steps:
+        - setWeight: 30
+        - setHeaderRoute:
+            name: canary-route1
+            match:
+              - headerName: X-Test
+                headerValue:
+                  exact: test
+        - pause: {duration: 30s}   # auto-promotes — no promote command needed in tests
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: httproute-pingpong-header
+  template:
+    metadata:
+      labels:
+        app: httproute-pingpong-header
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:red
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

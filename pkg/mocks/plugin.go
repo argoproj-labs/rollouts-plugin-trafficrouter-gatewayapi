@@ -14,6 +14,8 @@ const (
 	TLSRoute          = "TLSRoute"
 	StableServiceName = "argo-rollouts-stable-service"
 	CanaryServiceName = "argo-rollouts-canary-service"
+	PingServiceName   = "argo-rollouts-ping-service"
+	PongServiceName   = "argo-rollouts-pong-service"
 	HTTPRouteName     = "argo-rollouts-http-route"
 	GRPCRouteName     = "argo-rollouts-grpc-route"
 	TCPRouteName      = "argo-rollouts-tcp-route"
@@ -309,4 +311,144 @@ var TLSRouteObj = v1alpha2.TLSRoute{
 			},
 		},
 	},
+}
+
+func CreateHTTPRouteWithPingPong(name string) *gatewayv1.HTTPRoute {
+	pingWeight := int32(100)
+	pongWeight := int32(0)
+	return &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: PingServiceName,
+									Port: &port,
+								},
+								Weight: &pingWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: PongServiceName,
+									Port: &port,
+								},
+								Weight: &pongWeight,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateGRPCRouteWithPingPong(name string) *gatewayv1.GRPCRoute {
+	pingWeight := int32(100)
+	pongWeight := int32(0)
+	return &gatewayv1.GRPCRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+		},
+		Spec: gatewayv1.GRPCRouteSpec{
+			Rules: []gatewayv1.GRPCRouteRule{
+				{
+					BackendRefs: []gatewayv1.GRPCBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: PingServiceName,
+									Port: &port,
+								},
+								Weight: &pingWeight,
+							},
+						},
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Name: PongServiceName,
+									Port: &port,
+								},
+								Weight: &pongWeight,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateTCPRouteWithPingPong(name string) *v1alpha2.TCPRoute {
+	pingWeight := int32(100)
+	pongWeight := int32(0)
+	return &v1alpha2.TCPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+		},
+		Spec: v1alpha2.TCPRouteSpec{
+			Rules: []v1alpha2.TCPRouteRule{
+				{
+					BackendRefs: []v1alpha2.BackendRef{
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: PingServiceName,
+								Port: &port,
+							},
+							Weight: &pingWeight,
+						},
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: PongServiceName,
+								Port: &port,
+							},
+							Weight: &pongWeight,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateTLSRouteWithPingPong(name string) *v1alpha2.TLSRoute {
+	pingWeight := int32(100)
+	pongWeight := int32(0)
+	return &v1alpha2.TLSRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: RolloutNamespace,
+		},
+		Spec: v1alpha2.TLSRouteSpec{
+			Rules: []v1alpha2.TLSRouteRule{
+				{
+					BackendRefs: []v1alpha2.BackendRef{
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: PingServiceName,
+								Port: &port,
+							},
+							Weight: &pingWeight,
+						},
+						{
+							BackendObjectReference: v1alpha2.BackendObjectReference{
+								Name: PongServiceName,
+								Port: &port,
+							},
+							Weight: &pongWeight,
+						},
+					},
+				},
+			},
+		},
+	}
 }

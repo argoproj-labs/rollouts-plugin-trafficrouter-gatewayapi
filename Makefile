@@ -7,7 +7,9 @@ CHAINSAW_VERSION=v0.2.15
 # Versions of components used in e2e tests
 GATEWAY_API_VERSION=v1.4.0
 # See more versions at https://artifacthub.io/packages/helm/argo/argo-rollouts
-ARGO_ROLLOUTS_HELM_VERSION=2.40.10 # Contains Argo Rollouts 1.9.0
+# Controller image tag is overridden to v1.10.0 in test/cluster-setup/argo-rollouts-values.yml
+# (no chart with that appVersion exists yet; needed for pingPong support).
+ARGO_ROLLOUTS_HELM_VERSION=2.41.1 # Chart's appVersion is 1.9.1, controller image pinned to v1.10.0
 # See more versions at https://artifacthub.io/packages/helm/traefik/traefik
 TRAEFIK_HELM_VERSION=37.4.0 # Contains Traefik proxy v3.6.2
 

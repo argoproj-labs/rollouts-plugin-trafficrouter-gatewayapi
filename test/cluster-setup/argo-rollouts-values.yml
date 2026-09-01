@@ -4,6 +4,12 @@ controller:
 
   replicas: 1
 
+  # Pin the controller image to a release newer than the chart's appVersion.
+  # Needed for pingPong (argoproj/argo-rollouts#4740), first shipped in v1.10.0 —
+  # no Helm chart with that appVersion exists yet.
+  image:
+    tag: v1.10.0
+
   logging:
     level: debug
 

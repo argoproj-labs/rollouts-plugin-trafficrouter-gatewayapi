@@ -241,7 +241,7 @@ func TestHandleExperimentUsesMaxTrafficWeight(t *testing.T) {
 		{ServiceName: "exp-svc-2", Weight: 30000},
 	}
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, httpRoute, destinations)
+	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(50000), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
@@ -261,7 +261,7 @@ func TestHandleExperimentPreservesCanaryWeight(t *testing.T) {
 		{ServiceName: "exp-svc-2", Weight: 10},
 	}
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, httpRoute, destinations)
+	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(60), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
@@ -284,7 +284,7 @@ func TestHandleExperimentFloorsStableWeightWhenExperimentWeightsExceedMaxTraffic
 		{ServiceName: "exp-svc-2", Weight: 50000},
 	}
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, httpRoute, destinations)
+	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
 	require.NoError(t, err)
 	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 4)
@@ -306,7 +306,7 @@ func TestHandleExperimentCleanupRestoresMaxTrafficWeight(t *testing.T) {
 		backendRef("exp-svc", 30000),
 	)
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, httpRoute, nil)
+	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
 
 	require.NoError(t, err)
 	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 2)
@@ -330,7 +330,7 @@ func TestHandleExperimentCleansUpBeforeCurrentExperimentIsCleared(t *testing.T) 
 		backendRef("exp-svc-2", 10),
 	)
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, httpRoute, nil)
+	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
 
 	require.NoError(t, err)
 	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
