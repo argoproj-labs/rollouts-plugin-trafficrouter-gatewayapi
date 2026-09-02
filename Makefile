@@ -5,7 +5,8 @@ IS_E2E_CLUSTER=$(shell kind get clusters | grep -e "^${E2E_CLUSTER_NAME}$$")
 CHAINSAW_VERSION=v0.2.15
 
 # Versions of components used in e2e tests
-GATEWAY_API_VERSION=v1.4.0
+KIND_NODE_IMAGE=kindest/node:v1.34.0
+GATEWAY_API_VERSION=v1.6.1
 # See more versions at https://artifacthub.io/packages/helm/argo/argo-rollouts
 ARGO_ROLLOUTS_HELM_VERSION=2.43.0 # Contains Argo Rollouts v1.10.0
 # See more versions at https://artifacthub.io/packages/helm/traefik/traefik
@@ -63,7 +64,7 @@ coverage:
 setup-e2e-cluster:
 	make BIN_NAME=gatewayapi-plugin-linux-amd64 GOOS=linux GOARCH=amd64 gatewayapi-plugin-build
 ifeq (${IS_E2E_CLUSTER},)
-	kind create cluster --name ${E2E_CLUSTER_NAME} --config ./test/cluster-setup/cluster-config.yml
+	kind create cluster --name ${E2E_CLUSTER_NAME} --image ${KIND_NODE_IMAGE} --config ./test/cluster-setup/cluster-config.yml
 	$(call add_helm_repo)
 	$(call setup_cluster)
 endif

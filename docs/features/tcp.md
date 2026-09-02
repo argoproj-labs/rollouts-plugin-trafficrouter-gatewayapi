@@ -3,13 +3,13 @@
 To use TCPRoute:
 
 1. Install your traffic provider
-2. Install [GatewayAPI CRD](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api) if your traffic provider doesn't do it by default
+2. Install [GatewayAPI CRD](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api) v1.6.0 or later if your traffic provider doesn't do it by default (TCPRoute requires the `v1` API version, available since Gateway API v1.6.0)
 3. Install [Argo Rollouts](https://argoproj.github.io/argo-rollouts/installation/)
 4. Install [Argo Rollouts GatewayAPI plugin](../installation.md)
 5. Create stable and canary services
 6. Create TCPRoute resource according to the GatewayAPI and your traffic provider documentation
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TCPRoute
 metadata:
   name: first-tcproute

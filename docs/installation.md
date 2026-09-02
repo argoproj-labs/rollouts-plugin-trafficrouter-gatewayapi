@@ -114,7 +114,7 @@ rules:
     resources: ["httproutes", "grpcroutes"]
     verbs: ["get", "list", "update", "patch"]
 
-  # Gateway API v1alpha2 resources
+  # Gateway API v1 resources (requires Gateway API v1.6.0 or later)
   - apiGroups: ["gateway.networking.k8s.io"]
     resources: ["tcproutes", "tlsroutes"]
     verbs: ["get", "list", "update", "patch"]
@@ -139,7 +139,7 @@ rules:
     resources: ["httproutes", "grpcroutes"]
     verbs: ["get", "list", "update", "patch"]
 
-  # Gateway API v1alpha2 resources
+  # Gateway API v1 resources (requires Gateway API v1.6.0 or later)
   - apiGroups: ["gateway.networking.k8s.io"]
     resources: ["tcproutes", "tlsroutes"]
     verbs: ["get", "list", "update", "patch"]

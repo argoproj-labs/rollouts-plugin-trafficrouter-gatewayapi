@@ -5,7 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
@@ -100,17 +99,17 @@ type HTTPRouteRule gatewayv1.HTTPRouteRule
 
 type GRPCRouteRule gatewayv1.GRPCRouteRule
 
-type TCPRouteRule v1alpha2.TCPRouteRule
+type TCPRouteRule gatewayv1.TCPRouteRule
 
-type TLSRouteRule v1alpha2.TLSRouteRule
+type TLSRouteRule gatewayv1.TLSRouteRule
 
 type HTTPRouteRuleList []gatewayv1.HTTPRouteRule
 
 type GRPCRouteRuleList []gatewayv1.GRPCRouteRule
 
-type TCPRouteRuleList []v1alpha2.TCPRouteRule
+type TCPRouteRuleList []gatewayv1.TCPRouteRule
 
-type TLSRouteRuleList []v1alpha2.TLSRouteRule
+type TLSRouteRuleList []gatewayv1.TLSRouteRule
 
 type HTTPBackendRef gatewayv1.HTTPBackendRef
 

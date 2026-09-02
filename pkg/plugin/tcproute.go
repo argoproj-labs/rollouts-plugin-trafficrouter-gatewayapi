@@ -15,7 +15,7 @@ import (
 
 func (r *RpcPlugin) setTCPRouteWeight(rollout *v1alpha1.Rollout, desiredWeight int32, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
-	tcpRouteClient := r.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(gatewayAPIConfig.Namespace)
+	tcpRouteClient := r.GatewayAPIClientset.GatewayV1().TCPRoutes(gatewayAPIConfig.Namespace)
 
 	stableServiceName, canaryServiceName := trafficrouting.GetStableAndCanaryServices(rollout, true)
 	restWeight := weightutil.MaxTrafficWeight(rollout) - desiredWeight

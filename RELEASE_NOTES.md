@@ -1,5 +1,13 @@
 # Changes
 
+## ⚠️ Breaking change: TCPRoute/TLSRoute now use the `v1` API version
+
+`TCPRoute` and `TLSRoute` support was promoted from `v1alpha2` to `v1` in [Gateway API v1.6.0](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.0), and the plugin now talks to the `v1` API for these resource types. **Before upgrading the plugin, make sure your cluster's Gateway API CRDs are upgraded to v1.6.0 or later** (`kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml`), otherwise `setWeight` for TCPRoute/TLSRoute will fail with an error such as:
+
+```
+failed to set weight via plugin: the server could not find the requested resource (get tcproutes.gateway.networking.k8s.io ...)
+```
+
 ## Ping pong (alternating stable with preview)
 
 Added support for the [pingPong](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/features/ping-pong/) traffic routing strategy  on all route types (HTTPRoute, GRPCRoute, TCPRoute, TLSRoute) allowing zero-downtime deployments for long lived connections. This was previously available

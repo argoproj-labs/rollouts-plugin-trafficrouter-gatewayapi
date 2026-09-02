@@ -298,7 +298,7 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 			return err
 		}
 
-		tcpRouteList, err := r.GatewayAPIClientset.GatewayV1alpha2().TCPRoutes(namespace).List(
+		tcpRouteList, err := r.GatewayAPIClientset.GatewayV1().TCPRoutes(namespace).List(
 			context.TODO(),
 			metav1.ListOptions{LabelSelector: selector.String()},
 		)
@@ -324,7 +324,7 @@ func (r *RpcPlugin) discoverRoutesBySelector(rollout *v1alpha1.Rollout, gatewayA
 			return err
 		}
 
-		tlsRouteList, err := r.GatewayAPIClientset.GatewayV1alpha2().TLSRoutes(namespace).List(
+		tlsRouteList, err := r.GatewayAPIClientset.GatewayV1().TLSRoutes(namespace).List(
 			context.TODO(),
 			metav1.ListOptions{LabelSelector: selector.String()},
 		)

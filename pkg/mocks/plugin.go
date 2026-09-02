@@ -3,8 +3,6 @@ package mocks
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
-
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -154,28 +152,28 @@ func CreateGRPCRouteWithLabels(name string, labels map[string]string) *gatewayv1
 	}
 }
 
-func CreateTCPRouteWithLabels(name string, labels map[string]string) *v1alpha2.TCPRoute {
+func CreateTCPRouteWithLabels(name string, labels map[string]string) *gatewayv1.TCPRoute {
 	stableWeight := int32(100)
 	canaryWeight := int32(0)
-	return &v1alpha2.TCPRoute{
+	return &gatewayv1.TCPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: RolloutNamespace,
 			Labels:    labels,
 		},
-		Spec: v1alpha2.TCPRouteSpec{
-			Rules: []v1alpha2.TCPRouteRule{
+		Spec: gatewayv1.TCPRouteSpec{
+			Rules: []gatewayv1.TCPRouteRule{
 				{
-					BackendRefs: []v1alpha2.BackendRef{
+					BackendRefs: []gatewayv1.BackendRef{
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: StableServiceName,
 								Port: &port,
 							},
 							Weight: &stableWeight,
 						},
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: CanaryServiceName,
 								Port: &port,
 							},
@@ -188,28 +186,28 @@ func CreateTCPRouteWithLabels(name string, labels map[string]string) *v1alpha2.T
 	}
 }
 
-func CreateTLSRouteWithLabels(name string, labels map[string]string) *v1alpha2.TLSRoute {
+func CreateTLSRouteWithLabels(name string, labels map[string]string) *gatewayv1.TLSRoute {
 	stableWeight := int32(100)
 	canaryWeight := int32(0)
-	return &v1alpha2.TLSRoute{
+	return &gatewayv1.TLSRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: RolloutNamespace,
 			Labels:    labels,
 		},
-		Spec: v1alpha2.TLSRouteSpec{
-			Rules: []v1alpha2.TLSRouteRule{
+		Spec: gatewayv1.TLSRouteSpec{
+			Rules: []gatewayv1.TLSRouteRule{
 				{
-					BackendRefs: []v1alpha2.BackendRef{
+					BackendRefs: []gatewayv1.BackendRef{
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: StableServiceName,
 								Port: &port,
 							},
 							Weight: &stableWeight,
 						},
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: CanaryServiceName,
 								Port: &port,
 							},
@@ -255,24 +253,24 @@ var GRPCRouteObj = gatewayv1.GRPCRoute{
 	},
 }
 
-var TCPPRouteObj = v1alpha2.TCPRoute{
+var TCPPRouteObj = gatewayv1.TCPRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      TCPRouteName,
 		Namespace: RolloutNamespace,
 	},
-	Spec: v1alpha2.TCPRouteSpec{
-		Rules: []v1alpha2.TCPRouteRule{
+	Spec: gatewayv1.TCPRouteSpec{
+		Rules: []gatewayv1.TCPRouteRule{
 			{
-				BackendRefs: []v1alpha2.BackendRef{
+				BackendRefs: []gatewayv1.BackendRef{
 					{
-						BackendObjectReference: v1alpha2.BackendObjectReference{
+						BackendObjectReference: gatewayv1.BackendObjectReference{
 							Name: StableServiceName,
 							Port: &port,
 						},
 						Weight: &weight,
 					},
 					{
-						BackendObjectReference: v1alpha2.BackendObjectReference{
+						BackendObjectReference: gatewayv1.BackendObjectReference{
 							Name: CanaryServiceName,
 							Port: &port,
 						},
@@ -284,24 +282,24 @@ var TCPPRouteObj = v1alpha2.TCPRoute{
 	},
 }
 
-var TLSRouteObj = v1alpha2.TLSRoute{
+var TLSRouteObj = gatewayv1.TLSRoute{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      TLSRouteName,
 		Namespace: RolloutNamespace,
 	},
-	Spec: v1alpha2.TLSRouteSpec{
-		Rules: []v1alpha2.TLSRouteRule{
+	Spec: gatewayv1.TLSRouteSpec{
+		Rules: []gatewayv1.TLSRouteRule{
 			{
-				BackendRefs: []v1alpha2.BackendRef{
+				BackendRefs: []gatewayv1.BackendRef{
 					{
-						BackendObjectReference: v1alpha2.BackendObjectReference{
+						BackendObjectReference: gatewayv1.BackendObjectReference{
 							Name: StableServiceName,
 							Port: &port,
 						},
 						Weight: &weight,
 					},
 					{
-						BackendObjectReference: v1alpha2.BackendObjectReference{
+						BackendObjectReference: gatewayv1.BackendObjectReference{
 							Name: CanaryServiceName,
 							Port: &port,
 						},
@@ -387,27 +385,27 @@ func CreateGRPCRouteWithPingPong(name string) *gatewayv1.GRPCRoute {
 	}
 }
 
-func CreateTCPRouteWithPingPong(name string) *v1alpha2.TCPRoute {
+func CreateTCPRouteWithPingPong(name string) *gatewayv1.TCPRoute {
 	pingWeight := int32(100)
 	pongWeight := int32(0)
-	return &v1alpha2.TCPRoute{
+	return &gatewayv1.TCPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: RolloutNamespace,
 		},
-		Spec: v1alpha2.TCPRouteSpec{
-			Rules: []v1alpha2.TCPRouteRule{
+		Spec: gatewayv1.TCPRouteSpec{
+			Rules: []gatewayv1.TCPRouteRule{
 				{
-					BackendRefs: []v1alpha2.BackendRef{
+					BackendRefs: []gatewayv1.BackendRef{
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: PingServiceName,
 								Port: &port,
 							},
 							Weight: &pingWeight,
 						},
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: PongServiceName,
 								Port: &port,
 							},
@@ -420,27 +418,27 @@ func CreateTCPRouteWithPingPong(name string) *v1alpha2.TCPRoute {
 	}
 }
 
-func CreateTLSRouteWithPingPong(name string) *v1alpha2.TLSRoute {
+func CreateTLSRouteWithPingPong(name string) *gatewayv1.TLSRoute {
 	pingWeight := int32(100)
 	pongWeight := int32(0)
-	return &v1alpha2.TLSRoute{
+	return &gatewayv1.TLSRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: RolloutNamespace,
 		},
-		Spec: v1alpha2.TLSRouteSpec{
-			Rules: []v1alpha2.TLSRouteRule{
+		Spec: gatewayv1.TLSRouteSpec{
+			Rules: []gatewayv1.TLSRouteRule{
 				{
-					BackendRefs: []v1alpha2.BackendRef{
+					BackendRefs: []gatewayv1.BackendRef{
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: PingServiceName,
 								Port: &port,
 							},
 							Weight: &pingWeight,
 						},
 						{
-							BackendObjectReference: v1alpha2.BackendObjectReference{
+							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: PongServiceName,
 								Port: &port,
 							},

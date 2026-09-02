@@ -65,7 +65,7 @@ spec:
 ### 2. Create TCPRoute with both services as backendRefs
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TCPRoute
 metadata:
   name: rollouts-demo-tcproute
