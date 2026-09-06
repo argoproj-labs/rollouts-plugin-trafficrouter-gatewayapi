@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -319,7 +320,7 @@ func TestRunSuccessfully(t *testing.T) {
 		headerName := "X-Test"
 		headerValue := "test"
 		headerValueType := gatewayv1.HeaderMatchRegularExpression
-		prefixedHeaderValue := headerValue + ".*"
+		prefixedHeaderValue := "^" + headerValue + ".*"
 		headerMatch := v1alpha1.StringMatch{
 			Prefix: headerValue,
 		}
@@ -350,7 +351,7 @@ func TestRunSuccessfully(t *testing.T) {
 		headerName := "X-Test"
 		headerValue := "test"
 		headerValueType := gatewayv1.GRPCHeaderMatchRegularExpression
-		prefixedHeaderValue := headerValue + ".*"
+		prefixedHeaderValue := "^" + headerValue + ".*"
 		headerMatch := v1alpha1.StringMatch{
 			Prefix: headerValue,
 		}
@@ -707,6 +708,78 @@ func TestRunSuccessfully(t *testing.T) {
 	// Canceling should cause an exit
 	cancel()
 	<-closeCh
+}
+
+func TestPrefixHeaderMatchRegex(t *testing.T) {
+	// Gateway API has no prefix header match, so a prefix is expressed as a regular
+	// expression. Implementations differ in how they apply it: Envoy based ones match
+	// the whole header value, Traefik uses an unanchored search. The expression must
+	// therefore be anchored and the prefix escaped so it only matches values that
+	// literally start with the prefix under both interpretations.
+	testCases := []struct {
+		prefix      string
+		expected    string
+		matching    []string
+		nonMatching []string
+	}{
+		{
+			prefix:      "canary",
+			expected:    "^canary.*",
+			matching:    []string{"canary", "canary-v2"},
+			nonMatching: []string{"not-canary", "xcanaryx", ""},
+		},
+		{
+			prefix:      "v1.0",
+			expected:    "^v1\\.0.*",
+			matching:    []string{"v1.0", "v1.0-beta"},
+			nonMatching: []string{"v1x0", "av1.0"},
+		},
+		{
+			prefix:      "a+b",
+			expected:    "^a\\+b.*",
+			matching:    []string{"a+b", "a+bc"},
+			nonMatching: []string{"aab", "ab"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.prefix, func(t *testing.T) {
+			actual := prefixHeaderMatchRegex(tc.prefix)
+			assert.Equal(t, tc.expected, actual)
+
+			search := regexp.MustCompile(actual)                // unanchored search, as Traefik does
+			whole := regexp.MustCompile("^(?:" + actual + ")$") // whole value match, as Envoy does
+			for _, value := range tc.matching {
+				assert.True(t, search.MatchString(value), "search should match %q", value)
+				assert.True(t, whole.MatchString(value), "whole match should match %q", value)
+			}
+			for _, value := range tc.nonMatching {
+				assert.False(t, search.MatchString(value), "search should not match %q", value)
+				assert.False(t, whole.MatchString(value), "whole match should not match %q", value)
+			}
+		})
+	}
+}
+
+func TestHeaderRouteRuleListPrefixIsEscapedAndAnchored(t *testing.T) {
+	headerRouting := &v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{
+				HeaderName:  "X-Version",
+				HeaderValue: &v1alpha1.StringMatch{Prefix: "v1.0"},
+			},
+		},
+	}
+
+	httpMatches, rpcErr := getHTTPHeaderRouteRuleList(headerRouting)
+	assert.Empty(t, rpcErr.Error())
+	assert.Equal(t, gatewayv1.HeaderMatchRegularExpression, *httpMatches[0].Type)
+	assert.Equal(t, "^v1\\.0.*", httpMatches[0].Value)
+
+	grpcMatches, rpcErr := getGRPCHeaderRouteRuleList(headerRouting)
+	assert.Empty(t, rpcErr.Error())
+	assert.Equal(t, gatewayv1.GRPCHeaderMatchRegularExpression, *grpcMatches[0].Type)
+	assert.Equal(t, "^v1\\.0.*", grpcMatches[0].Value)
 }
 
 func TestHTTPRouteWithSelector(t *testing.T) {

@@ -200,7 +200,7 @@ func getGRPCHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 		case headerRule.HeaderValue.Prefix != "":
 			headerMatchType := gatewayv1.GRPCHeaderMatchRegularExpression
 			grpcHeaderRouteRule.Type = &headerMatchType
-			grpcHeaderRouteRule.Value = headerRule.HeaderValue.Prefix + ".*"
+			grpcHeaderRouteRule.Value = prefixHeaderMatchRegex(headerRule.HeaderValue.Prefix)
 		case headerRule.HeaderValue.Regex != "":
 			headerMatchType := gatewayv1.GRPCHeaderMatchRegularExpression
 			grpcHeaderRouteRule.Type = &headerMatchType
