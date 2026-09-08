@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -372,6 +373,19 @@ func insertGatewayAPIRouteLists(gatewayAPIConfig *GatewayAPITrafficRouting) {
 			UseHeaderRoutes: true,
 		})
 	}
+}
+
+// prefixHeaderMatchRegex converts a header prefix match into a RegularExpression
+// header match value. Gateway API has no prefix match type for headers, so the
+// prefix is expressed as a regular expression. The prefix is escaped so that
+// characters like "." or "+" match literally, and the expression is anchored with
+// "^" because implementations differ in how they apply the regular expression:
+// Envoy based implementations match the whole header value, while for example
+// Traefik uses an unanchored search, where "canary.*" would also match
+// "not-canary". The trailing ".*" keeps the expression valid for implementations
+// that require the whole value to match.
+func prefixHeaderMatchRegex(prefix string) string {
+	return "^" + regexp.QuoteMeta(prefix) + ".*"
 }
 
 // isManagedRuleName reports whether ruleName was produced by this plugin for any of

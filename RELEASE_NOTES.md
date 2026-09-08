@@ -1,22 +1,12 @@
 # Changes
 
-## Ping pong (alternating stable with preview)
+## Prefix header matches are now escaped and anchored
 
-Added support for the [pingPong](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/latest/features/ping-pong/) traffic routing strategy  on all route types (HTTPRoute, GRPCRoute, TCPRoute, TLSRoute) allowing zero-downtime deployments for long lived connections. This was previously available
-only for [ALB](https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/alb/#zero-downtime-updates-with-ping-pong-feature) and [istio](https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/istio/#ping-pong).
+A `setHeaderRoute` step with a `prefix` header match is turned into a Gateway API `RegularExpression` header match, because Gateway API has no prefix match type for headers. The plugin used to build that expression as `<prefix>.*`, with the prefix inserted verbatim. It now builds `^<prefix>.*`, with the prefix escaped.
 
-Ping pong Requires Argo Rollouts v1.10.0 or later.
+Two things change for existing users:
 
-## Fine grained canaries
+- Regular expression characters in the prefix are no longer interpreted. `prefix: v1.0` also matched `v1x0`, and `prefix: a+b` did not match the value `a+b` at all. Both now behave as a plain prefix.
+- The expression is anchored. Gateway API leaves `RegularExpression` semantics to the implementation. Envoy based implementations match the whole header value, so `canary.*` already behaved as a prefix there. Traefik evaluates the expression as an unanchored search, so `canary.*` also matched `not-canary` and sent those requests to the canary.
 
-Added support for `maxTrafficWeight` for values over 100.
-
-Note that this MAY change the behavior of rollouts with `maxTrafficWeight` already set, where all `setWeight` use values not more than 100. For instance, `setWeight: 10` with `maxTrafficWeight: 1000` will now route **1%** of the traffic, **NOT** 10%. If you use such settings, you should review the `setWeight` values.
-
-## Other changes
-
-- Fixed experiment percentage calculation
-- Tested with HaProxy gateway API implementation
-- Started e2e tests for experiments
-- Added code coverage calculation in CI
-
+On Envoy based implementations this matches exactly the same header values as before, as long as the prefix contains no regular expression characters. On Traefik, header values that merely contain the prefix are no longer routed to the canary, which is the prefix behavior documented by Argo Rollouts. If you relied on the previous unanchored matching, use a `regex` header match instead of a `prefix` one.
