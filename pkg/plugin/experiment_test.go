@@ -8,223 +8,51 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-func TestHandleExperiment_ExperimentStatusChecking(t *testing.T) {
-	stableService := "stable-svc"
-	canaryService := "canary-svc"
-
-	rollout := &v1alpha1.Rollout{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rollout-test",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.RolloutSpec{
-			Strategy: v1alpha1.RolloutStrategy{
-				Canary: &v1alpha1.CanaryStrategy{
-					StableService: stableService,
-					CanaryService: canaryService,
-				},
-			},
-		},
-		Status: v1alpha1.RolloutStatus{
-			Canary: v1alpha1.CanaryStatus{
-				CurrentExperiment: "active-experiment",
-			},
-		},
+func TestHandleExperimentUsesDefaultMaxTrafficWeightWhenUnset(t *testing.T) {
+	rollout := experimentRollout(0, "active-experiment")
+	rollout.Spec.Strategy.Canary.TrafficRouting.MaxTrafficWeight = nil
+	httpRoute := experimentHTTPRoute(
+		backendRef("stable-svc", 100),
+		backendRef("canary-svc", 0),
+		backendRef("exp-svc-1", 25),
+		backendRef("exp-svc-2", 30),
+	)
+	destinations := []v1alpha1.WeightDestination{
+		{ServiceName: "exp-svc-1", Weight: 25},
+		{ServiceName: "exp-svc-2", Weight: 30},
 	}
 
-	stableWeight := int32(100)
-	canaryWeight := int32(0)
-	httpRoute := &gatewayv1.HTTPRoute{
-		Spec: gatewayv1.HTTPRouteSpec{
-			Rules: []gatewayv1.HTTPRouteRule{
-				{
-					BackendRefs: []gatewayv1.HTTPBackendRef{
-						{
-							BackendRef: gatewayv1.BackendRef{
-								BackendObjectReference: gatewayv1.BackendObjectReference{
-									Name: gatewayv1.ObjectName(stableService),
-								},
-								Weight: &stableWeight,
-							},
-						},
-						{
-							BackendRef: gatewayv1.BackendRef{
-								BackendObjectReference: gatewayv1.BackendObjectReference{
-									Name: gatewayv1.ObjectName(canaryService),
-								},
-								Weight: &canaryWeight,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
-	isExperimentActive := rollout.Spec.Strategy.Canary != nil && rollout.Status.Canary.CurrentExperiment != ""
-	assert.True(t, isExperimentActive, "Experiment should be detected as active")
-
-	hasExperimentServices := false
-	ruleIdx := 0
-	for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
-		serviceName := string(backendRef.Name)
-		if serviceName != stableService && serviceName != canaryService {
-			hasExperimentServices = true
-			break
-		}
-	}
-	assert.False(t, hasExperimentServices, "HTTPRoute should not have experiment services initially")
-
-	// Test dynamic weight calculation
-	additionalDestinations := []v1alpha1.WeightDestination{
-		{
-			ServiceName: "exp-svc-1",
-			Weight:      25,
-		},
-		{
-			ServiceName: "exp-svc-2",
-			Weight:      30,
-		},
-	}
-
-	// Calculate total experiment weight
-	var totalExperimentWeight int32
-	for _, dest := range additionalDestinations {
-		totalExperimentWeight += dest.Weight
-	}
-	expectedStableWeight := int32(100) - totalExperimentWeight
-
-	// Update stable weight
-	for i, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
-		if string(backendRef.Name) == stableService {
-			httpRoute.Spec.Rules[ruleIdx].BackendRefs[i].Weight = &expectedStableWeight
-			break
-		}
-	}
-
-	assert.Equal(t, int32(45), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight, "Stable weight should be 45% (100% - 55% experiment weight)")
+	require.NoError(t, err)
+	assert.Equal(t, int32(45), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
 }
 
-func TestHandleExperiment_RemoveExperimentServices(t *testing.T) {
-	stableService := "stable-svc"
-	canaryService := "canary-svc"
-	experimentSvc := "exp-svc"
-
-	rollout := &v1alpha1.Rollout{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rollout-test",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.RolloutSpec{
-			Strategy: v1alpha1.RolloutStrategy{
-				Canary: &v1alpha1.CanaryStrategy{
-					StableService: stableService,
-					CanaryService: canaryService,
-				},
-			},
-		},
-		Status: v1alpha1.RolloutStatus{
-			Canary: v1alpha1.CanaryStatus{
-				CurrentExperiment: "",
-			},
-		},
+func TestHandleExperimentCleanupPreservesRemainingBackendRefFields(t *testing.T) {
+	rollout := experimentRollout(100, "")
+	rollout.Status.Canary.Weights = &v1alpha1.TrafficWeights{
+		Additional: []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 15}},
 	}
+	httpRoute := experimentHTTPRoute(
+		backendRefWithPort("stable-svc", 45, 8080),
+		backendRefWithPort("canary-svc", 0, 8080),
+		backendRefWithPort("exp-svc", 15, 8080),
+	)
 
-	stableWeight := int32(45)
-	canaryWeight := int32(0)
-	experimentWeight := int32(15)
-	port := gatewayv1.PortNumber(8080)
-	namespace := gatewayv1.Namespace("default")
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
 
-	httpRoute := &gatewayv1.HTTPRoute{
-		Spec: gatewayv1.HTTPRouteSpec{
-			Rules: []gatewayv1.HTTPRouteRule{
-				{
-					BackendRefs: []gatewayv1.HTTPBackendRef{
-						{
-							BackendRef: gatewayv1.BackendRef{
-								BackendObjectReference: gatewayv1.BackendObjectReference{
-									Name: gatewayv1.ObjectName(stableService),
-									Port: &port,
-								},
-								Weight: &stableWeight,
-							},
-						},
-						{
-							BackendRef: gatewayv1.BackendRef{
-								BackendObjectReference: gatewayv1.BackendObjectReference{
-									Name: gatewayv1.ObjectName(canaryService),
-									Port: &port,
-								},
-								Weight: &canaryWeight,
-							},
-						},
-						{
-							BackendRef: gatewayv1.BackendRef{
-								BackendObjectReference: gatewayv1.BackendObjectReference{
-									Name:      gatewayv1.ObjectName(experimentSvc),
-									Namespace: &namespace,
-									Port:      &port,
-								},
-								Weight: &experimentWeight,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	isExperimentActive := rollout.Spec.Strategy.Canary != nil && rollout.Status.Canary.CurrentExperiment != ""
-	assert.False(t, isExperimentActive, "Experiment should be detected as inactive")
-
-	hasExperimentServices := false
-	ruleIdx := 0
-	for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
-		serviceName := string(backendRef.Name)
-		if serviceName != stableService && serviceName != canaryService {
-			hasExperimentServices = true
-			break
-		}
-	}
-	assert.True(t, hasExperimentServices, "HTTPRoute should have experiment services initially")
-
-	stableWeight = int32(100)
-	canaryWeight = int32(0)
-	filteredBackendRefs := []gatewayv1.HTTPBackendRef{}
-
-	for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
-		serviceName := string(backendRef.Name)
-
-		switch serviceName {
-		case stableService:
-			backendRef.Weight = &stableWeight
-			filteredBackendRefs = append(filteredBackendRefs, backendRef)
-		case canaryService:
-			backendRef.Weight = &canaryWeight
-			filteredBackendRefs = append(filteredBackendRefs, backendRef)
-		}
-	}
-
-	httpRoute.Spec.Rules[ruleIdx].BackendRefs = filteredBackendRefs
-
-	assert.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 2, "Should only have stable and canary services after cleanup")
-	assert.Equal(t, int32(100), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight, "Stable weight should be reset to 100%")
-	assert.Equal(t, int32(0), *httpRoute.Spec.Rules[0].BackendRefs[1].Weight, "Canary weight should remain at 0%")
-
-	hasExperimentServices = false
-	for _, backendRef := range httpRoute.Spec.Rules[ruleIdx].BackendRefs {
-		serviceName := string(backendRef.Name)
-		if serviceName != stableService && serviceName != canaryService {
-			hasExperimentServices = true
-			break
-		}
-	}
-	assert.False(t, hasExperimentServices, "HTTPRoute should not have experiment services after cleanup")
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 2)
+	assert.Equal(t, int32(100), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
+	assert.Equal(t, gatewayv1.PortNumber(8080), *httpRoute.Spec.Rules[0].BackendRefs[0].Port)
+	assert.Equal(t, int32(0), *httpRoute.Spec.Rules[0].BackendRefs[1].Weight)
+	assert.Equal(t, gatewayv1.PortNumber(8080), *httpRoute.Spec.Rules[0].BackendRefs[1].Port)
 }
 
 func TestHandleExperimentUsesMaxTrafficWeight(t *testing.T) {
@@ -241,7 +69,7 @@ func TestHandleExperimentUsesMaxTrafficWeight(t *testing.T) {
 		{ServiceName: "exp-svc-2", Weight: 30000},
 	}
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(50000), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
@@ -261,7 +89,7 @@ func TestHandleExperimentPreservesCanaryWeight(t *testing.T) {
 		{ServiceName: "exp-svc-2", Weight: 10},
 	}
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(60), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
@@ -284,7 +112,7 @@ func TestHandleExperimentFloorsStableWeightWhenExperimentWeightsExceedMaxTraffic
 		{ServiceName: "exp-svc-2", Weight: 50000},
 	}
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
 
 	require.NoError(t, err)
 	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 4)
@@ -306,7 +134,7 @@ func TestHandleExperimentCleanupRestoresMaxTrafficWeight(t *testing.T) {
 		backendRef("exp-svc", 30000),
 	)
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
 
 	require.NoError(t, err)
 	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 2)
@@ -330,7 +158,7 @@ func TestHandleExperimentCleansUpBeforeCurrentExperimentIsCleared(t *testing.T) 
 		backendRef("exp-svc-2", 10),
 	)
 
-	err := HandleExperiment(context.Background(), nil, nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
 
 	require.NoError(t, err)
 	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
@@ -339,6 +167,141 @@ func TestHandleExperimentCleansUpBeforeCurrentExperimentIsCleared(t *testing.T) 
 	assert.Equal(t, gatewayv1.ObjectName("canary-svc"), httpRoute.Spec.Rules[0].BackendRefs[1].Name)
 	assert.Equal(t, int32(0), *httpRoute.Spec.Rules[0].BackendRefs[1].Weight)
 	assert.Equal(t, gatewayv1.ObjectName("unmanaged-svc"), httpRoute.Spec.Rules[0].BackendRefs[2].Name)
+}
+
+// TestHandleExperimentAddsBackendsToAllWeightedRules locks in that experiment
+// backends land on every rule SetWeight splits, not just the first one.
+func TestHandleExperimentAddsBackendsToAllWeightedRules(t *testing.T) {
+	rollout := experimentRollout(100, "active-experiment")
+	httpRoute := multiRuleHTTPRoute(
+		[]gatewayv1.HTTPBackendRef{backendRef("stable-svc", 80), backendRef("canary-svc", 20)},
+		[]gatewayv1.HTTPBackendRef{backendRef("stable-svc", 80), backendRef("canary-svc", 20)},
+	)
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+	clientset := fake.NewClientset(experimentService("exp-svc", corev1.ServicePort{Name: "http", Port: 8080}))
+
+	err := HandleExperiment(context.Background(), clientset, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	for i := range httpRoute.Spec.Rules {
+		require.Len(t, httpRoute.Spec.Rules[i].BackendRefs, 3, "rule %d", i)
+		assert.Equal(t, int32(70), *httpRoute.Spec.Rules[i].BackendRefs[0].Weight, "rule %d", i)
+		assert.Equal(t, gatewayv1.ObjectName("exp-svc"), httpRoute.Spec.Rules[i].BackendRefs[2].Name, "rule %d", i)
+		assert.Equal(t, int32(10), *httpRoute.Spec.Rules[i].BackendRefs[2].Weight, "rule %d", i)
+	}
+}
+
+// TestHandleExperimentLeavesRuleWithoutBothServicesUntouched locks in the ownership
+// rule: only rules holding both the canary and the stable backendRef belong to the
+// plugin, so a user-managed rule referencing just the canary is never mutated, even
+// when it is ordered first.
+func TestHandleExperimentLeavesRuleWithoutBothServicesUntouched(t *testing.T) {
+	rollout := experimentRollout(100, "active-experiment")
+	httpRoute := multiRuleHTTPRoute(
+		[]gatewayv1.HTTPBackendRef{backendRef("canary-svc", 5)},
+		[]gatewayv1.HTTPBackendRef{backendRef("stable-svc", 80), backendRef("canary-svc", 20)},
+	)
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+	clientset := fake.NewClientset(experimentService("exp-svc", corev1.ServicePort{Name: "http", Port: 8080}))
+
+	err := HandleExperiment(context.Background(), clientset, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 1)
+	assert.Equal(t, int32(5), *httpRoute.Spec.Rules[0].BackendRefs[0].Weight)
+	require.Len(t, httpRoute.Spec.Rules[1].BackendRefs, 3)
+	assert.Equal(t, int32(70), *httpRoute.Spec.Rules[1].BackendRefs[0].Weight)
+	assert.Equal(t, gatewayv1.ObjectName("exp-svc"), httpRoute.Spec.Rules[1].BackendRefs[2].Name)
+}
+
+// TestHandleExperimentPrefersHTTPNamedServicePort covers a service whose "http" port
+// is the same number the lookup used to use as its "not found" default.
+func TestHandleExperimentPrefersHTTPNamedServicePort(t *testing.T) {
+	rollout := experimentRollout(100, "active-experiment")
+	httpRoute := experimentHTTPRoute(backendRef("stable-svc", 80), backendRef("canary-svc", 20))
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+	clientset := fake.NewClientset(experimentService("exp-svc",
+		corev1.ServicePort{Name: "metrics", Port: 9090},
+		corev1.ServicePort{Name: "http", Port: 8080},
+	))
+
+	err := HandleExperiment(context.Background(), clientset, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
+	addedRef := httpRoute.Spec.Rules[0].BackendRefs[2]
+	assert.Equal(t, gatewayv1.ObjectName("exp-svc"), addedRef.Name)
+	assert.Equal(t, gatewayv1.PortNumber(8080), *addedRef.Port)
+	assert.Equal(t, gatewayv1.Namespace("default"), *addedRef.Namespace)
+}
+
+func TestHandleExperimentSkipsDestinationWithoutService(t *testing.T) {
+	rollout := experimentRollout(100, "active-experiment")
+	httpRoute := experimentHTTPRoute(backendRef("stable-svc", 80), backendRef("canary-svc", 20))
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "missing-svc", Weight: 10}}
+
+	err := HandleExperiment(context.Background(), fake.NewClientset(), testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 2)
+}
+
+func TestHandleExperimentErrorsWhenNoWeightedRuleExists(t *testing.T) {
+	rollout := experimentRollout(100, "active-experiment")
+	httpRoute := experimentHTTPRoute(backendRef("other-svc", 100))
+
+	err := HandleExperiment(context.Background(), nil, testLogger(), rollout, "stable-svc", "canary-svc", httpRoute, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no matching rule found for rollout rollout-test")
+}
+
+func TestExperimentServicePort(t *testing.T) {
+	tests := []struct {
+		name     string
+		ports    []corev1.ServicePort
+		wantPort gatewayv1.PortNumber
+		wantOK   bool
+	}{
+		{
+			name:     "prefers the port named http",
+			ports:    []corev1.ServicePort{{Name: "http", Port: 80}},
+			wantPort: 80,
+			wantOK:   true,
+		},
+		{
+			name:     "falls back to the first port",
+			ports:    []corev1.ServicePort{{Name: "grpc", Port: 9000}},
+			wantPort: 9000,
+			wantOK:   true,
+		},
+		{
+			name:     "falls back for an unnamed single port",
+			ports:    []corev1.ServicePort{{Port: 8080}},
+			wantPort: 8080,
+			wantOK:   true,
+		},
+		{
+			name:     "keeps an http port that is not listed first",
+			ports:    []corev1.ServicePort{{Name: "metrics", Port: 9090}, {Name: "http", Port: 8080}},
+			wantPort: 8080,
+			wantOK:   true,
+		},
+		{
+			name:   "reports no port when the service exposes none",
+			ports:  nil,
+			wantOK: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			port, ok := experimentServicePort(&corev1.Service{Spec: corev1.ServiceSpec{Ports: test.ports}})
+
+			assert.Equal(t, test.wantOK, ok)
+			assert.Equal(t, test.wantPort, port)
+		})
+	}
 }
 
 func experimentRollout(maxWeight int32, currentExperiment string) *v1alpha1.Rollout {
@@ -369,12 +332,41 @@ func experimentHTTPRoute(refs ...gatewayv1.HTTPBackendRef) *gatewayv1.HTTPRoute 
 	}
 }
 
+func multiRuleHTTPRoute(ruleRefs ...[]gatewayv1.HTTPBackendRef) *gatewayv1.HTTPRoute {
+	rules := make([]gatewayv1.HTTPRouteRule, 0, len(ruleRefs))
+	for _, refs := range ruleRefs {
+		rules = append(rules, gatewayv1.HTTPRouteRule{BackendRefs: refs})
+	}
+	return &gatewayv1.HTTPRoute{Spec: gatewayv1.HTTPRouteSpec{Rules: rules}}
+}
+
 func backendRef(name string, weight int32) gatewayv1.HTTPBackendRef {
 	return gatewayv1.HTTPBackendRef{
 		BackendRef: gatewayv1.BackendRef{
 			BackendObjectReference: gatewayv1.BackendObjectReference{Name: gatewayv1.ObjectName(name)},
 			Weight:                 &weight,
 		},
+	}
+}
+
+func backendRefWithPort(name string, weight int32, port gatewayv1.PortNumber) gatewayv1.HTTPBackendRef {
+	namespace := gatewayv1.Namespace("default")
+	return gatewayv1.HTTPBackendRef{
+		BackendRef: gatewayv1.BackendRef{
+			BackendObjectReference: gatewayv1.BackendObjectReference{
+				Name:      gatewayv1.ObjectName(name),
+				Namespace: &namespace,
+				Port:      &port,
+			},
+			Weight: &weight,
+		},
+	}
+}
+
+func experimentService(name string, ports ...corev1.ServicePort) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+		Spec:       corev1.ServiceSpec{Ports: ports},
 	}
 }
 

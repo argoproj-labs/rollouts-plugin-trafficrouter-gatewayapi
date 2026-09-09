@@ -17,21 +17,22 @@ linters:
     - whitespace
   settings:
     gocyclo:
-      # Threshold = current worst offender, so existing code passes but future
-      # regressions are caught. Top 3 (gocyclo -top 15 -avg ., 2026-09-07):
-      #   1. 37 HandleExperiment (pkg/plugin/experiment.go:16)
-      #   2. 21 (*RpcPlugin).discoverRoutesBySelector (pkg/plugin/plugin.go:241)
-      #   3. 18 (*RpcPlugin).setHTTPHeaderRoute (pkg/plugin/httproute.go:74),
+      # Top 3 (gocyclo -top 15 -avg ., 2026-09-09):
+      #   1. 21 (*RpcPlugin).discoverRoutesBySelector (pkg/plugin/plugin.go:241)
+      #   2. 18 (*RpcPlugin).setHTTPHeaderRoute (pkg/plugin/httproute.go:74),
       #      (*RpcPlugin).setGRPCHeaderRoute (pkg/plugin/grpcroute.go:69)
-      min-complexity: 37
+      #   3. 11 ensureInProgressLabel (pkg/plugin/labels.go:9),
+      #      (*RpcPlugin).setHTTPRouteWeight (pkg/plugin/httproute.go:18)
+      min-complexity: 25
     gocognit:
-      # Threshold = current worst offender, so existing code passes but future
-      # regressions are caught. Top 3 (gocognit -top 15 -avg ., 2026-09-07):
-      #   1. 74 HandleExperiment (pkg/plugin/experiment.go:16)
-      #   2. 43 (*RpcPlugin).setGRPCHeaderRoute (pkg/plugin/grpcroute.go:69),
+      # Top 3 (gocognit -top 15 -avg -ignore vendor/ .,
+      # 2026-09-09):
+      #   1. 43 (*RpcPlugin).setGRPCHeaderRoute (pkg/plugin/grpcroute.go:69),
       #      (*RpcPlugin).setHTTPHeaderRoute (pkg/plugin/httproute.go:74)
-      #   3. 36 (*RpcPlugin).discoverRoutesBySelector (pkg/plugin/plugin.go:241)
-      min-complexity: 74
+      #   2. 36 (*RpcPlugin).discoverRoutesBySelector (pkg/plugin/plugin.go:241)
+      #   3. 23 TestSetGRPCHeaderRouteWithMethodAndHeaders
+      #      (pkg/plugin/plugin_test.go:1588)
+      min-complexity: 50
     staticcheck:
       checks:
         - all
