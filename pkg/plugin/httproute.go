@@ -222,6 +222,327 @@ func getHTTPHeaderRouteRuleList(headerRouting *v1alpha1.SetHeaderRoute) ([]gatew
 	return httpHeaderRouteRuleList, pluginTypes.RpcError{}
 }
 
+func (r *RpcPlugin) setHTTPMirrorRoute(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	if gatewayAPIConfig.MirrorMode == "rule" {
+		return r.setHTTPMirrorRouteAsRule(rollout, setMirrorRoute, gatewayAPIConfig)
+	}
+	return r.setHTTPMirrorRouteAsFilter(rollout, setMirrorRoute, gatewayAPIConfig)
+}
+
+// setHTTPMirrorRouteAsFilter adds/removes a RequestMirror filter on the existing
+// weighted rules. Both weighted routing and mirroring apply to the same traffic.
+func (r *RpcPlugin) setHTTPMirrorRouteAsFilter(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	if len(setMirrorRoute.Match) == 0 {
+		return r.removeHTTPMirrorFilter(rollout, gatewayAPIConfig)
+	}
+	ctx := context.TODO()
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+
+	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		weightedRules, err := getAllRouteRules(HTTPRouteRuleList(httpRoute.Spec.Rules), canaryServiceName, stableServiceName)
+		if err != nil {
+			return err
+		}
+
+		mirrorFilter := buildMirrorFilter(rollout, weightedRules, setMirrorRoute.Percentage)
+
+		for _, rule := range weightedRules {
+			stripMirrorFilters(rule)
+			rule.Filters = append(rule.Filters, mirrorFilter)
+		}
+
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	return pluginTypes.RpcError{}
+}
+
+func (r *RpcPlugin) removeHTTPMirrorFilter(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	ctx := context.TODO()
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+
+	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		weightedRules, err := getAllRouteRules(HTTPRouteRuleList(httpRoute.Spec.Rules), canaryServiceName, stableServiceName)
+		if err != nil {
+			return nil
+		}
+
+		for _, rule := range weightedRules {
+			stripMirrorFilters(rule)
+		}
+
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	return pluginTypes.RpcError{}
+}
+
+// setHTTPMirrorRouteAsRule creates a separate managed rule with its own match
+// criteria and a RequestMirror filter. Traffic matching the rule goes to stable
+// and is mirrored to canary; other traffic follows the normal weighted rules.
+func (r *RpcPlugin) setHTTPMirrorRouteAsRule(rollout *v1alpha1.Rollout, setMirrorRoute *v1alpha1.SetMirrorRoute, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	if len(setMirrorRoute.Match) == 0 {
+		return r.removeHTTPMirrorRule(setMirrorRoute.Name, gatewayAPIConfig)
+	}
+	ctx := context.TODO()
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+
+	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+	stableServiceName := rollout.Spec.Strategy.Canary.StableService
+	managedName := gatewayv1.SectionName(setMirrorRoute.Name)
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
+		weightedRules, err := getAllRouteRules(httpRouteRuleList, canaryServiceName, stableServiceName)
+		if err != nil {
+			return err
+		}
+
+		mirrorFilter := buildMirrorFilter(rollout, weightedRules, setMirrorRoute.Percentage)
+		httpMatches := convertRouteMatchesToHTTPRouteMatches(setMirrorRoute.Match)
+
+		stableRefs, err := getBackendRefs(stableServiceName, httpRouteRuleList)
+		if err != nil {
+			return fmt.Errorf("stable service %q not found in HTTPRoute: %w", stableServiceName, err)
+		}
+
+		serviceKind := gatewayv1.Kind("Service")
+		serviceGroup := gatewayv1.Group("")
+
+		mirrorRule := gatewayv1.HTTPRouteRule{
+			Name:    &managedName,
+			Matches: httpMatches,
+			Filters: []gatewayv1.HTTPRouteFilter{mirrorFilter},
+			BackendRefs: []gatewayv1.HTTPBackendRef{
+				{
+					BackendRef: gatewayv1.BackendRef{
+						BackendObjectReference: gatewayv1.BackendObjectReference{
+							Group: &serviceGroup,
+							Kind:  &serviceKind,
+							Name:  gatewayv1.ObjectName(stableServiceName),
+							Port:  stableRefs[0].Port,
+						},
+					},
+				},
+			},
+		}
+
+		cleanedRules := make([]gatewayv1.HTTPRouteRule, 0, len(httpRoute.Spec.Rules))
+		for _, rule := range httpRoute.Spec.Rules {
+			if rule.Name != nil && isManagedRuleName(string(*rule.Name), map[string]bool{string(managedName): true}) {
+				continue
+			}
+			cleanedRules = append(cleanedRules, rule)
+		}
+		httpRoute.Spec.Rules = append(cleanedRules, mirrorRule)
+
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	return pluginTypes.RpcError{}
+}
+
+func (r *RpcPlugin) removeHTTPMirrorRule(mirrorRouteName string, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
+	ctx := context.TODO()
+	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
+	managedNames := map[string]bool{mirrorRouteName: true}
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		httpRoute, err := httpRouteClient.Get(ctx, gatewayAPIConfig.HTTPRoute, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		newRules := make([]gatewayv1.HTTPRouteRule, 0, len(httpRoute.Spec.Rules))
+		changed := false
+		for _, rule := range httpRoute.Spec.Rules {
+			if rule.Name != nil && isManagedRuleName(string(*rule.Name), managedNames) {
+				changed = true
+				continue
+			}
+			newRules = append(newRules, rule)
+		}
+		if !changed {
+			return nil
+		}
+		httpRoute.Spec.Rules = newRules
+
+		_, err = httpRouteClient.Update(ctx, httpRoute, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return pluginTypes.RpcError{
+			ErrorString: err.Error(),
+		}
+	}
+	return pluginTypes.RpcError{}
+}
+
+func buildMirrorFilter(rollout *v1alpha1.Rollout, weightedRules []*HTTPRouteRule, percentage *int32) gatewayv1.HTTPRouteFilter {
+	canaryServiceName := rollout.Spec.Strategy.Canary.CanaryService
+
+	var canaryPort *gatewayv1.PortNumber
+	for _, rule := range weightedRules {
+		for j := range rule.BackendRefs {
+			if string(rule.BackendRefs[j].Name) == canaryServiceName {
+				canaryPort = rule.BackendRefs[j].Port
+				break
+			}
+		}
+		if canaryPort != nil {
+			break
+		}
+	}
+
+	serviceKind := gatewayv1.Kind("Service")
+	serviceGroup := gatewayv1.Group("")
+
+	filter := gatewayv1.HTTPRouteFilter{
+		Type: gatewayv1.HTTPRouteFilterRequestMirror,
+		RequestMirror: &gatewayv1.HTTPRequestMirrorFilter{
+			BackendRef: gatewayv1.BackendObjectReference{
+				Group: &serviceGroup,
+				Kind:  &serviceKind,
+				Name:  gatewayv1.ObjectName(canaryServiceName),
+				Port:  canaryPort,
+			},
+		},
+	}
+
+	if percentage != nil {
+		filter.RequestMirror.Percent = percentage
+	}
+
+	return filter
+}
+
+func stripMirrorFilters(rule *HTTPRouteRule) {
+	cleaned := make([]gatewayv1.HTTPRouteFilter, 0, len(rule.Filters))
+	for _, f := range rule.Filters {
+		if f.Type != gatewayv1.HTTPRouteFilterRequestMirror {
+			cleaned = append(cleaned, f)
+		}
+	}
+	rule.Filters = cleaned
+}
+
+func convertRouteMatchesToHTTPRouteMatches(matches []v1alpha1.RouteMatch) []gatewayv1.HTTPRouteMatch {
+	httpMatches := make([]gatewayv1.HTTPRouteMatch, 0, len(matches))
+	for _, match := range matches {
+		httpMatch := gatewayv1.HTTPRouteMatch{}
+
+		if match.Method != nil {
+			method := gatewayv1.HTTPMethod(stringMatchValue(match.Method))
+			httpMatch.Method = &method
+		}
+
+		if match.Path != nil {
+			httpMatch.Path = convertStringMatchToPathMatch(match.Path)
+		}
+
+		if match.Headers != nil {
+			for name, headerMatch := range match.Headers {
+				httpMatch.Headers = append(httpMatch.Headers, convertStringMatchToHeaderMatch(name, &headerMatch))
+			}
+		}
+
+		httpMatches = append(httpMatches, httpMatch)
+	}
+	return httpMatches
+}
+
+func stringMatchValue(sm *v1alpha1.StringMatch) string {
+	switch {
+	case sm.Exact != "":
+		return sm.Exact
+	case sm.Prefix != "":
+		return sm.Prefix
+	case sm.Regex != "":
+		return sm.Regex
+	}
+	return ""
+}
+
+func convertStringMatchToPathMatch(sm *v1alpha1.StringMatch) *gatewayv1.HTTPPathMatch {
+	pathMatch := &gatewayv1.HTTPPathMatch{}
+	switch {
+	case sm.Exact != "":
+		pathType := gatewayv1.PathMatchExact
+		pathMatch.Type = &pathType
+		pathMatch.Value = &sm.Exact
+	case sm.Prefix != "":
+		pathType := gatewayv1.PathMatchPathPrefix
+		pathMatch.Type = &pathType
+		pathMatch.Value = &sm.Prefix
+	case sm.Regex != "":
+		pathType := gatewayv1.PathMatchRegularExpression
+		pathMatch.Type = &pathType
+		pathMatch.Value = &sm.Regex
+	}
+	return pathMatch
+}
+
+func convertStringMatchToHeaderMatch(name string, sm *v1alpha1.StringMatch) gatewayv1.HTTPHeaderMatch {
+	headerMatch := gatewayv1.HTTPHeaderMatch{
+		Name: gatewayv1.HTTPHeaderName(name),
+	}
+	switch {
+	case sm.Exact != "":
+		matchType := gatewayv1.HeaderMatchExact
+		headerMatch.Type = &matchType
+		headerMatch.Value = sm.Exact
+	case sm.Regex != "":
+		matchType := gatewayv1.HeaderMatchRegularExpression
+		headerMatch.Type = &matchType
+		headerMatch.Value = sm.Regex
+	case sm.Prefix != "":
+		matchType := gatewayv1.HeaderMatchRegularExpression
+		headerMatch.Type = &matchType
+		headerMatch.Value = sm.Prefix + ".*"
+	}
+	return headerMatch
+}
+
 func (r *RpcPlugin) removeHTTPManagedRoutes(rollout *v1alpha1.Rollout, gatewayAPIConfig *GatewayAPITrafficRouting) pluginTypes.RpcError {
 	ctx := context.TODO()
 	httpRouteClient := r.GatewayAPIClientset.GatewayV1().HTTPRoutes(gatewayAPIConfig.Namespace)
