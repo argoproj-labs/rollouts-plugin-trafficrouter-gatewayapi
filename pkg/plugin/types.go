@@ -56,6 +56,10 @@ type GatewayAPITrafficRouting struct {
 	TCPRouteSelector *metav1.LabelSelector `json:"tcpRouteSelector,omitempty"`
 	// TLSRouteSelector refers to label selector for auto-discovery of TLSRoutes
 	TLSRouteSelector *metav1.LabelSelector `json:"tlsRouteSelector,omitempty"`
+	// MirrorMode controls how setMirrorRoute is applied to the HTTPRoute.
+	// "filter" (default) adds a RequestMirror filter to the existing weighted rule.
+	// "rule" creates a separate managed rule with its own matches and the mirror filter.
+	MirrorMode string `json:"mirrorMode,omitempty"`
 	// DisableInProgressLabel disables the automatic label that marks routes as managed during canary steps
 	DisableInProgressLabel bool `json:"disableInProgressLabel,omitempty"`
 	// InProgressLabelKey overrides the label key used while a canary is running
