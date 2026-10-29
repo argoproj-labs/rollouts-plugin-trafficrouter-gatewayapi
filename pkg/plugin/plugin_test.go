@@ -22,7 +22,9 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	log "github.com/sirupsen/logrus"
+	gatewayAPIClientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 	gwFake "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/fake"
+	gatewayv1client "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned/typed/apis/v1"
 
 	goPlugin "github.com/hashicorp/go-plugin"
 )
@@ -1162,6 +1164,37 @@ func TestSetHTTPHeaderRouteWithExistingMethod(t *testing.T) {
 	}
 }
 
+// capturingHTTPRoutes records the HTTPRoute passed to Update before the fake
+// clientset deep-copies it, so tests can inspect pointer aliasing in the
+// object the plugin actually built.
+type capturingHTTPRoutes struct {
+	gatewayv1client.HTTPRouteInterface
+	updated *gatewayv1.HTTPRoute
+}
+
+func (c *capturingHTTPRoutes) Update(ctx context.Context, route *gatewayv1.HTTPRoute, opts metav1.UpdateOptions) (*gatewayv1.HTTPRoute, error) {
+	c.updated = route
+	return c.HTTPRouteInterface.Update(ctx, route, opts)
+}
+
+type capturingGatewayV1 struct {
+	gatewayv1client.GatewayV1Interface
+	httpRoutes gatewayv1client.HTTPRouteInterface
+}
+
+func (c *capturingGatewayV1) HTTPRoutes(string) gatewayv1client.HTTPRouteInterface {
+	return c.httpRoutes
+}
+
+type capturingGatewayClientset struct {
+	gatewayAPIClientset.Interface
+	gatewayV1 gatewayv1client.GatewayV1Interface
+}
+
+func (c *capturingGatewayClientset) GatewayV1() gatewayv1client.GatewayV1Interface {
+	return c.gatewayV1
+}
+
 // TestSetHTTPHeaderRouteCopiesTimeouts verifies that the managed header rule
 // keeps the source rule's timeouts, so header-routed canary requests are not
 // left without the request/backend timeouts configured on the HTTPRoute.
@@ -1174,9 +1207,19 @@ func TestSetHTTPHeaderRouteCopiesTimeouts(t *testing.T) {
 		BackendRequest: &backendTimeout,
 	}
 
+	fakeClient := gwFake.NewSimpleClientset(httpRoute)
+	capturedRoutes := &capturingHTTPRoutes{
+		HTTPRouteInterface: fakeClient.GatewayV1().HTTPRoutes(mocks.RolloutNamespace),
+	}
 	rpcPluginImp := &RpcPlugin{
-		LogCtx:              utils.SetupLog("text"),
-		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+		LogCtx: utils.SetupLog("text"),
+		GatewayAPIClientset: &capturingGatewayClientset{
+			Interface: fakeClient,
+			gatewayV1: &capturingGatewayV1{
+				GatewayV1Interface: fakeClient.GatewayV1(),
+				httpRoutes:         capturedRoutes,
+			},
+		},
 	}
 
 	headerRouting := v1alpha1.SetHeaderRoute{
@@ -1207,8 +1250,17 @@ func TestSetHTTPHeaderRouteCopiesTimeouts(t *testing.T) {
 	require.NotNil(t, managedTimeouts.BackendRequest)
 	assert.Equal(t, backendTimeout, *managedTimeouts.BackendRequest)
 
-	// The copy must be independent of the source rule.
-	assert.NotSame(t, updatedHTTP.Spec.Rules[0].Timeouts, managedTimeouts)
+	// The copy must be independent of the source rule. Check the object the
+	// plugin passed to Update, because the fake clientset deep-copies it.
+	require.NotNil(t, capturedRoutes.updated)
+	require.Len(t, capturedRoutes.updated.Spec.Rules, 2)
+	sourceTimeouts := capturedRoutes.updated.Spec.Rules[0].Timeouts
+	capturedTimeouts := capturedRoutes.updated.Spec.Rules[1].Timeouts
+	require.NotNil(t, sourceTimeouts)
+	require.NotNil(t, capturedTimeouts)
+	assert.NotSame(t, sourceTimeouts, capturedTimeouts)
+	assert.NotSame(t, sourceTimeouts.Request, capturedTimeouts.Request)
+	assert.NotSame(t, sourceTimeouts.BackendRequest, capturedTimeouts.BackendRequest)
 }
 
 // TestSetHTTPHeaderRouteWithExistingQueryParams verifies that when adding canary header-based
