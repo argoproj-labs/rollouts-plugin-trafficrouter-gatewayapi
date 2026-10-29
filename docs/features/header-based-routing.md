@@ -4,6 +4,9 @@ When you want to isolate the behavior of clients that connect to a canary, you c
 
 An alternative method is to use HTTP headers that distinguish which clients connect to the canary and which do not.
 
+!!! info
+    Header based routing needs Gateway API standard channel v1.4.0+ or experimental channel v1.2.0+ in your cluster.
+
 ## How Header based routing works
 
 By default when Argo Rollouts sends new traffic to canary pods, this happens on the request level and it is completely random.
