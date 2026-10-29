@@ -31,7 +31,7 @@ nav:
 - Contributing: CONTRIBUTING.md
 repo_url: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi
 site_name: Argo Rollouts Gateway API plugin
-site_url: https://argo-rollouts.readthedocs.io/
+site_url: https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/
 theme:
   font:
     text: Work Sans
