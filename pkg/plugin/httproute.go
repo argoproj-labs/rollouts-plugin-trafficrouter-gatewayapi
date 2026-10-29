@@ -145,6 +145,12 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 				}
 			}
 
+			// Copy timeouts from original route so header-routed canary requests
+			// keep the same request/backend timeouts as the source rule.
+			if httpRouteRule.Timeouts != nil {
+				httpHeaderRouteRule.Timeouts = httpRouteRule.Timeouts.DeepCopy()
+			}
+
 			// Copy matches from original route and merge headers
 			if len(httpRouteRule.Matches) == 0 {
 				httpHeaderRouteRule.Matches = []gatewayv1.HTTPRouteMatch{
