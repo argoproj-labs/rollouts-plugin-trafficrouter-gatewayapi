@@ -87,8 +87,6 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			return err
 		}
 
-		canaryServiceKind := gatewayv1.Kind("Service")
-		canaryServiceGroup := gatewayv1.Group("")
 		grpcRouteRuleList := GRPCRouteRuleList(grpcRoute.Spec.Rules)
 		backendRefNameList := []string{string(canaryServiceName), stableServiceName}
 		sourceRules, err := getAllRouteRules(grpcRouteRuleList, backendRefNameList...)
@@ -115,47 +113,26 @@ func (r *RpcPlugin) setGRPCHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			if idx > 0 {
 				ruleName = gatewayv1.SectionName(fmt.Sprintf("%s-%d", managedName, idx))
 			}
-			grpcHeaderRouteRule := gatewayv1.GRPCRouteRule{
-				Name:    &ruleName,
-				Matches: []gatewayv1.GRPCRouteMatch{},
-				Filters: []gatewayv1.GRPCRouteFilter{},
-				BackendRefs: []gatewayv1.GRPCBackendRef{
-					{
-						BackendRef: gatewayv1.BackendRef{
-							BackendObjectReference: gatewayv1.BackendObjectReference{
-								Group: &canaryServiceGroup,
-								Kind:  &canaryServiceKind,
-								Name:  canaryServiceName,
-								Port:  canaryBackendRef.Port,
-							},
-						},
-					},
-				},
-			}
+			// Deep copy the whole source rule so every field (sessionPersistence, filters, ...)
+			// is carried over, including fields added by future Gateway API versions.
+			// Only name, matches and backendRefs differ.
+			grpcHeaderRouteRule := *(*gatewayv1.GRPCRouteRule)(grpcRouteRule).DeepCopy()
+			grpcHeaderRouteRule.Name = &ruleName
 
-			// Copy filters from original route
-			if grpcRouteRule.Filters != nil {
-				for i := 0; i < len(grpcRouteRule.Filters); i++ {
-					grpcHeaderRouteRule.Filters = append(grpcHeaderRouteRule.Filters, *grpcRouteRule.Filters[i].DeepCopy())
-				}
-			}
+			// Send everything to the canary. Weight is cleared because the canary may
+			// currently be at weight 0, which would make a single backendRef serve nothing.
+			headerBackendRef := *(*gatewayv1.GRPCBackendRef)(canaryBackendRef).DeepCopy()
+			headerBackendRef.Weight = nil
+			grpcHeaderRouteRule.BackendRefs = []gatewayv1.GRPCBackendRef{headerBackendRef}
 
-			// Copy matches from original route and merge headers
-			if len(grpcRouteRule.Matches) == 0 {
+			// Keep the original matches and add the canary headers to each of them
+			if len(grpcHeaderRouteRule.Matches) == 0 {
 				grpcHeaderRouteRule.Matches = []gatewayv1.GRPCRouteMatch{
 					{Headers: grpcHeaderRouteRuleList},
 				}
 			} else {
-				for i := range len(grpcRouteRule.Matches) {
-					mergedHeaders := make([]gatewayv1.GRPCHeaderMatch, 0)
-					if grpcRouteRule.Matches[i].Headers != nil {
-						mergedHeaders = append(mergedHeaders, grpcRouteRule.Matches[i].Headers...)
-					}
-					mergedHeaders = append(mergedHeaders, grpcHeaderRouteRuleList...)
-					grpcHeaderRouteRule.Matches = append(grpcHeaderRouteRule.Matches, gatewayv1.GRPCRouteMatch{
-						Method:  grpcRouteRule.Matches[i].Method,
-						Headers: mergedHeaders,
-					})
+				for i := range grpcHeaderRouteRule.Matches {
+					grpcHeaderRouteRule.Matches[i].Headers = append(grpcHeaderRouteRule.Matches[i].Headers, grpcHeaderRouteRuleList...)
 				}
 			}
 
