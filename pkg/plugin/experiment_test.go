@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -296,10 +297,143 @@ func TestExperimentServicePort(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			port, ok := experimentServicePort(&corev1.Service{Spec: corev1.ServiceSpec{Ports: test.ports}})
+			port, ok := experimentServicePort(&corev1.Service{Spec: corev1.ServiceSpec{Ports: test.ports}}, nil)
 
 			assert.Equal(t, test.wantOK, ok)
 			assert.Equal(t, test.wantPort, port)
+		})
+	}
+}
+
+// TestHandleExperimentMatchesStablePortPerRoute covers a service that serves HTTP
+// and gRPC on different ports through two routes. Each route must receive the
+// experiment backend on the port that matches its own stable backend, not the
+// port named "http".
+func TestHandleExperimentMatchesStablePortPerRoute(t *testing.T) {
+	clientset := fake.NewClientset(
+		experimentService("stable-svc",
+			corev1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt32(8080)},
+			corev1.ServicePort{Name: "grpc", Port: 9090, TargetPort: intstr.FromInt32(9090)},
+		),
+		// Ports as Argo Rollouts builds them for an experiment: one per container port.
+		experimentService("exp-svc",
+			corev1.ServicePort{Name: "http", Port: 8080, TargetPort: intstr.FromInt32(8080)},
+			corev1.ServicePort{Name: "grpc", Port: 9090, TargetPort: intstr.FromInt32(9090)},
+		),
+	)
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+
+	tests := []struct {
+		name     string
+		port     gatewayv1.PortNumber
+		expected gatewayv1.PortNumber
+	}{
+		{name: "http route", port: 80, expected: 8080},
+		{name: "grpc route", port: 9090, expected: 9090},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			httpRoute := experimentHTTPRoute(
+				backendRefWithPort("stable-svc", 100, test.port),
+				backendRefWithPort("canary-svc", 0, test.port),
+			)
+
+			err := HandleExperiment(context.Background(), clientset, testLogger(), experimentRollout(100, "active-experiment"), "stable-svc", "canary-svc", httpRoute, destinations)
+
+			require.NoError(t, err)
+			require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
+			experimentRef := httpRoute.Spec.Rules[0].BackendRefs[2]
+			assert.Equal(t, gatewayv1.ObjectName("exp-svc"), experimentRef.Name)
+			assert.Equal(t, test.expected, *experimentRef.Port)
+		})
+	}
+}
+
+// TestHandleExperimentMatchesNamedStableTargetPort covers a stable Service whose
+// targetPort refers to the container port by name.
+func TestHandleExperimentMatchesNamedStableTargetPort(t *testing.T) {
+	clientset := fake.NewClientset(
+		experimentService("stable-svc",
+			corev1.ServicePort{Name: "web", Port: 80, TargetPort: intstr.FromString("http")},
+			corev1.ServicePort{Name: "rpc", Port: 9090, TargetPort: intstr.FromString("grpc")},
+		),
+		experimentService("exp-svc",
+			corev1.ServicePort{Name: "http", Port: 8080},
+			corev1.ServicePort{Name: "grpc", Port: 9000},
+		),
+	)
+	httpRoute := experimentHTTPRoute(
+		backendRefWithPort("stable-svc", 100, 9090),
+		backendRefWithPort("canary-svc", 0, 9090),
+	)
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+
+	err := HandleExperiment(context.Background(), clientset, testLogger(), experimentRollout(100, "active-experiment"), "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
+	assert.Equal(t, gatewayv1.PortNumber(9000), *httpRoute.Spec.Rules[0].BackendRefs[2].Port)
+}
+
+// TestHandleExperimentFallsBackWhenStableServiceIsMissing keeps the previous
+// behaviour when the stable Service cannot be read.
+func TestHandleExperimentFallsBackWhenStableServiceIsMissing(t *testing.T) {
+	clientset := fake.NewClientset(experimentService("exp-svc",
+		corev1.ServicePort{Name: "grpc", Port: 9090},
+		corev1.ServicePort{Name: "http", Port: 8080},
+	))
+	httpRoute := experimentHTTPRoute(
+		backendRefWithPort("stable-svc", 100, 9090),
+		backendRefWithPort("canary-svc", 0, 9090),
+	)
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+
+	err := HandleExperiment(context.Background(), clientset, testLogger(), experimentRollout(100, "active-experiment"), "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
+	assert.Equal(t, gatewayv1.PortNumber(8080), *httpRoute.Spec.Rules[0].BackendRefs[2].Port)
+}
+
+func TestExperimentServicePortFollowsStableTargetPort(t *testing.T) {
+	experimentPorts := []corev1.ServicePort{
+		{Name: "http", Port: 8080},
+		{Name: "grpc", Port: 9090},
+	}
+	tests := []struct {
+		name       string
+		stablePort corev1.ServicePort
+		expected   gatewayv1.PortNumber
+	}{
+		{
+			name:       "numeric target port",
+			stablePort: corev1.ServicePort{Port: 9090, TargetPort: intstr.FromInt32(9090)},
+			expected:   9090,
+		},
+		{
+			name:       "named target port",
+			stablePort: corev1.ServicePort{Port: 9090, TargetPort: intstr.FromString("grpc")},
+			expected:   9090,
+		},
+		{
+			name:       "unset target port defaults to the service port",
+			stablePort: corev1.ServicePort{Port: 9090},
+			expected:   9090,
+		},
+		{
+			name:       "no matching experiment port falls back to http",
+			stablePort: corev1.ServicePort{Port: 7000, TargetPort: intstr.FromInt32(7000)},
+			expected:   8080,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			port, ok := experimentServicePort(&corev1.Service{Spec: corev1.ServiceSpec{Ports: experimentPorts}}, &test.stablePort)
+
+			require.True(t, ok)
+			assert.Equal(t, test.expected, port)
 		})
 	}
 }
