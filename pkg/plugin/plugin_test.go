@@ -2974,3 +2974,183 @@ func TestSetTLSRouteWeightPingPong(t *testing.T) {
 		assert.Equal(t, 100-desiredWeight, *updated.Spec.Rules[0].BackendRefs[1].Weight)
 	})
 }
+
+// TestSetHTTPHeaderRouteCopiesAllSourceRuleFields locks in that the managed header rule is the
+// source rule with only its name, matches and backendRefs changed (issue #242). Comparing the
+// whole rule means any field that stops being copied (timeouts, retry, sessionPersistence, ...)
+// fails this test, instead of surfacing later as a bug report.
+func TestSetHTTPHeaderRouteCopiesAllSourceRuleFields(t *testing.T) {
+	port := gatewayv1.PortNumber(80)
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	canaryNamespace := gatewayv1.Namespace(mocks.RolloutNamespace)
+	sourceRuleName := gatewayv1.SectionName("main")
+	requestTimeout := gatewayv1.Duration("55s")
+	backendTimeout := gatewayv1.Duration("50s")
+	retryAttempts := 3
+	retryBackoff := gatewayv1.Duration("100ms")
+	sessionName := "session"
+	sessionType := gatewayv1.CookieBasedSessionPersistence
+	pathType := gatewayv1.PathMatchPathPrefix
+	pathValue := "/api"
+	method := gatewayv1.HTTPMethodGet
+	headerType := gatewayv1.HeaderMatchExact
+	queryType := gatewayv1.QueryParamMatchExact
+
+	sourceRule := gatewayv1.HTTPRouteRule{
+		Name: &sourceRuleName,
+		Matches: []gatewayv1.HTTPRouteMatch{
+			{
+				Path:        &gatewayv1.HTTPPathMatch{Type: &pathType, Value: &pathValue},
+				Headers:     []gatewayv1.HTTPHeaderMatch{{Type: &headerType, Name: "Host", Value: "example.com"}},
+				QueryParams: []gatewayv1.HTTPQueryParamMatch{{Type: &queryType, Name: "q", Value: "1"}},
+				Method:      &method,
+			},
+		},
+		Filters: []gatewayv1.HTTPRouteFilter{
+			{
+				Type:                  gatewayv1.HTTPRouteFilterRequestHeaderModifier,
+				RequestHeaderModifier: &gatewayv1.HTTPHeaderFilter{Set: []gatewayv1.HTTPHeader{{Name: "X-Rule", Value: "main"}}},
+			},
+		},
+		BackendRefs: []gatewayv1.HTTPBackendRef{
+			{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.StableServiceName, Port: &port}, Weight: &stableWeight}},
+			{
+				// Canary at weight 0: the managed rule must clear it or it would serve nothing.
+				BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.CanaryServiceName, Namespace: &canaryNamespace, Port: &port}, Weight: &canaryWeight},
+				Filters: []gatewayv1.HTTPRouteFilter{
+					{
+						Type:                  gatewayv1.HTTPRouteFilterRequestHeaderModifier,
+						RequestHeaderModifier: &gatewayv1.HTTPHeaderFilter{Set: []gatewayv1.HTTPHeader{{Name: "X-Backend", Value: "canary"}}},
+					},
+				},
+			},
+		},
+		Timeouts:           &gatewayv1.HTTPRouteTimeouts{Request: &requestTimeout, BackendRequest: &backendTimeout},
+		Retry:              &gatewayv1.HTTPRouteRetry{Codes: []gatewayv1.HTTPRouteRetryStatusCode{503}, Attempts: &retryAttempts, Backoff: &retryBackoff},
+		SessionPersistence: &gatewayv1.SessionPersistence{SessionName: &sessionName, Type: &sessionType},
+	}
+	httpRoute := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: mocks.HTTPRouteName, Namespace: mocks.RolloutNamespace},
+		Spec:       gatewayv1.HTTPRouteSpec{Rules: []gatewayv1.HTTPRouteRule{sourceRule}},
+	}
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(httpRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		HTTPRoute: mocks.HTTPRouteName,
+	})
+	exactMatch := v1alpha1.StringMatch{Exact: "true"}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Canary", HeaderValue: &exactMatch},
+		},
+	}
+
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	require.Empty(t, err.Error())
+
+	updatedHTTP, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().HTTPRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.HTTPRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedHTTP.Spec.Rules, 2)
+	assert.Equal(t, sourceRule, updatedHTTP.Spec.Rules[0], "source rule must be left untouched")
+
+	canaryHeaders, rpcErr := getHTTPHeaderRouteRuleList(&headerRouting)
+	require.Empty(t, rpcErr.Error())
+	managedName := gatewayv1.SectionName(mocks.ManagedRouteName)
+	expected := *sourceRule.DeepCopy()
+	expected.Name = &managedName
+	expected.Matches[0].Headers = append(expected.Matches[0].Headers, canaryHeaders...)
+	canaryRef := *sourceRule.BackendRefs[1].DeepCopy()
+	canaryRef.Weight = nil
+	expected.BackendRefs = []gatewayv1.HTTPBackendRef{canaryRef}
+	assert.Equal(t, expected, updatedHTTP.Spec.Rules[1])
+}
+
+// TestSetGRPCHeaderRouteCopiesAllSourceRuleFields is the GRPCRoute counterpart of
+// TestSetHTTPHeaderRouteCopiesAllSourceRuleFields.
+func TestSetGRPCHeaderRouteCopiesAllSourceRuleFields(t *testing.T) {
+	port := gatewayv1.PortNumber(80)
+	stableWeight := int32(100)
+	canaryWeight := int32(0)
+	canaryNamespace := gatewayv1.Namespace(mocks.RolloutNamespace)
+	sourceRuleName := gatewayv1.SectionName("main")
+	sessionName := "session"
+	sessionType := gatewayv1.HeaderBasedSessionPersistence
+	methodMatchType := gatewayv1.GRPCMethodMatchExact
+	service := "svc.Service"
+	methodName := "Method"
+	headerType := gatewayv1.GRPCHeaderMatchExact
+
+	sourceRule := gatewayv1.GRPCRouteRule{
+		Name: &sourceRuleName,
+		Matches: []gatewayv1.GRPCRouteMatch{
+			{
+				Method:  &gatewayv1.GRPCMethodMatch{Type: &methodMatchType, Service: &service, Method: &methodName},
+				Headers: []gatewayv1.GRPCHeaderMatch{{Type: &headerType, Name: "X-Tenant", Value: "a"}},
+			},
+		},
+		Filters: []gatewayv1.GRPCRouteFilter{
+			{
+				Type:                  gatewayv1.GRPCRouteFilterRequestHeaderModifier,
+				RequestHeaderModifier: &gatewayv1.HTTPHeaderFilter{Set: []gatewayv1.HTTPHeader{{Name: "X-Rule", Value: "main"}}},
+			},
+		},
+		BackendRefs: []gatewayv1.GRPCBackendRef{
+			{BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.StableServiceName, Port: &port}, Weight: &stableWeight}},
+			{
+				BackendRef: gatewayv1.BackendRef{BackendObjectReference: gatewayv1.BackendObjectReference{Name: mocks.CanaryServiceName, Namespace: &canaryNamespace, Port: &port}, Weight: &canaryWeight},
+				Filters: []gatewayv1.GRPCRouteFilter{
+					{
+						Type:                  gatewayv1.GRPCRouteFilterRequestHeaderModifier,
+						RequestHeaderModifier: &gatewayv1.HTTPHeaderFilter{Set: []gatewayv1.HTTPHeader{{Name: "X-Backend", Value: "canary"}}},
+					},
+				},
+			},
+		},
+		SessionPersistence: &gatewayv1.SessionPersistence{SessionName: &sessionName, Type: &sessionType},
+	}
+	grpcRoute := &gatewayv1.GRPCRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: mocks.GRPCRouteName, Namespace: mocks.RolloutNamespace},
+		Spec:       gatewayv1.GRPCRouteSpec{Rules: []gatewayv1.GRPCRouteRule{sourceRule}},
+	}
+
+	rpcPluginImp := &RpcPlugin{
+		LogCtx:              utils.SetupLog("text"),
+		GatewayAPIClientset: gwFake.NewSimpleClientset(grpcRoute),
+	}
+	rollout := newRollout(mocks.StableServiceName, mocks.CanaryServiceName, &GatewayAPITrafficRouting{
+		Namespace: mocks.RolloutNamespace,
+		GRPCRoute: mocks.GRPCRouteName,
+	})
+	exactMatch := v1alpha1.StringMatch{Exact: "true"}
+	headerRouting := v1alpha1.SetHeaderRoute{
+		Name: mocks.ManagedRouteName,
+		Match: []v1alpha1.HeaderRoutingMatch{
+			{HeaderName: "X-Canary", HeaderValue: &exactMatch},
+		},
+	}
+
+	err := rpcPluginImp.SetHeaderRoute(rollout, &headerRouting)
+	require.Empty(t, err.Error())
+
+	updatedGRPC, getErr := rpcPluginImp.GatewayAPIClientset.GatewayV1().GRPCRoutes(mocks.RolloutNamespace).Get(context.Background(), mocks.GRPCRouteName, metav1.GetOptions{})
+	require.NoError(t, getErr)
+	require.Len(t, updatedGRPC.Spec.Rules, 2)
+	assert.Equal(t, sourceRule, updatedGRPC.Spec.Rules[0], "source rule must be left untouched")
+
+	canaryHeaders, rpcErr := getGRPCHeaderRouteRuleList(&headerRouting)
+	require.Empty(t, rpcErr.Error())
+	managedName := gatewayv1.SectionName(mocks.ManagedRouteName)
+	expected := *sourceRule.DeepCopy()
+	expected.Name = &managedName
+	expected.Matches[0].Headers = append(expected.Matches[0].Headers, canaryHeaders...)
+	canaryRef := *sourceRule.BackendRefs[1].DeepCopy()
+	canaryRef.Weight = nil
+	expected.BackendRefs = []gatewayv1.GRPCBackendRef{canaryRef}
+	assert.Equal(t, expected, updatedGRPC.Spec.Rules[1])
+}

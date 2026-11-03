@@ -92,8 +92,6 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			return err
 		}
 
-		canaryServiceKind := gatewayv1.Kind("Service")
-		canaryServiceGroup := gatewayv1.Group("")
 		httpRouteRuleList := HTTPRouteRuleList(httpRoute.Spec.Rules)
 		backendRefNameList := []string{string(canaryServiceName), stableServiceName}
 		sourceRules, err := getAllRouteRules(httpRouteRuleList, backendRefNameList...)
@@ -120,49 +118,26 @@ func (r *RpcPlugin) setHTTPHeaderRoute(rollout *v1alpha1.Rollout, headerRouting 
 			if idx > 0 {
 				ruleName = gatewayv1.SectionName(fmt.Sprintf("%s-%d", managedName, idx))
 			}
-			httpHeaderRouteRule := gatewayv1.HTTPRouteRule{
-				Name:    &ruleName,
-				Matches: []gatewayv1.HTTPRouteMatch{},
-				Filters: []gatewayv1.HTTPRouteFilter{},
-				BackendRefs: []gatewayv1.HTTPBackendRef{
-					{
-						BackendRef: gatewayv1.BackendRef{
-							BackendObjectReference: gatewayv1.BackendObjectReference{
-								Group: &canaryServiceGroup,
-								Kind:  &canaryServiceKind,
-								Name:  canaryServiceName,
-								Port:  canaryBackendRef.Port,
-							},
-						},
-					},
-				},
-			}
+			// Deep copy the whole source rule so every field (timeouts, retry,
+			// sessionPersistence, filters, ...) is carried over, including fields added
+			// by future Gateway API versions. Only name, matches and backendRefs differ.
+			httpHeaderRouteRule := *(*gatewayv1.HTTPRouteRule)(httpRouteRule).DeepCopy()
+			httpHeaderRouteRule.Name = &ruleName
 
-			// Copy filters from original route
-			if httpRouteRule.Filters != nil {
-				for i := 0; i < len(httpRouteRule.Filters); i++ {
-					httpHeaderRouteRule.Filters = append(httpHeaderRouteRule.Filters, *httpRouteRule.Filters[i].DeepCopy())
-				}
-			}
+			// Send everything to the canary. Weight is cleared because the canary may
+			// currently be at weight 0, which would make a single backendRef serve nothing.
+			headerBackendRef := *(*gatewayv1.HTTPBackendRef)(canaryBackendRef).DeepCopy()
+			headerBackendRef.Weight = nil
+			httpHeaderRouteRule.BackendRefs = []gatewayv1.HTTPBackendRef{headerBackendRef}
 
-			// Copy matches from original route and merge headers
-			if len(httpRouteRule.Matches) == 0 {
+			// Keep the original matches and add the canary headers to each of them
+			if len(httpHeaderRouteRule.Matches) == 0 {
 				httpHeaderRouteRule.Matches = []gatewayv1.HTTPRouteMatch{
 					{Headers: httpHeaderRouteRuleList},
 				}
 			} else {
-				for i := 0; i < len(httpRouteRule.Matches); i++ {
-					mergedHeaders := make([]gatewayv1.HTTPHeaderMatch, 0)
-					if httpRouteRule.Matches[i].Headers != nil {
-						mergedHeaders = append(mergedHeaders, httpRouteRule.Matches[i].Headers...)
-					}
-					mergedHeaders = append(mergedHeaders, httpHeaderRouteRuleList...)
-					httpHeaderRouteRule.Matches = append(httpHeaderRouteRule.Matches, gatewayv1.HTTPRouteMatch{
-						Path:        httpRouteRule.Matches[i].Path,
-						Headers:     mergedHeaders,
-						QueryParams: httpRouteRule.Matches[i].QueryParams,
-						Method:      httpRouteRule.Matches[i].Method,
-					})
+				for i := range httpHeaderRouteRule.Matches {
+					httpHeaderRouteRule.Matches[i].Headers = append(httpHeaderRouteRule.Matches[i].Headers, httpHeaderRouteRuleList...)
 				}
 			}
 
