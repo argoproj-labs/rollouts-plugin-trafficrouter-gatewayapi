@@ -257,6 +257,8 @@ func TestHandleExperimentErrorsWhenNoWeightedRuleExists(t *testing.T) {
 	assert.Contains(t, err.Error(), "no matching rule found for rollout rollout-test")
 }
 
+// TestExperimentServicePort covers port selection when the rule pins no stable
+// port: the port named "http" is preferred and the first port is used otherwise.
 func TestExperimentServicePort(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -396,6 +398,36 @@ func TestHandleExperimentFallsBackWhenStableServiceIsMissing(t *testing.T) {
 	assert.Equal(t, gatewayv1.PortNumber(8080), *httpRoute.Spec.Rules[0].BackendRefs[2].Port)
 }
 
+// TestHandleExperimentFallsBackWhenStableServiceLacksRoutePort keeps the previous
+// behaviour when the stable Service exists but does not expose the port the
+// rule routes to.
+func TestHandleExperimentFallsBackWhenStableServiceLacksRoutePort(t *testing.T) {
+	clientset := fake.NewClientset(
+		experimentService("stable-svc",
+			corev1.ServicePort{Name: "http", Port: 80, TargetPort: intstr.FromInt32(8080)},
+		),
+		experimentService("exp-svc",
+			corev1.ServicePort{Name: "grpc", Port: 9090},
+			corev1.ServicePort{Name: "http", Port: 8080},
+		),
+	)
+	httpRoute := experimentHTTPRoute(
+		backendRefWithPort("stable-svc", 100, 9090),
+		backendRefWithPort("canary-svc", 0, 9090),
+	)
+	destinations := []v1alpha1.WeightDestination{{ServiceName: "exp-svc", Weight: 10}}
+
+	err := HandleExperiment(context.Background(), clientset, testLogger(), experimentRollout(100, "active-experiment"), "stable-svc", "canary-svc", httpRoute, destinations)
+
+	require.NoError(t, err)
+	require.Len(t, httpRoute.Spec.Rules[0].BackendRefs, 3)
+	assert.Equal(t, gatewayv1.PortNumber(8080), *httpRoute.Spec.Rules[0].BackendRefs[2].Port)
+}
+
+// TestExperimentServicePortFollowsStableTargetPort covers port selection when the
+// stable port is known: its targetPort picks the experiment port by number, by
+// name, or by the stable port number when targetPort is unset, and the "http"
+// preference still applies when nothing matches.
 func TestExperimentServicePortFollowsStableTargetPort(t *testing.T) {
 	experimentPorts := []corev1.ServicePort{
 		{Name: "http", Port: 8080},
