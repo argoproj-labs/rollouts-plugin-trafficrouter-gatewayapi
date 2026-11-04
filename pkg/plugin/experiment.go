@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -71,11 +72,19 @@ func ownedExperimentServices(rollout *v1alpha1.Rollout) map[string]bool {
 func addExperimentBackends(ctx context.Context, clientset kubernetes.Interface, logger *logrus.Entry, rollout *v1alpha1.Rollout, rule *HTTPRouteRule, stableService string, canaryService string, additionalDestinations []v1alpha1.WeightDestination) {
 	setBackendWeight(rule, stableService, stableWeightForExperiment(logger, rollout, rule, canaryService, additionalDestinations))
 
+	// Resolved lazily so a rule whose experiment backends already exist never
+	// needs the stable Service.
+	var stablePort *corev1.ServicePort
+	stablePortResolved := false
 	for _, dest := range additionalDestinations {
 		if findBackendRef(rule, dest.ServiceName) != nil {
 			continue
 		}
-		backendRef, ok := experimentBackendRef(ctx, clientset, logger, rollout.Namespace, dest)
+		if !stablePortResolved {
+			stablePort = stableServicePort(ctx, clientset, logger, rollout.Namespace, rule, stableService)
+			stablePortResolved = true
+		}
+		backendRef, ok := experimentBackendRef(ctx, clientset, logger, rollout.Namespace, dest, stablePort)
 		if !ok {
 			continue
 		}
@@ -144,14 +153,14 @@ func hasOwnedBackend(rule *HTTPRouteRule, ownedServices map[string]bool) bool {
 
 // experimentBackendRef builds the backendRef for an experiment destination, or
 // reports false if the service cannot be resolved.
-func experimentBackendRef(ctx context.Context, clientset kubernetes.Interface, logger *logrus.Entry, namespace string, dest v1alpha1.WeightDestination) (gatewayv1.HTTPBackendRef, bool) {
+func experimentBackendRef(ctx context.Context, clientset kubernetes.Interface, logger *logrus.Entry, namespace string, dest v1alpha1.WeightDestination, stablePort *corev1.ServicePort) (gatewayv1.HTTPBackendRef, bool) {
 	service, err := clientset.CoreV1().Services(namespace).Get(ctx, dest.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		logger.Warnf("Failed to get service %s: %v", dest.ServiceName, err)
 		return gatewayv1.HTTPBackendRef{}, false
 	}
 
-	port, ok := experimentServicePort(service)
+	port, ok := experimentServicePort(service, stablePort)
 	if !ok {
 		logger.Warnf("Service %s exposes no ports, skipping experiment backendRef", dest.ServiceName)
 		return gatewayv1.HTTPBackendRef{}, false
@@ -171,9 +180,45 @@ func experimentBackendRef(ctx context.Context, clientset kubernetes.Interface, l
 	}, true
 }
 
-// experimentServicePort prefers the port named "http" and falls back to the
-// service's first port.
-func experimentServicePort(service *corev1.Service) (gatewayv1.PortNumber, bool) {
+// stableServicePort returns the stable Service port that this rule routes to,
+// or nil when the rule does not pin a port on the stable backend or the stable
+// Service cannot be read.
+func stableServicePort(ctx context.Context, clientset kubernetes.Interface, logger *logrus.Entry, namespace string, rule *HTTPRouteRule, stableService string) *corev1.ServicePort {
+	stableRef := findBackendRef(rule, stableService)
+	if stableRef == nil || stableRef.Port == nil {
+		return nil
+	}
+	service, err := clientset.CoreV1().Services(namespace).Get(ctx, stableService, metav1.GetOptions{})
+	if err != nil {
+		logger.Warnf("Failed to get stable service %s, using the default experiment port: %v", stableService, err)
+		return nil
+	}
+	for i := range service.Spec.Ports {
+		if service.Spec.Ports[i].Port == *stableRef.Port {
+			return &service.Spec.Ports[i]
+		}
+	}
+	return nil
+}
+
+// experimentServicePort picks the port of the experiment Service that serves the
+// same container port as the stable backend of the rule being updated.
+//
+// Argo Rollouts creates an experiment Service from the pod's container ports, so
+// each of its ports carries the container port number and name. The stable
+// Service's targetPort refers to that same container port, by number or by name,
+// which makes it the correct link between the two. Without it, a route on a
+// second port (for example gRPC on 9090 next to HTTP on 80) would get the
+// experiment backend on the wrong port.
+//
+// When the rule pins no stable port, the port named "http" is preferred and the
+// first port is used otherwise.
+func experimentServicePort(service *corev1.Service, stablePort *corev1.ServicePort) (gatewayv1.PortNumber, bool) {
+	if stablePort != nil {
+		if port, ok := portForTarget(service, stablePort); ok {
+			return port, true
+		}
+	}
 	for _, servicePort := range service.Spec.Ports {
 		if servicePort.Name == experimentPortName {
 			return servicePort.Port, true
@@ -181,6 +226,30 @@ func experimentServicePort(service *corev1.Service) (gatewayv1.PortNumber, bool)
 	}
 	if len(service.Spec.Ports) > 0 {
 		return service.Spec.Ports[0].Port, true
+	}
+	return 0, false
+}
+
+// portForTarget returns the experiment Service port that matches the stable
+// port's targetPort. An unset targetPort defaults to the stable port number, as
+// it does in Kubernetes.
+func portForTarget(service *corev1.Service, stablePort *corev1.ServicePort) (gatewayv1.PortNumber, bool) {
+	target := stablePort.TargetPort
+	for _, servicePort := range service.Spec.Ports {
+		switch {
+		case target.Type == intstr.String && target.StrVal != "":
+			if servicePort.Name == target.StrVal {
+				return servicePort.Port, true
+			}
+		case target.IntVal != 0:
+			if servicePort.Port == target.IntVal {
+				return servicePort.Port, true
+			}
+		default:
+			if servicePort.Port == stablePort.Port {
+				return servicePort.Port, true
+			}
+		}
 	}
 	return 0, false
 }
