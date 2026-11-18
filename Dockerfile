@@ -9,7 +9,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags "-s -w" -o rollouts-plugin-trafficrouter-gatewayapi .
 
-FROM alpine:3.19.0
+FROM alpine:3.24
 
 ARG TARGETARCH
 
