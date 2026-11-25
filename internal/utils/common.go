@@ -61,13 +61,18 @@ func (f *hcLogJSONFormatter) Format(entry *log.Entry) ([]byte, error) {
 	}
 
 	const levelKey = "@level"
-	var raw map[string]any
+	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return b, nil
 	}
 
-	lvl, ok := raw[levelKey].(string)
+	levelRaw, ok := raw[levelKey]
 	if !ok {
+		return b, nil
+	}
+
+	var lvl string
+	if err := json.Unmarshal(levelRaw, &lvl); err != nil {
 		return b, nil
 	}
 
@@ -76,7 +81,12 @@ func (f *hcLogJSONFormatter) Format(entry *log.Entry) ([]byte, error) {
 		return b, nil
 	}
 
-	raw[levelKey] = normalized
+	normalizedLevel, err := json.Marshal(normalized)
+	if err != nil {
+		return b, nil
+	}
+	raw[levelKey] = normalizedLevel
+
 	out, err := json.Marshal(raw)
 	if err != nil {
 		return b, nil

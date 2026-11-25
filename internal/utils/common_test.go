@@ -60,6 +60,21 @@ func TestSetupLog_JSONUsesHCLogKeys(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSetupLog_JSONNormalizesWarningPreservesLargeInteger(t *testing.T) {
+	logger := log.New()
+	logger.SetFormatter(newHCLogJSONFormatter())
+	buf := &bytes.Buffer{}
+	logger.SetOutput(buf)
+
+	const largeInt = int64(9007199254740993)
+	logger.WithField("large_id", largeInt).Warn("warn message")
+
+	line := bytes.TrimSpace(buf.Bytes())
+	assert.Contains(t, string(line), `"@level":"warn"`)
+	assert.Contains(t, string(line), "9007199254740993")
+	assert.NotContains(t, string(line), "9007199254740992")
+}
+
 func TestSetupLog_JSONNormalizesWarningLevel(t *testing.T) {
 	logger := log.New()
 	logger.SetFormatter(newHCLogJSONFormatter())
