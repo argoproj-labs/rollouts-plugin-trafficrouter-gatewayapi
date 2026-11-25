@@ -162,7 +162,7 @@ If you want to further fine-tune permissions:
 
 ### Log format
 
-By default the plugin logs in text format. To switch to JSON (useful when your log aggregation stack expects structured logs), pass `--logformat=json`:
+By default the plugin logs in text format. To switch to JSON (useful when your log aggregation stack expects structured logs), pass `--logformat=json`. JSON output uses hclog-compatible field names (`@level`, `@message`, `@timestamp`) so the Argo Rollouts controller can relay plugin stderr through go-plugin at the correct level when the controller is also using JSON logging.
 
 ```yaml
   trafficRouterPlugins: |-
